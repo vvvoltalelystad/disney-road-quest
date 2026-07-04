@@ -38,7 +38,7 @@ const STAGES = [
 
 export default function App() {
   // App navigation state
-  const [screen, setScreen] = useState('home'); // 'home', 'setup', 'lobby', 'game', 'scores', 'scorelog', 'end', 'manage', 'versioninfo', 'gamehistory'
+  const [screen, setScreen] = useState('portal'); // 'portal', 'home', 'setup', 'lobby', 'game', 'scores', 'scorelog', 'end', 'manage', 'versioninfo', 'gamehistory'
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
 
@@ -122,7 +122,7 @@ export default function App() {
     setPlayers([]);
     setScoreHistory([]);
     setLocalPlayer(null);
-    setScreen('home');
+    setScreen('portal');
   };
 
   // 2. Realtime subscription to the active room
@@ -721,10 +721,86 @@ export default function App() {
 
       {!loading && (
         <>
+          {/* SCREEN: PORTAL */}
+          {screen === 'portal' && (
+            <div>
+              <div className="topbar">
+                <h1 style={{ textAlign: 'center', width: '100%', margin: 0 }}>🏰 Disney Game Portal</h1>
+              </div>
+              <section className="card hero">
+                <div className="badge">Reisspellen naar Parijs ✨</div>
+                <div className="bigicon">🚗🎶🪄</div>
+                <h1>Kies een Game</h1>
+                <p>Selecteer een spel voor in de auto. Iedereen speelt op zijn eigen telefoon!</p>
+
+                <div className="btnrow stack" style={{ marginTop: '20px', gap: '16px' }}>
+                  {/* Game 1: Disney Road Quest */}
+                  <button 
+                    className="modecard" 
+                    style={{ 
+                      display: 'flex', 
+                      alignItems: 'center', 
+                      width: '100%', 
+                      textAlign: 'left', 
+                      padding: '16px', 
+                      background: 'rgba(255, 255, 255, 0.05)',
+                      border: '1px solid rgba(255, 255, 255, 0.1)',
+                      borderRadius: '12px',
+                      cursor: 'pointer'
+                    }}
+                    onClick={() => setScreen('home')}
+                  >
+                    <span style={{ fontSize: '32px', marginRight: '16px' }}>🚗</span>
+                    <span style={{ display: 'flex', flexDirection: 'column', flex: 1 }}>
+                      <strong style={{ fontSize: '18px', color: 'var(--gold)' }}>Disney Road Quest</strong>
+                      <small style={{ opacity: 0.8, fontSize: '12px', marginTop: '4px' }}>
+                        De ultieme roadtrip game met quizzen, dilemma's en gezamenlijke opdrachten.
+                      </small>
+                    </span>
+                  </button>
+
+                  {/* Game 2: Disney Music Quiz */}
+                  <a 
+                    href="./music/index.html"
+                    className="modecard" 
+                    style={{ 
+                      display: 'flex', 
+                      alignItems: 'center', 
+                      width: '100%', 
+                      textAlign: 'left', 
+                      padding: '16px', 
+                      background: 'rgba(255, 255, 255, 0.05)',
+                      border: '1px solid rgba(255, 255, 255, 0.1)',
+                      borderRadius: '12px',
+                      cursor: 'pointer',
+                      textDecoration: 'none',
+                      color: 'inherit'
+                    }}
+                  >
+                    <span style={{ fontSize: '32px', marginRight: '16px' }}>🎵</span>
+                    <span style={{ display: 'flex', flexDirection: 'column', flex: 1 }}>
+                      <strong style={{ fontSize: '18px', color: '#74d7ff' }}>Disney Music Quiz</strong>
+                      <small style={{ opacity: 0.8, fontSize: '12px', marginTop: '4px' }}>
+                        Multiplayer muziekquiz. Scan Hitster-kaarten via Spotify en raad film en jaar.
+                      </small>
+                    </span>
+                  </a>
+                </div>
+              </section>
+
+              <section className="card">
+                <h2 className="sectiontitle">Over de games</h2>
+                <div className="notice">
+                  Beide spellen maken gebruik van dezelfde database op Supabase, maar werken apart. Veel plezier met de voorpret en tijdens de autorit!
+                </div>
+              </section>
+            </div>
+          )}
+
           {/* SCREEN: HOME */}
           {screen === 'home' && (
             <div>
-              {renderAppHeader()}
+              {renderAppHeader("Disney Road Quest", () => setScreen('portal'))}
               <section className="card hero">
                 <div className="badge">Multiplayer Edition · Real-time</div>
                 <div className="bigicon">✨🏰✨</div>

@@ -1,0 +1,27 @@
+DISNEY MUSIC QUEST v2.4 – VOLLEDIG NETLIFY-PAKKET
+
+Dit is de complete actuele map. Upload de INHOUD van deze map als één nieuwe deploy naar Netlify.
+
+BELANGRIJK VOOR config.js
+- De juiste Supabase Project URL staat al ingevuld.
+- Vul vóór uploaden alleen nog jouw huidige publieke Supabase publishable/anon key in.
+- Gebruik nooit de service_role- of secret key.
+
+Bestand dat je moet aanpassen:
+  config.js
+
+Vervang:
+  PLAK_HIER_JE_HUIDIGE_PUBLIEKE_SUPABASE_SLEUTEL
+
+met jouw bestaande publieke sleutel.
+
+Daarna:
+1. Sla config.js op.
+2. Upload deze volledige map naar Netlify via Deploys > Deploy manually.
+3. Open https://disneymusicquest.netlify.app/?v=24
+4. Maak voor de test een nieuwe kamer.
+
+De actuele databasecorrecties staan ook in:
+  supabase_hotfix_actueel.sql
+
+Die hoef je niet opnieuw uit te voeren als kamer maken en deelnemen al werken.

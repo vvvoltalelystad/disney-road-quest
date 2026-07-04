@@ -1,0 +1,19 @@
+DISNEY MUSIC QUEST v2.5 — KLEUR- EN AVATARFIX
+
+Deze versie voorkomt dat een tweede speler een reeds gekozen kleur of avatar nog als vrije optie ziet.
+
+INSTALLATIE
+
+1. Open Supabase → SQL Editor → New query.
+2. Plak de volledige inhoud van supabase_hotfix_v2_5.sql.
+3. Klik op Run.
+4. Open config.js in deze map.
+5. Vul dezelfde publieke Supabase-sleutel in als in je huidige werkende versie.
+6. Upload de volledige uitgepakte map opnieuw naar Netlify.
+7. Maak daarna een nieuwe kamer.
+8. Scan de nieuwe QR-code met twee verschillende telefoons.
+
+De QR-code gebruikt nu expliciet ?join=KAMERCODE.
+Bij het openen én na iedere kleur-/avatarkeuze haalt de app de bezette keuzes opnieuw op.
+
+De database blokkeert daarnaast nog steeds dubbele kleuren en avatars, ook als twee spelers vrijwel gelijktijdig kiezen.

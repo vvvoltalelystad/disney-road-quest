@@ -1,0 +1,26 @@
+DISNEY MUSIC QUEST v2.9 — START- EN BEHEERHERSTEL
+
+Deze versie herstelt:
+- fout 'shuffle is not defined';
+- speler wijzigen;
+- speler verwijderen;
+- nieuwe kamercode maken;
+- kamer herstellen;
+- Supabase schema-cache verversen.
+
+STAP 1 — SUPABASE
+1. Open Supabase → SQL Editor → New query.
+2. Open supabase_hotfix_v2_9.sql.
+3. Plak de volledige inhoud in Supabase.
+4. Klik Run.
+5. Onderaan moeten vier dmq_host_-functies zichtbaar zijn.
+
+STAP 2 — LOKAAL TESTEN
+1. Gebruik de volledige v2.9-map.
+2. Vul config.js met je werkende publieke Supabase-sleutel.
+3. Kopieer de PowerShell-testserverbestanden in deze map.
+4. Start START_LOCAL_TESTSERVER.bat.
+5. Open http://localhost:8080/?v=29.
+6. Druk eventueel Ctrl+F5.
+
+Je hoeft tijdens het testen niets naar Netlify te uploaden.

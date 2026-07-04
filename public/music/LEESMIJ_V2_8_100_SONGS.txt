@@ -1,0 +1,27 @@
+DISNEY MUSIC QUEST v2.8 — 100 ACTIEVE SPOTIFY-SONGS
+
+Deze versie bevat een SQL-bestand waarmee je 100 Disney-songs in één keer activeert.
+
+INSTALLATIE
+
+1. Open Supabase → SQL Editor → New query.
+2. Open `supabase_songs_100_spotify.sql`.
+3. Kopieer de volledige inhoud naar Supabase.
+4. Klik op Run.
+5. Onderaan hoort `actieve_songs = 100` te staan.
+6. Vernieuw daarna de lokale webapp met Ctrl+F5.
+
+HOE DE QR-CODES WERKEN
+
+De app maakt per song automatisch een gewone QR-code van de opgeslagen Spotify-link.
+De QR-code opent een zeer specifieke Spotify-zoekopdracht met:
+- titel;
+- uitvoerder;
+- film;
+- Disney.
+
+Omdat er geen Spotify-API wordt gebruikt, opent Spotify soms eerst een zoekresultatenpagina.
+Kies dan het bovenste juiste resultaat.
+
+De 100 songs zijn direct als actief gemarkeerd.
+Je hoeft hiervoor niets naar Netlify te uploaden wanneer je lokaal test.
