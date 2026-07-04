@@ -388,7 +388,16 @@ async function shareRoom(){
       await navigator.share(shareData);
     }else{
       await navigator.clipboard.writeText(url);
-      toast('Deellink gekopieerd!');function showPowersInfo(){
+      toast('Deellink gekopieerd!');
+    }
+  }catch(e){
+    if(e.name!=='AbortError'){
+      try{await navigator.clipboard.writeText(url);toast('Deellink gekopieerd!');}catch(err){toast('Kopiëren mislukt.');}
+    }
+  }
+}
+
+function showPowersInfo(){
   let modal=document.createElement('div');
   modal.id='powersModal';
   modal.className='modal-overlay';
