@@ -14,7 +14,7 @@ function app(){return document.getElementById('app')}
 function toast(m){const e=document.getElementById('toast');e.textContent=m;e.classList.add('show');clearTimeout(e._t);e._t=setTimeout(()=>e.classList.remove('show'),2600)}
 function loading(m='Even laden…'){app().innerHTML=`<section class="card hero"><div class="spinner"></div><p>${esc(m)}</p></section>`}
 function fatal(m,e){console.error(e);app().innerHTML=`<section class="card"><h2>Er ging iets mis</h2><p>${esc(m)}</p><div class="notice red">${esc(e?.message||e)}</div><button class="btn primary full" onclick="location.reload()">Opnieuw</button></section>`}
-function topbar(t,b=''){return `<div class="topbar">${b?`<button class="iconbtn" onclick="${b}">←</button>`:'<span></span>'}<h1>${esc(t)}</h1><button class="iconbtn" onclick="refreshAll()">↻</button></div>`}
+function topbar(t,b=''){const action=b||(state.room?'leaveRoom()':'');return `<div class="topbar">${action?`<button class="iconbtn" onclick="${action}">←</button>`:'<span></span>'}<h1>${esc(t)}</h1><button class="iconbtn" onclick="refreshAll()">↻</button></div>`}
 function C(id){const x=COLORS.find(v=>v[0]===id)||COLORS[0];return{id:x[0],name:x[1],hex:x[2]}}
 function A(id){const x=AVATARS.find(v=>v[0]===id)||AVATARS[0];return{id:x[0],name:x[1],icon:x[2],power:x[3]}}
 function online(p){return Object.values(state.presence||{}).flat().some(x=>x.user_id===p.user_id)}
@@ -98,14 +98,7 @@ async function loadJoinChoices(code){
 }
 
 
-function leaveRoom(){
-  cleanup();
-  state.room=null;state.players=[];state.me=null;state.round=null;state.answers=[];state.presence={};
-  state.manageOpen=false;state.startError='';
-  localStorage.removeItem('dmq-v2-room');
-  history.replaceState(null,'',location.pathname+'?v=27');
-  state.view='home';render();
-}
+function leaveRoom(){if(state.room&&state.room.status==='playing'){if(!confirm('Weet je zeker dat je het actieve spel wilt verlaten?'))return}cleanup();state.room=null;state.players=[];state.me=null;state.round=null;state.answers=[];state.presence={};state.manageOpen=false;state.startError='';state.view='home';localStorage.removeItem('dmq-v2-room');history.replaceState(null,'',location.pathname+'?v=31');render()}
 function openSongAdminFromLobby(){
   const url=`${location.origin}${location.pathname}?admin=1&v=29`;
   const w=window.open(url,'_blank');
