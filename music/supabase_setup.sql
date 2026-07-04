@@ -357,6 +357,10 @@ drop policy if exists "players_own_update" on dmq_players;
 create policy "players_own_update" on dmq_players for update to authenticated
 using(user_id=auth.uid()) with check(user_id=auth.uid());
 
+drop policy if exists "players_delete_own_or_host" on dmq_players;
+create policy "players_delete_own_or_host" on dmq_players for delete to authenticated
+using(user_id=auth.uid() or exists(select 1 from dmq_rooms r where r.id=room_id and r.host_user_id=auth.uid()));
+
 drop policy if exists "rounds_select" on dmq_rounds;
 create policy "rounds_select" on dmq_rounds for select to authenticated using(
   dmq_is_room_member(room_id)
@@ -387,7 +391,7 @@ drop policy if exists "songs_select" on dmq_songs;
 create policy "songs_select" on dmq_songs for select to authenticated using(true);
 
 grant select,update on dmq_rooms to authenticated;
-grant select,update on dmq_players to authenticated;
+grant select,update,delete on dmq_players to authenticated;
 grant select,insert,update on dmq_rounds to authenticated;
 grant select,insert,update on dmq_answers to authenticated;
 grant select on dmq_songs to authenticated;
