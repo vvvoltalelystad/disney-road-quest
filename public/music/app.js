@@ -2,9 +2,9 @@
 "use strict";
 const cfg=window.DMQ_CONFIG||{};
 const COLORS=[['blue','Blauw','#74d7ff'],['green','Groen','#69e58d'],['yellow','Geel','#ffe45f'],['pink','Roze','#ff7ac8'],['purple','Paars','#bb86ff']];
-const AVATARS=[['hyperspace','Hyperspace Mountain','🚀','hyperdrive'],['big_thunder','Big Thunder Mountain','🚂','wild_ride'],['phantom','Phantom Manor','👻','ghost_whisper'],['pirates','Pirates of the Caribbean','🏴‍☠️','hidden_treasure'],['tower','Tower of Terror','🏨','second_drop']];
+const AVATARS=[['hyperspace','Hyperspace Mountain','🚀','hyperdrive'],['big_thunder','Big Thunder Mountain','🚂','wild_ride'],['phantom','Phantom Manor','👻','ghost_whisper'],['pirates','Pirates of the Caribbean','🏴‍☠️','hidden_treasure'],['tower','Tower of Terror','🏨','second_drop'],['star_tours','Star Tours','🛸','lightspeed'],['small_world','"it\'s a small world"','🌍','small_world']];
 const DEFAULT_SETTINGS={streaks:true,powers:true,quick_guess:false,jackpot:false,stat_titles:true,final_bet:false,animations:true,leader_mode:'rotating',fixed_leader_player_id:null};
-const state={sb:null,user:null,room:null,players:[],me:null,round:null,answers:[],songs:[],presence:{},channel:null,poll:null,view:'home',joinCode:'',joinName:'',joinColor:null,joinAvatar:null,adminPin:'',adminSelectedSong:1,refreshing:false,timer:null,startError:'',manageOpen:false,lobbySettings:{roundCount:10,gameMode:'mix',leaderMode:'rotating',fixedLeader:null,streaks:true,powers:true,quick_guess:false,jackpot:false,stat_titles:true,final_bet:false,animations:true},currentAnswer:{film:'',title:'',year:'',text:'',artist:''},timerSeconds:0,timerRoundId:null,timerPhase:null};
+const state={sb:null,user:null,room:null,players:[],me:null,round:null,answers:[],songs:[],presence:{},channel:null,poll:null,view:'home',joinCode:'',joinName:'',joinColor:null,joinAvatar:null,adminPin:'',adminSelectedSong:1,refreshing:false,timer:null,startError:'',manageOpen:false,lobbySettings:{roundCount:10,gameMode:'mix',leaderMode:'rotating',fixedLeader:null,streaks:true,powers:true,quick_guess:false,jackpot:false,stat_titles:true,final_bet:false,animations:true},currentAnswer:{film:'',title:'',year:'',text:'',artist:''},timerSeconds:0,timerRoundId:null,timerPhase:null,lastShownPower:null,answerPhaseStartedAt:null};
 document.addEventListener('DOMContentLoaded',init);window.addEventListener('beforeunload',cleanup);
 async function init(){document.addEventListener('focusout',e=>{if(['INPUT','TEXTAREA','SELECT'].includes(e.target.tagName))window.scrollTo(0,window.scrollY)});if('serviceWorker'in navigator){navigator.serviceWorker.getRegistrations().then(rs=>rs.forEach(r=>r.unregister())).catch(()=>{});if('caches'in window)caches.keys().then(ks=>ks.forEach(k=>caches.delete(k))).catch(()=>{})}if(!configured()){setupScreen();return}try{state.sb=window.supabase.createClient(cfg.SUPABASE_URL,cfg.SUPABASE_ANON_KEY,{auth:{persistSession:true,autoRefreshToken:true}});let{data:{session}}=await state.sb.auth.getSession();if(!session){let r=await state.sb.auth.signInAnonymously();if(r.error)throw r.error;session=r.data.session}state.user=session.user;await fetchSongs();const params=new URLSearchParams(location.search);if(params.get('admin')==='1'){state.room=null;state.players=[];state.me=null;state.view='admin';render();return}const join=(params.get('join')||'').toUpperCase();const hostCode=(params.get('host')||'').toUpperCase();const legacy=(params.get('room')||'').toUpperCase();if(join){localStorage.removeItem('dmq-v2-room');state.room=null;state.me=null;state.joinCode=join;state.view='join';await loadJoinChoices(join);render();return}const q=hostCode||legacy;if(q){let roomResult=await state.sb.from('dmq_rooms').select('id,code,host_user_id,status').eq('code',q).maybeSingle();if(roomResult.data){let isHost=roomResult.data.host_user_id===state.user.id;let membership=await state.sb.from('dmq_players').select('id').eq('room_id',roomResult.data.id).eq('user_id',state.user.id).maybeSingle();if(isHost||membership.data){if(await loadRoom(roomResult.data.id,false))return}}state.joinCode=q;state.view='join';await loadJoinChoices(q);render();return}const saved=localStorage.getItem('dmq-v2-room');if(saved&&await loadRoom(saved,false))return;render()}catch(e){fatal('Verbinden mislukt.',e)}}
 function configured(){return cfg.SUPABASE_URL&&cfg.SUPABASE_ANON_KEY&&!cfg.SUPABASE_URL.includes('VUL_HIER')&&!cfg.SUPABASE_ANON_KEY.includes('VUL_HIER')}
@@ -41,9 +41,9 @@ function scorebar(){return `<div class="scorebar">${state.players.map(p=>`<div c
 function progress(){if(!state.room?.total_rounds)return'';let n=state.room.current_round_no||0,t=state.room.total_rounds;return `<div class="progress"><i style="width:${Math.min(100,n/t*100)}%"></i></div><p class="small" style="text-align:center;margin:6px 0 12px">Ronde ${n} van ${t}</p>`}
 async function fetchSongs(){let r=await state.sb.from('dmq_songs').select('*').order('song_number');if(r.error)throw r.error;state.songs=r.data||[]}
 async function loadRoom(id,show=true){try{if(show)loading('Kamer openen…');let r=await state.sb.from('dmq_rooms').select('*').eq('id',id).single();if(r.error)return false;let p=await state.sb.from('dmq_players').select('*').eq('room_id',id).order('joined_at');if(p.error)throw p.error;const players=p.data||[];const me=players.find(x=>x.user_id===state.user.id)||null;const isHost=r.data.host_user_id===state.user.id;if(!isHost&&!me){localStorage.removeItem('dmq-v2-room');return false}state.room=r.data;state.players=players;state.me=me;localStorage.setItem('dmq-v2-room',id);await fetchRound();subscribe();render();return true}catch(e){console.error(e);return false}}
-async function fetchRound(){if(!state.room?.current_round_no)return;let r=await state.sb.from('dmq_rounds').select('*').eq('room_id',state.room.id).eq('round_no',state.room.current_round_no).maybeSingle();if(r.error)throw r.error;if(r.data && (!state.round || state.round.id !== r.data.id)){state.currentAnswer={film:'',title:'',year:'',text:'',artist:''}}state.round=r.data;if(r.data){let a=await state.sb.from('dmq_answers').select('*').eq('round_id',r.data.id);if(a.error)throw a.error;state.answers=a.data||[]}}
+async function fetchRound(){if(!state.room?.current_round_no)return;let r=await state.sb.from('dmq_rounds').select('*').eq('room_id',state.room.id).eq('round_no',state.room.current_round_no).maybeSingle();if(r.error)throw r.error;if(r.data && (!state.round || state.round.id !== r.data.id)){state.currentAnswer={film:'',title:'',year:'',text:'',artist:''};state.answerPhaseStartedAt=null}state.round=r.data;if(r.data){let a=await state.sb.from('dmq_answers').select('*').eq('round_id',r.data.id);if(a.error)throw a.error;state.answers=a.data||[]}}
 let rt=null;function schedule(){clearTimeout(rt);rt=setTimeout(refreshAll,130)}
-async function refreshAll(){if(state.refreshing||!state.room)return;state.refreshing=true;try{let r=await state.sb.from('dmq_rooms').select('*').eq('id',state.room.id).single();let p=await state.sb.from('dmq_players').select('*').eq('room_id',state.room.id).order('joined_at');if(r.data)state.room=r.data;if(p.data){state.players=p.data;state.me=p.data.find(x=>x.user_id===state.user.id)||state.me}await fetchRound();render()}finally{state.refreshing=false}}
+async function refreshAll(){if(state.refreshing||!state.room)return;state.refreshing=true;try{let r=await state.sb.from('dmq_rooms').select('*').eq('id',state.room.id).single();let p=await state.sb.from('dmq_players').select('*').eq('room_id',state.room.id).order('joined_at');if(r.data)state.room=r.data;if(p.data){state.players=p.data;state.me=p.data.find(x=>x.user_id===state.user.id)||state.me}await fetchRound();if(state.round?.active_power && state.lastShownPower !== state.round.active_power){const activator=state.players.find(pl=>pl.id===state.round.power_used_by_player_id)?.name||'Iemand';playPowerTakeover(state.round.active_power,activator);state.lastShownPower=state.round.active_power}else if(!state.round?.active_power){state.lastShownPower=null}render()}finally{state.refreshing=false}}
 function subscribe(){cleanup();state.channel=state.sb.channel('dmq2-'+state.room.id,{config:{presence:{key:state.user.id}}}).on('presence',{event:'sync'},()=>{state.presence=state.channel.presenceState();render()}).on('postgres_changes',{event:'*',schema:'public',table:'dmq_rooms',filter:`id=eq.${state.room.id}`},schedule).on('postgres_changes',{event:'*',schema:'public',table:'dmq_players',filter:`room_id=eq.${state.room.id}`},schedule).on('postgres_changes',{event:'*',schema:'public',table:'dmq_rounds',filter:`room_id=eq.${state.room.id}`},schedule).on('postgres_changes',{event:'*',schema:'public',table:'dmq_answers',filter:`room_id=eq.${state.room.id}`},schedule).subscribe(async s=>{if(s==='SUBSCRIBED')await state.channel.track({user_id:state.user.id,name:state.me?.name||'organisator'})});state.poll=setInterval(refreshAll,4500)}
 function cleanup(){if(state.poll)clearInterval(state.poll);state.poll=null;if(state.channel&&state.sb)state.sb.removeChannel(state.channel).catch(()=>{});state.channel=null}
 function render(){
@@ -121,7 +121,7 @@ if(state.joinAvatar&&state.players.some(p=>p.avatar_id===state.joinAvatar))state
 app().innerHTML=`${topbar('Deelnemen',"state.view='home';render()")}
 <section class="card"><div class="field"><label>Kamercode</label><input id="joinCode" value="${esc(state.joinCode)}"></div><div class="field"><label>Jouw naam</label><input id="joinName" maxlength="18" value="${esc(state.joinName)}"></div></section>
 <section class="card"><h2>Kies een kleur</h2><div class="choicegrid">${COLORS.map(x=>{let taken=state.players.some(p=>p.color_id===x[0]);return `<button class="colorchoice ${state.joinColor===x[0]?'selected':''} ${taken?'taken':''}" style="--choice:${x[2]}" ${taken?'disabled':''} onclick="chooseJoinColor('${x[0]}')"><span class="colororb"></span>${x[1]}</button>`}).join('')}</div></section>
-<section class="card"><h2>Kies een attractie-avatar</h2><div class="avatargrid">${AVATARS.map(x=>{let taken=state.players.some(p=>p.avatar_id===x[0]);return `<button class="avatarchoice ${state.joinAvatar===x[0]?'selected':''} ${taken?'taken':''}" ${taken?'disabled':''} onclick="chooseJoinAvatar('${x[0]}')"><span class="avataricon">${x[2]}</span>${x[1]}</button>`}).join('')}</div></section><section class="card"><button class="btn primary full" onclick="joinRoom()">Bevestigen</button></section>`}
+<section class="card"><h2>Kies een attractie-avatar</h2><div class="avatargrid">${AVATARS.map(x=>{let taken=state.players.some(p=>p.avatar_id===x[0]);return `<button class="avatarchoice ${state.joinAvatar===x[0]?'selected':''} ${taken?'taken':''}" ${taken?'disabled':''} onclick="chooseJoinAvatar('${x[0]}')"><span class="avataricon">${x[2]}</span>${x[1]}</button>`}).join('')}</div><button class="btn ghost full" style="margin-top:12px" onclick="showPowersInfo()">ℹ Uitleg over de krachten</button></section><section class="card"><button class="btn primary full" onclick="joinRoom()">Bevestigen</button></section>`}
 async function createRoom(){loading('Kamer maken…');let r=await state.sb.rpc('dmq_create_host_room');if(r.error){fatal('Kamer maken mislukt.',r.error);return}let row=Array.isArray(r.data)?r.data[0]:r.data;history.replaceState(null,'',`${location.pathname}?host=${row.room_code}&v=29`);await loadRoom(row.room_id,false)}
 async function joinRoom(){state.joinCode=(document.getElementById('joinCode').value||'').trim().toUpperCase();state.joinName=(document.getElementById('joinName').value||'').trim();if(!state.joinCode||!state.joinName||!state.joinColor||!state.joinAvatar){toast('Vul naam, kleur en avatar in.');return}let c=C(state.joinColor);loading('Deelnemen…');let r=await state.sb.rpc('dmq_join_room_v2',{p_code:state.joinCode,p_player_name:state.joinName,p_color_id:c.id,p_color:c.hex,p_avatar_id:state.joinAvatar});if(r.error){fatal('Deelnemen mislukt.',r.error);return}let row=Array.isArray(r.data)?r.data[0]:r.data;history.replaceState(null,'',`${location.pathname}?room=${state.joinCode}&v=29`);await loadRoom(row.room_id,false)}
 function toggle(id,label,on,key){return `<label class="toggleline"><span>${label}</span><input id="${id}" type="checkbox" ${on?'checked':''} onchange="state.lobbySettings['${key}']=this.checked; renderLobby();"></label>`}
@@ -294,7 +294,7 @@ async function updateManagedPlayer(playerId){
   }catch(e){console.error(e);toast(`Wijzigen mislukt: ${e.message||e}`)}
 }
 
-function rules(type,p=null){let x=type==='full'?['Juiste film: +1','Juiste titel: +1','Exact filmjaar: +1','Maximum: 3']:type==='film'?['Juiste film: +2']:type==='title'?['Juiste titel: +2']:type==='artist'?['Juiste uitvoerder/personage: +2']:['Exact: +3','1 jaar verschil: +2','2 jaar verschil: +1','Verder: 0'];if(p==='hyperdrive')x.push('Hyperdrive: alle punten dubbel');if(p==='wild_ride'&&type==='year')x=['Exact: +3','Maximaal 2 jaar verschil: +2','Maximaal 4 jaar verschil: +1'];if(p==='hidden_treasure')x.push('Verborgen schat: minimaal 1 goed = +1 bonus');if(p==='ghost_whisper')x.push('Geestenfluistering: kies 10 seconden uit alle jaartallen');if(p==='second_drop')x.push('Tweede val: rode antwoorden 10 seconden aanpassen');return `<div class="rulebox"><h3>Punten deze ronde</h3>${x.map(v=>`<div>• ${v}</div>`).join('')}</div>`}
+function rules(type,p=null){let x=type==='full'?['Juiste film: +1','Juiste titel: +1','Exact filmjaar: +1','Maximum: 3']:type==='film'?['Juiste film: +2']:type==='title'?['Juiste titel: +2']:type==='artist'?['Juiste uitvoerder/personage: +2']:['Exact: +3','1 jaar verschil: +2','2 jaar verschil: +1','Verder: 0'];if(p==='hyperdrive')x.push('Hyperdrive: alle punten dubbel');if(p==='wild_ride'&&type==='year')x=['Exact: +3','Maximaal 2 jaar verschil: +2','Maximaal 4 jaar verschil: +1'];if(p==='hidden_treasure')x.push('Verborgen schat: minimaal 1 goed = +1 bonus');if(p==='ghost_whisper')x.push('Geestenfluistering: kies 10 seconden uit alle jaartallen');if(p==='second_drop')x.push('Tweede val: rode antwoorden 30 seconden aanpassen');if(p==='lightspeed')x.push('Lichtsnelheid: beantwoord binnen 8s = +1 bonus');if(p==='small_world')x.push('Kleine wereld harmonie: minder scorende spelers schenken +1 bonus');return `<div class="rulebox"><h3>Punten deze ronde</h3>${x.map(v=>`<div>• ${v}</div>`).join('')}</div>`}
 function power(){return state.round?.active_power||null}
 function powerButton(){if(!settings().powers||!state.me||state.me.power_used||power())return'';let a=A(state.me.avatar_id);if(a.power==='ghost_whisper'&&state.round.question_type!=='year')return'';return `<button class="btn secondary full" onclick="activatePower('${a.power}')">${a.icon} Gebruik ${esc(a.name)}-kracht</button>`}
 async function activatePower(p){let r=await state.sb.rpc('dmq_activate_power',{p_round_id:state.round.id,p_power:p});if(r.error)toast(r.error.message);else schedule()}
@@ -307,14 +307,14 @@ function prompt(t){return{full:'Welke film, welke titel en welk filmjaar?',film:
 function form(t,a={}){const fVal=state.currentAnswer.film!==undefined?state.currentAnswer.film:(a.film||'');const tVal=state.currentAnswer.title!==undefined?state.currentAnswer.title:(a.title||'');const yVal=state.currentAnswer.year!==undefined?state.currentAnswer.year:(a.year||'');const txVal=state.currentAnswer.text!==undefined?state.currentAnswer.text:(a[t]||'');if(t==='full')return `<div class="field"><label>Film</label><input id="ansFilm" value="${esc(fVal)}" oninput="state.currentAnswer.film=this.value"></div><div class="field"><label>Titel</label><input id="ansTitle" value="${esc(tVal)}" oninput="state.currentAnswer.title=this.value"></div><div class="field"><label>Jaar</label><input id="ansYear" type="number" value="${esc(yVal)}" oninput="state.currentAnswer.year=this.value"></div>`;if(t==='year')return `<div class="field"><label>Jaar</label><input id="ansYear" type="number" value="${esc(yVal)}" oninput="state.currentAnswer.year=this.value"></div>`;return `<div class="field"><label>Antwoord</label><input id="ansText" value="${esc(txVal)}" oninput="state.currentAnswer.text=this.value"></div>`}
 function collect(t){if(t==='full')return{film:ansFilm.value.trim(),title:ansTitle.value.trim(),year:+ansYear.value||null};if(t==='year')return{year:+ansYear.value||null};return{[t]:ansText.value.trim()}}
 function filled(t,a){return t==='full'?!!(a.film&&a.title&&a.year):t==='year'?!!a.year:!!a[t]}
-function renderAnswer(){let mine=own(),done=new Set(state.answers.map(a=>a.user_id)),all=state.answers.length===state.players.length;app().innerHTML=`${topbar('Geheim antwoorden')}${scorebar()}${progress()}<section class="card question" style="--accent:${state.me?.color||'#00e5ff'}"><div class="prompt">${esc(prompt(state.round.question_type))}</div>${rules(state.round.question_type,power())}${powerButton()}${mine?'<div class="notice green">Je antwoord is opgeslagen.</div>':host()?'<div class="notice blue">Jij bent de organisator. Wacht tot de spelers antwoorden.</div>':`${form(state.round.question_type)}<button class="btn primary full" onclick="submitAnswer()">Antwoord vastleggen</button>`}</section><section class="card"><h2>Wie heeft geantwoord?</h2>${playerList(p=>done.has(p.user_id)?['Antwoord binnen','ok']:['Denkt nog na','wait'])}${leader()||host()?`<button class="btn secondary full" style="margin-top:12px" ${all?'':'disabled'} onclick="afterAnswers()">Verder</button>`:`<div class="notice blue">${all?'Alle antwoorden zijn binnen.':'Wachten op alle spelers.'}</div>`}</section>`}
-async function submitAnswer(){if(host())return;let a=collect(state.round.question_type);if(!filled(state.round.question_type,a)){toast('Vul je antwoord in.');return}let r=await state.sb.from('dmq_answers').insert({room_id:state.room.id,round_id:state.round.id,player_id:state.me.id,user_id:state.user.id,answer:a});if(r.error)toast(r.error.message);else schedule()}
+function renderAnswer(){if(!state.answerPhaseStartedAt)state.answerPhaseStartedAt=Date.now();let mine=own(),done=new Set(state.answers.map(a=>a.user_id)),all=state.answers.length===state.players.length;app().innerHTML=`${topbar('Geheim antwoorden')}${scorebar()}${progress()}<section class="card question" style="--accent:${state.me?.color||'#00e5ff'}"><div class="prompt">${esc(prompt(state.round.question_type))}</div>${rules(state.round.question_type,power())}${powerButton()}${mine?'<div class="notice green">Je antwoord is opgeslagen.</div>':host()?'<div class="notice blue">Jij bent de organisator. Wacht tot de spelers antwoorden.</div>':`${form(state.round.question_type)}<button class="btn primary full" onclick="submitAnswer()">Antwoord vastleggen</button>`}</section><section class="card"><h2>Wie heeft geantwoord?</h2>${playerList(p=>done.has(p.user_id)?['Antwoord binnen','ok']:['Denkt nog na','wait'])}${leader()||host()?`<button class="btn secondary full" style="margin-top:12px" ${all?'':'disabled'} onclick="afterAnswers()">Verder</button>`:`<div class="notice blue">${all?'Alle antwoorden zijn binnen.':'Wachten op alle spelers.'}</div>`}</section>`}
+async function submitAnswer(){if(host())return;let a=collect(state.round.question_type);if(!filled(state.round.question_type,a)){toast('Vul je antwoord in.');return}const elapsed=(Date.now()-(state.answerPhaseStartedAt||Date.now()))/1000;if(elapsed<=8)a.speed_bonus=true;let r=await state.sb.from('dmq_answers').insert({room_id:state.room.id,round_id:state.round.id,player_id:state.me.id,user_id:state.user.id,answer:a});if(r.error)toast(r.error.message);else schedule()}
 function norm(v){return String(v||'').normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLowerCase().replace(/&/g,' and ').replace(/\b(the|a|an|de|het|een|la|le|les|un|une|der|die|das)\b/g,' ').replace(/[^a-z0-9]+/g,' ').trim().replace(/\s+/g,' ')}
 function lev(a,b){if(a===b)return 0;if(!a.length)return b.length;if(!b.length)return a.length;let r=Array.from({length:b.length+1},(_,i)=>i);for(let i=1;i<=a.length;i++){let p=r[0];r[0]=i;for(let j=1;j<=b.length;j++){let t=r[j];r[j]=Math.min(r[j]+1,r[j-1]+1,p+(a[i-1]===b[j-1]?0:1));p=t}}return r[b.length]}
 function match(v,targets){let a=norm(v);if(!a)return false;return targets.filter(Boolean).some(t=>{let b=norm(t);return a===b||(a.length>=6&&(a.includes(b)||b.includes(a)))||(1-lev(a,b)/Math.max(a.length,b.length)>=.72)})}
-function points(a,s,t,p){let film=[s.film,...(s.film_aliases||[])],title=[s.title,...(s.title_aliases||[])],artist=[s.artist,...(s.artist_aliases||[])],q=0;if(t==='full')q=(match(a.film,film)?1:0)+(match(a.title,title)?1:0)+(+a.year===+s.year?1:0);if(t==='film')q=match(a.film,film)?2:0;if(t==='title')q=match(a.title,title)?2:0;if(t==='artist')q=match(a.artist,artist)?2:0;if(t==='year'){let d=Math.abs(+a.year-+s.year);q=p==='wild_ride'?(d===0?3:d<=2?2:d<=4?1:0):(d===0?3:d===1?2:d===2?1:0)}if(p==='hidden_treasure'&&q>0)q++;if(p==='hyperdrive')q*=2;return q}
+function points(a,s,t,p){let film=[s.film,...(s.film_aliases||[])],title=[s.title,...(s.title_aliases||[])],artist=[s.artist,...(s.artist_aliases||[])],q=0;if(t==='full')q=(match(a.film,film)?1:0)+(match(a.title,title)?1:0)+(+a.year===+s.year?1:0);if(t==='film')q=match(a.film,film)?2:0;if(t==='title')q=match(a.title,title)?2:0;if(t==='artist')q=match(a.artist,artist)?2:0;if(t==='year'){let d=Math.abs(+a.year-+s.year);q=p==='wild_ride'?(d===0?3:d<=2?2:d<=4?1:0):(d===0?3:d===1?2:d===2?1:0)}if(p==='hidden_treasure'&&q>0)q++;if(p==='hyperdrive')q*=2;if(p==='lightspeed'&&a.speed_bonus&&q>0)q++;return q}
 async function afterAnswers(){if(power()==='ghost_whisper'){let r=await state.sb.rpc('dmq_begin_power_phase',{p_round_id:state.round.id,p_phase:'power_phantom'});if(r.error)toast(r.error.message);return}if(power()==='second_drop'){await prepareTower();return}await reveal()}
-async function reveal(){let s=currentSong();for(const a of state.answers){let q=points(a.revised_answer||a.answer||{},s,state.round.question_type,power());let r=await state.sb.from('dmq_answers').update({proposed_points:q,final_points:q}).eq('id',a.id);if(r.error){fatal('Beoordelen mislukt.',r.error);return}}let r=await state.sb.rpc('dmq_set_phase',{p_round_id:state.round.id,p_phase:'review'});if(r.error)toast(r.error.message);else schedule()}
+async function reveal(){let s=currentSong();let basePoints=[];for(const a of state.answers){let q=points(a.revised_answer||a.answer||{},s,state.round.question_type,power());basePoints.push({ans:a,pts:q})}if(power()==='small_world'){const activatorPlayerId=state.round.power_used_by_player_id;const activatorEntry=basePoints.find(bp=>bp.ans.player_id===activatorPlayerId);if(activatorEntry&&activatorEntry.pts>0){let bonus=0;basePoints.forEach(bp=>{if(bp.ans.player_id!==activatorPlayerId&&bp.pts<activatorEntry.pts){bonus++}});activatorEntry.pts+=Math.min(bonus,2)}}for(const bp of basePoints){let r=await state.sb.from('dmq_answers').update({proposed_points:bp.pts,final_points:bp.pts}).eq('id',bp.ans.id);if(r.error){fatal('Beoordelen mislukt.',r.error);return}}let r=await state.sb.rpc('dmq_set_phase',{p_round_id:state.round.id,p_phase:'review'});if(r.error)toast(r.error.message);else schedule()}
 function startTimer(seconds,done){clearInterval(state.timer);state.timerSeconds=seconds;state.timerFinished=false;state.timer=setInterval(async()=>{state.timerSeconds--;let e=document.getElementById('countNum');if(e)e.textContent=state.timerSeconds;if(state.timerSeconds<=0){clearInterval(state.timer);state.timer=null;state.timerFinished=true;await done()}},1000)}
 function renderPhantom(){let mine=own(),counts={};state.answers.forEach(a=>{let y=+a.answer?.year;if(y)counts[y]=(counts[y]||0)+1});let ys=Object.keys(counts).map(Number).sort((a,b)=>a-b),selected=+(mine?.revised_answer?.year||mine?.answer?.year),same=ys.length===1;const duration=same?3:10;const secondsLeft=(state.timerRoundId===state.round.id&&state.timerPhase===state.round.phase&&state.timerFinished)?0:(state.timerRoundId===state.round.id&&state.timerPhase===state.round.phase&&state.timer)?state.timerSeconds:duration;app().innerHTML=`${topbar('Phantom Manor')}${scorebar()}${progress()}<section class="card phantom"><div class="powerbanner">👻 Geestenfluistering geldt voor iedereen</div>${rules('year','ghost_whisper')}<h2>De geesten fluisteren…</h2><p>Alle jaartallen zijn anoniem samengevoegd. ${host()?'Wacht tot de spelers kiezen.':'Jouw antwoord staat geselecteerd.'}</p><div class="yearchoices">${ys.map(y=>`<button class="yearbtn ${selected===y?'selected':''}" ${host()?'disabled':''} onclick="chooseYear(${y})">${y}${counts[y]>1?` × ${counts[y]}`:''}</button>`).join('')}</div><div class="countdown phantom"><div class="small">De klokken tikken…</div><div id="countNum" class="number">${secondsLeft}</div><div>🕯️ 👻 🕯️</div></div></section>`;if((state.timerRoundId!==state.round.id||state.timerPhase!==state.round.phase)&&!state.timerFinished){state.timerRoundId=state.round.id;state.timerPhase=state.round.phase;startTimer(duration,finishPhantom)}}
 async function chooseYear(y){let r=await state.sb.from('dmq_answers').update({revised_answer:{year:y}}).eq('id',own().id);if(r.error)toast(r.error.message);else schedule()}
@@ -324,7 +324,7 @@ function renderTower(){let mine=own(),a=mine?.revised_answer||mine?.answer||{},c
 async function completeTower(){let mine=own(),c=mine?.correctness||{},t=state.round.question_type,a={...(mine?.revised_answer||mine?.answer||{})},keys=t==='full'?['film','title','year']:[t];keys.forEach(k=>{if(c[k]!==true){let e=document.getElementById('tower_'+k);if(e)a[k]=k==='year'?+e.value||null:e.value.trim()}});let r=await state.sb.from('dmq_answers').update({revised_answer:a,tower_completed:true}).eq('id',mine.id);if(r.error)toast(r.error.message);else schedule()}
 async function finishTower(){if(!leader()&&!host())return;let r=await state.sb.rpc('dmq_finalize_tower',{p_round_id:state.round.id});if(r.error)toast(r.error.message);else{await refreshAll();await reveal()}}
 function answerText(a,t){if(t==='full')return `${a.film||'—'} · ${a.title||'—'} · ${a.year||'—'}`;return String(a[t]||'—')}
-function maxPoints(t,p){let m=t==='full'||t==='year'?3:2;if(p==='hidden_treasure')m++;if(p==='hyperdrive')m*=2;return m}
+function maxPoints(t,p){let m=t==='full'||t==='year'?3:2;if(p==='hidden_treasure'||p==='lightspeed')m++;if(p==='small_world')m+=2;if(p==='hyperdrive')m*=2;return m}
 function renderReview(){let s=currentSong(),mine=own();if(!s||(!mine&&!host())){loading('Laden…');return}let a=mine?.revised_answer||mine?.answer||{},p=power();app().innerHTML=`${topbar('Punten controleren')}${scorebar()}${progress()}<section class="card question" style="--accent:${state.me?.color||'#00e5ff'}"><div class="correctbox"><strong>Het juiste antwoord</strong><p style="margin:7px 0 0">${esc(s.title)} · ${esc(s.film)} · ${esc(s.year)}${s.artist?` · ${esc(s.artist)}`:''}</p></div>${rules(state.round.question_type,p)}${host()?'':`<div class="answerline"><small>Jouw definitieve antwoord</small><strong>${esc(answerText(a,state.round.question_type))}</strong></div>`}${host()?'<div class="notice blue">Jij bent de organisator. Wacht tot de spelers hun punten bevestigen.</div>':!mine.points_confirmed?`<div class="field"><label>Mijn definitieve punten</label><select id="finalPoints">${Array.from({length:maxPoints(state.round.question_type,p)+1},(_,i)=>`<option value="${i}" ${+mine.final_points===i?'selected':''}>${i}</option>`).join('')}</select></div><div class="field"><label>Toelichting bij correctie</label><input id="correctionNote"></div><button class="btn primary full" onclick="confirmPoints()">Punten bevestigen</button>`:`<div class="notice green">Je hebt +${mine.final_points} bevestigd.</div>${!mine.round_completed?'<button class="btn primary full" onclick="completeRound()">Ik ben klaar met deze ronde</button>':'<button class="btn ghost full" disabled>Ronde afgerond ✓</button>'}`}</section><section class="card"><h2>Puntenstatus</h2>${playerList(pl=>{let x=state.answers.find(a=>a.player_id===pl.id);if(!x?.points_confirmed)return['Controleert nog','wait'];return x.round_completed?[`+${x.final_points} · klaar`,'ok']:[`+${x.final_points} · afronden`,'wait']})}</section>`}
 async function confirmPoints(){let r=await state.sb.rpc('dmq_confirm_points',{p_answer_id:own().id,p_final_points:+finalPoints.value,p_note:correctionNote.value.trim()});if(r.error)toast(r.error.message);else schedule()}
 async function completeRound(){let r=await state.sb.rpc('dmq_complete_round',{p_answer_id:own().id});if(r.error)toast(r.error.message);else schedule()}
@@ -355,9 +355,147 @@ async function shareRoom(){
 }
 
 
+function showPowersInfo(){
+  let modal=document.createElement('div');
+  modal.id='powersModal';
+  modal.className='modal-overlay';
+  modal.innerHTML=`<div class="modal-content">
+    <button class="modal-close" onclick="closePowersInfo()">×</button>
+    <h2 class="modal-title">ℹ Attractiekrachten Uitleg</h2>
+    <div class="modal-body">
+      ${AVATARS.map(x=>{
+        let desc='';
+        if(x[3]==='hyperdrive') desc='<b>Hyperdrive:</b> Verdubbel al jouw behaalde punten in de huidige ronde! (Extreem handig bij moeilijke of Full-vragen)';
+        if(x[3]==='wild_ride') desc='<b>Wild Ride:</b> Bij jaartal-vragen krijg je ook punten bij een grotere afwijking (tot 4 jaar verschil in plaats van max. 2 jaar).';
+        if(x[3]==='ghost_whisper') desc='<b>Geestenfluistering:</b> Geldt voor iedereen. Alle ingevulde jaartallen worden anoniem samengevoegd. Iedereen kiest uit deze anonieme lijst.';
+        if(x[3]==='hidden_treasure') desc='<b>Verborgen Schat:</b> Krijg +1 bonuspunt als je ten minste één onderdeel van de vraag correct beantwoordt.';
+        if(x[3]==='second_drop') desc='<b>Tweede Val:</b> Geldt voor iedereen. Iedereen mag gedurende 30 seconden zijn foutieve (rode) antwoorden herzien en aanpassen.';
+        if(x[3]==='lightspeed') desc='<b>Lichtsnelheid:</b> Reageer bliksemsnel! Beantwoord de vraag binnen 8 seconden correct en verdien +1 bonuspunt voor je snelheid.';
+        if(x[3]==='small_world') desc='<b>Kleine Wereld Harmonie:</b> Delen is lief. Spelers die deze ronde minder punten halen dan jij, schenken jou +1 bonuspunt per persoon (max. +2), terwijl ze zelf hun eigen punten behouden.';
+        return `<div class="modal-item"><div class="icon">${x[2]}</div><div><h3>${esc(x[1])}</h3><p>${desc}</p></div></div>`;
+      }).join('')}
+    </div>
+  </div>`;
+  document.body.appendChild(modal);
+  setTimeout(()=>modal.classList.add('show'),10);
+}
+function closePowersInfo(){
+  let modal=document.getElementById('powersModal');
+  if(modal){
+    modal.classList.remove('show');
+    setTimeout(()=>modal.remove(),300);
+  }
+}
+
+function getPowerMiniDesc(power){
+  if(power==='hyperdrive') return 'Punten verdubbelaar geactiveerd!';
+  if(power==='wild_ride') return 'Maximale afwijking jaartal verhoogd!';
+  if(power==='ghost_whisper') return 'Spookfluisteraar! Alle keuzes anoniem!';
+  if(power==='hidden_treasure') return 'Verborgen schat bonus actief!';
+  if(power==='second_drop') return 'Tweede val! Pas rode antwoorden aan!';
+  if(power==='lightspeed') return 'Lichtsnelheid! Snelheidsbonus actief!';
+  if(power==='small_world') return 'Kleine Wereld Harmonie actief!';
+  return 'Kracht geactiveerd!';
+}
+
+function playPowerTakeover(power,playerName){
+  let takeover=document.createElement('div');
+  takeover.className='takeover-overlay';
+  const avatar=AVATARS.find(x=>x[3]===power)||['','','❓',''];
+  const colors={hyperdrive:'#ff7ac8',wild_ride:'#ffd45c',ghost_whisper:'#69e58d',hidden_treasure:'#74d7ff',second_drop:'#bb86ff',lightspeed:'#69e58d',small_world:'#ffe45f'};
+  const color=colors[power]||'#ffffff';
+  takeover.innerHTML=`
+    <div class="takeover-content">
+      <div class="takeover-avatar">${avatar[2]}</div>
+      <h1 class="takeover-title" style="color:${color}">${esc(playerName)} zet in:</h1>
+      <h2 class="takeover-title" style="font-size:32px">${esc(avatar[1])}</h2>
+      <p class="takeover-desc">${esc(getPowerMiniDesc(power))}</p>
+    </div>
+  `;
+  document.body.appendChild(takeover);
+  setTimeout(()=>takeover.classList.add('show'),10);
+  triggerPowerEffectEffects(power,takeover);
+  setTimeout(()=>{
+    takeover.classList.remove('show');
+    document.body.classList.remove('rumble-screen');
+    setTimeout(()=>takeover.remove(),500);
+  },3500);
+}
+
+function triggerPowerEffectEffects(power,overlay){
+  if(power==='hyperdrive'||power==='lightspeed'){
+    for(let i=0;i<40;i++){
+      let star=document.createElement('div');
+      star.className='star-particle';
+      star.textContent='✦';
+      let tx=(Math.random()-0.5)*window.innerWidth*1.2;
+      let ty=(Math.random()-0.5)*window.innerHeight*1.2;
+      star.style.setProperty('--tx', star.style.setProperty('--tx', `${tx}px`));
+      star.style.setProperty('--ty', star.style.setProperty('--ty', `${ty}px`));
+      star.style.left='50%';
+      star.style.top='50%';
+      star.style.animationDelay=`${Math.random()*0.8}s`;
+      overlay.appendChild(star);
+    }
+  }
+  if(power==='lightspeed'){
+    let raider=document.createElement('div');
+    raider.className='flyby-raider';
+    raider.textContent='🛸';
+    overlay.appendChild(raider);
+  }
+  if(power==='hyperdrive'){
+    let raider=document.createElement('div');
+    raider.className='flyby-raider';
+    raider.textContent='🚀';
+    overlay.appendChild(raider);
+  }
+  if(power==='wild_ride'){
+    document.body.classList.add('rumble-screen');
+    let train=document.createElement('div');
+    train.className='flyby-raider';
+    train.textContent='🚂💨';
+    overlay.appendChild(train);
+  }
+  if(power==='ghost_whisper'){
+    for(let i=0;i<6;i++){
+      let ghost=document.createElement('div');
+      ghost.className='ghost-particle';
+      ghost.textContent='👻';
+      ghost.style.left=`${10+Math.random()*80}%`;
+      ghost.style.setProperty('--tx',`${(Math.random()-0.5)*150}px`);
+      ghost.style.animationDelay=`${Math.random()*1.2}s`;
+      overlay.appendChild(ghost);
+    }
+  }
+  if(power==='hidden_treasure'||power==='small_world'){
+    const char=power==='small_world'?'🎉':'🪙';
+    for(let i=0;i<35;i++){
+      let coin=document.createElement('div');
+      coin.className='coin-particle';
+      coin.textContent=char;
+      coin.style.left=`${Math.random()*100}%`;
+      coin.style.top=`-${Math.random()*50}px`;
+      coin.style.animationDelay=`${Math.random()*1.5}s`;
+      overlay.appendChild(coin);
+    }
+  }
+  if(power==='second_drop'){
+    let box=document.createElement('div');
+    box.className='elevator-box';
+    box.textContent='🛗';
+    overlay.appendChild(box);
+    setTimeout(()=>{
+      document.body.classList.add('rumble-screen');
+      setTimeout(()=>document.body.classList.remove('rumble-screen'),400);
+    },1400);
+  }
+}
+
 Object.assign(window,{
   leaveRoom,openSongAdminFromLobby,regenerateRoomCode,resetRoomToLobby,
   removeManagedPlayer,updateManagedPlayer,startGame,refreshAll,shareRoom,
   createRoom,goJoin,chooseJoinColor,chooseJoinAvatar,joinRoom,render,
-  renderLobby,saveSong,nextRound,confirmMyPoints,completeMyRound
+  renderLobby,saveSong,nextRound,confirmMyPoints,completeMyRound,
+  showPowersInfo,closePowersInfo
 });
