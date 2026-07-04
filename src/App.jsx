@@ -761,7 +761,7 @@ export default function App() {
 
                   {/* Game 2: Disney Music Quiz */}
                   <a 
-                    href="./music/index.html"
+                    href={room?.code ? `./music/index.html?room=${room.code}` : "./music/index.html"}
                     className="modecard" 
                     style={{ 
                       display: 'flex', 
