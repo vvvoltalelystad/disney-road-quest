@@ -153,7 +153,7 @@ function renderLobby(){
     state.lobbySettings.fixedLeader = state.players[0].id;
   }
   app().innerHTML=`${topbar('Wachtruimte','leaveRoom()')}
-  <section class="card hero"><div class="badge">Kamercode</div><div class="roomcode">${esc(state.room.code)}</div><div id="joinQR" class="joinqr"></div><p>Laat spelers deze QR-code scannen.</p><button class="btn ghost" onclick="shareRoom()">Deellink delen</button></section>
+  <section class="card hero"><div class="badge">Kamercode</div><div class="roomcode">${esc(state.room.code)}</div><div id="joinQR" class="joinqr"></div><p>Laat spelers deze QR-code scannen of deel de link:</p><div style="margin:12px 0;background:#051024;padding:10px;border-radius:8px;border:1px solid #1a365d;font-size:12px;word-break:break-all;color:#74d7ff;font-family:monospace;line-height:1.4;">${location.origin}${location.pathname}?join=${state.room.code}&v=29</div><button class="btn ghost" onclick="shareRoom()">🔗 Kopieer & deel link</button></section>
   <section class="card"><h2>Spelers · ${state.players.length}/5</h2>${playerList()}
     ${!ready.enoughPlayers?`<div class="notice blue">Minimaal twee spelers nodig.</div>`:''}
     ${ready.enoughPlayers&&!ready.allOnline?`<div class="notice red">Niet alle spelers worden als online gezien. Laat iedereen de wachtruimte openhouden en druk op ↻.</div>`:''}
@@ -315,6 +315,22 @@ function renderAdmin(){let s=state.songs.find(x=>+x.song_number===+state.adminSe
 <section class="card"><div class="field"><label>Titel</label><input id="songTitle" value="${esc(s.title||'')}"></div><div class="field"><label>Film</label><input id="songFilm" value="${esc(s.film||'')}"></div><div class="grid2"><div class="field"><label>Jaar</label><input id="songYear" type="number" value="${esc(s.year||'')}"></div><div class="field"><label>Uitvoerder</label><input id="songArtist" value="${esc(s.artist||'')}"></div></div><div class="field"><label>Spotify-link</label><input id="songSpotify" value="${esc(s.spotify_url||'')}"></div><div class="field"><label>Codeafbeelding-URL</label><input id="songCode" value="${esc(s.code_image_url||'')}"></div><div class="field"><label>Film-aliases</label><input id="filmAliases" value="${esc((s.film_aliases||[]).join(', '))}"></div><div class="field"><label>Titel-aliases</label><input id="titleAliases" value="${esc((s.title_aliases||[]).join(', '))}"></div><div class="field"><label>Uitvoerder-aliases</label><input id="artistAliases" value="${esc((s.artist_aliases||[]).join(', '))}"></div><label class="toggleline">Song actief<input id="songEnabled" type="checkbox" ${s.enabled?'checked':''}></label><button class="btn primary full" onclick="saveSong()">Opslaan</button></section>`}
 function list(v){return String(v||'').split(',').map(x=>x.trim()).filter(Boolean)}
 async function saveSong(){state.adminPin=adminPin.value;let s=state.songs.find(x=>+x.song_number===+state.adminSelectedSong);let r=await state.sb.rpc('dmq_admin_upsert_song',{p_pin:state.adminPin,p_song_number:s.song_number,p_title:songTitle.value.trim(),p_film:songFilm.value.trim(),p_year:+songYear.value||null,p_artist:songArtist.value.trim(),p_spotify_url:songSpotify.value.trim(),p_code_image_url:songCode.value.trim(),p_film_aliases:list(filmAliases.value),p_title_aliases:list(titleAliases.value),p_artist_aliases:list(artistAliases.value),p_enabled:songEnabled.checked});if(r.error)toast(r.error.message);else{await fetchSongs();toast('Song opgeslagen.');renderAdmin()}}
+async function shareRoom(){
+  const url=`${location.origin}${location.pathname}?join=${state.room.code}&v=29`;
+  const shareData={title:'Disney Music Quest',text:`Doe mee met de Disney Music Quest! Kamercode: ${state.room.code}`,url:url};
+  try{
+    if(navigator.share&&navigator.canShare&&navigator.canShare(shareData)){
+      await navigator.share(shareData);
+    }else{
+      await navigator.clipboard.writeText(url);
+      toast('Deellink gekopieerd!');
+    }
+  }catch(e){
+    if(e.name!=='AbortError'){
+      try{await navigator.clipboard.writeText(url);toast('Deellink gekopieerd!');}catch(err){toast('Kopiëren mislukt.');}
+    }
+  }
+}
 
 
 Object.assign(window,{
