@@ -8,6 +8,7 @@ alter table public.dmq_rounds add column if not exists power_used_by_player_id u
 alter table public.dmq_rounds add column if not exists power_started_at timestamptz;
 alter table public.dmq_answers add column if not exists revised_answer jsonb;
 alter table public.dmq_answers add column if not exists correctness jsonb;
+alter table public.dmq_answers add column if not exists tower_completed boolean not null default false;
 
 -- Alter phase check constraints to allow power phases (power_phantom, power_tower)
 alter table public.dmq_rounds drop constraint if exists dmq_rounds_phase_check;
