@@ -205,7 +205,13 @@ declare v_name text;v_count integer;
 begin
   select p.name into v_name from dmq_rounds r join dmq_players p on p.room_id=r.room_id
   where r.id=p_round_id and p.user_id=auth.uid();
-  if not found then raise exception 'Je hoort niet bij deze spelkamer.';end if;
+  if not found then 
+    if exists(select 1 from dmq_rounds r join dmq_rooms rm on rm.id=r.room_id where r.id=p_round_id and rm.host_user_id=auth.uid()) then
+      v_name := 'Organisator';
+    else
+      raise exception 'Je hoort niet bij deze spelkamer.';
+    end if;
+  end if;
   update dmq_rounds set claimed_by_user_id=auth.uid(),claimed_by_name=v_name,claimed_at=now()
   where id=p_round_id and phase='claim' and claimed_by_user_id is null;
   get diagnostics v_count=row_count;

@@ -3,7 +3,7 @@ const cfg=window.DMQ_CONFIG||{};
 const COLORS=[['blue','Blauw','#74d7ff'],['green','Groen','#69e58d'],['yellow','Geel','#ffe45f'],['pink','Roze','#ff7ac8'],['purple','Paars','#bb86ff']];
 const AVATARS=[['hyperspace','Hyperspace Mountain','🚀','hyperdrive'],['big_thunder','Big Thunder Mountain','🚂','wild_ride'],['phantom','Phantom Manor','👻','ghost_whisper'],['pirates','Pirates of the Caribbean','🏴‍☠️','hidden_treasure'],['tower','Tower of Terror','🏨','second_drop']];
 const DEFAULT_SETTINGS={streaks:true,powers:true,quick_guess:false,jackpot:false,stat_titles:true,final_bet:false,animations:true,leader_mode:'rotating',fixed_leader_player_id:null};
-const state={sb:null,user:null,room:null,players:[],me:null,round:null,answers:[],songs:[],presence:{},channel:null,poll:null,view:'home',joinCode:'',joinName:'',joinColor:null,joinAvatar:null,adminPin:'',adminSelectedSong:1,refreshing:false,timer:null,startError:'',manageOpen:false};
+const state={sb:null,user:null,room:null,players:[],me:null,round:null,answers:[],songs:[],presence:{},channel:null,poll:null,view:'home',joinCode:'',joinName:'',joinColor:null,joinAvatar:null,adminPin:'',adminSelectedSong:1,refreshing:false,timer:null,startError:'',manageOpen:false,lobbySettings:{roundCount:10,gameMode:'mix',leaderMode:'rotating',fixedLeader:null,streaks:true,powers:true,quick_guess:false,jackpot:false,stat_titles:true,final_bet:false,animations:true}};
 document.addEventListener('DOMContentLoaded',init);window.addEventListener('beforeunload',cleanup);
 async function init(){if('serviceWorker'in navigator){navigator.serviceWorker.getRegistrations().then(rs=>rs.forEach(r=>r.unregister())).catch(()=>{});if('caches'in window)caches.keys().then(ks=>ks.forEach(k=>caches.delete(k))).catch(()=>{})}if(!configured()){setupScreen();return}try{state.sb=window.supabase.createClient(cfg.SUPABASE_URL,cfg.SUPABASE_ANON_KEY,{auth:{persistSession:true,autoRefreshToken:true}});let{data:{session}}=await state.sb.auth.getSession();if(!session){let r=await state.sb.auth.signInAnonymously();if(r.error)throw r.error;session=r.data.session}state.user=session.user;await fetchSongs();const params=new URLSearchParams(location.search);if(params.get('admin')==='1'){state.room=null;state.players=[];state.me=null;state.view='admin';render();return}const join=(params.get('join')||'').toUpperCase();const hostCode=(params.get('host')||'').toUpperCase();const legacy=(params.get('room')||'').toUpperCase();if(join){localStorage.removeItem('dmq-v2-room');state.room=null;state.me=null;state.joinCode=join;state.view='join';await loadJoinChoices(join);render();return}const q=hostCode||legacy;if(q){let roomResult=await state.sb.from('dmq_rooms').select('id,code,host_user_id,status').eq('code',q).maybeSingle();if(roomResult.data){let isHost=roomResult.data.host_user_id===state.user.id;let membership=await state.sb.from('dmq_players').select('id').eq('room_id',roomResult.data.id).eq('user_id',state.user.id).maybeSingle();if(isHost||membership.data){if(await loadRoom(roomResult.data.id,false))return}}state.joinCode=q;state.view='join';await loadJoinChoices(q);render();return}const saved=localStorage.getItem('dmq-v2-room');if(saved&&await loadRoom(saved,false))return;render()}catch(e){fatal('Verbinden mislukt.',e)}}
 function configured(){return cfg.SUPABASE_URL&&cfg.SUPABASE_ANON_KEY&&!cfg.SUPABASE_URL.includes('VUL_HIER')&&!cfg.SUPABASE_ANON_KEY.includes('VUL_HIER')}
@@ -34,7 +34,8 @@ function shuffle(list){
 }
 
 function activeSongs(){return state.songs.filter(s=>s.enabled&&s.title&&s.film&&s.year&&(s.spotify_url||s.code_image_url))}
-function playerList(statusFn){const l=leaderId();return `<div class="playerlist">${state.players.map(p=>{const s=statusFn?statusFn(p):(online(p)?['Online','ok']:['Offline','wait']);return `<div class="player energy ${p.id===l?'leader':''}" style="--player-color:${p.color}"><div class="playerleft"><span class="avatarbadge">${A(p.avatar_id).icon}</span><div><strong>${esc(p.name)}${p.id===l?' 👑':''}</strong><small>${esc(A(p.avatar_id).name)}</small></div></div><span class="statuspill ${s[1]}">${esc(s[0])}</span></div>`}).join('')}</div>`}
+function playerList(statusFn){const l=leaderId();return `<div class="playerlist">${state.players.map(p=>{const s=statusFn?statusFn(p):(online(p)?['Online','ok']:['Offline','wait']);const showKick=host()&&state.room&&state.room.status==='lobby';return `<div class="player energy ${p.id===l?'leader':''}" style="--player-color:${p.color}"><div class="playerleft"><span class="avatarbadge">${A(p.avatar_id).icon}</span><div><strong>${esc(p.name)}${p.id===l?' 👑':''}</strong><small>${esc(A(p.avatar_id).name)}</small></div></div><div style="display:flex;align-items:center;"><span class="statuspill ${s[1]}">${esc(s[0])}</span>${showKick?`<button class="btn ghost" style="margin-left:8px;padding:2px 6px;font-size:12px;border-color:#ff6b6b;color:#ff6b6b;width:auto;min-height:auto;border-radius:6px;cursor:pointer;" onclick="kickPlayer('${p.id}')">Verwijder</button>`:''}</div></div>`}).join('')}</div>`}
+async function kickPlayer(id){if(!confirm("Weet je zeker dat je deze speler wilt verwijderen?"))return;loading('Speler verwijderen…');let r=await state.sb.from('dmq_players').delete().eq('id',id);if(r.error)toast(r.error.message);await refreshAll()}
 function scorebar(){return `<div class="scorebar">${state.players.map(p=>`<div class="scorechip" style="border-color:${p.color}"><strong>${A(p.avatar_id).icon} ${esc(p.name)}</strong><span>${p.score||0} ★</span></div>`).join('')}</div>`}
 function progress(){if(!state.room?.total_rounds)return'';let n=state.room.current_round_no||0,t=state.room.total_rounds;return `<div class="progress"><i style="width:${Math.min(100,n/t*100)}%"></i></div><p class="small" style="text-align:center;margin:6px 0 12px">Ronde ${n} van ${t}</p>`}
 async function fetchSongs(){let r=await state.sb.from('dmq_songs').select('*').order('song_number');if(r.error)throw r.error;state.songs=r.data||[]}
@@ -101,7 +102,7 @@ app().innerHTML=`${topbar('Deelnemen',"state.view='home';render()")}
 <section class="card"><h2>Kies een attractie-avatar</h2><div class="avatargrid">${AVATARS.map(x=>{let taken=state.players.some(p=>p.avatar_id===x[0]);return `<button class="avatarchoice ${state.joinAvatar===x[0]?'selected':''} ${taken?'taken':''}" ${taken?'disabled':''} onclick="chooseJoinAvatar('${x[0]}')"><span class="avataricon">${x[2]}</span>${x[1]}</button>`}).join('')}</div></section><section class="card"><button class="btn primary full" onclick="joinRoom()">Bevestigen</button></section>`}
 async function createRoom(){loading('Kamer maken…');let r=await state.sb.rpc('dmq_create_host_room');if(r.error){fatal('Kamer maken mislukt.',r.error);return}let row=Array.isArray(r.data)?r.data[0]:r.data;history.replaceState(null,'',`${location.pathname}?host=${row.room_code}&v=29`);await loadRoom(row.room_id,false)}
 async function joinRoom(){state.joinCode=(document.getElementById('joinCode').value||'').trim().toUpperCase();state.joinName=(document.getElementById('joinName').value||'').trim();if(!state.joinCode||!state.joinName||!state.joinColor||!state.joinAvatar){toast('Vul naam, kleur en avatar in.');return}let c=C(state.joinColor);loading('Deelnemen…');let r=await state.sb.rpc('dmq_join_room_v2',{p_code:state.joinCode,p_player_name:state.joinName,p_color_id:c.id,p_color:c.hex,p_avatar_id:state.joinAvatar});if(r.error){fatal('Deelnemen mislukt.',r.error);return}let row=Array.isArray(r.data)?r.data[0]:r.data;history.replaceState(null,'',`${location.pathname}?room=${state.joinCode}&v=29`);await loadRoom(row.room_id,false)}
-function toggle(id,label,on){return `<label class="toggleline"><span>${label}</span><input id="${id}" type="checkbox" ${on?'checked':''}></label>`}
+function toggle(id,label,on,key){return `<label class="toggleline"><span>${label}</span><input id="${id}" type="checkbox" ${on?'checked':''} onchange="state.lobbySettings['${key}']=this.checked; renderLobby();"></label>`}
 
 function byId(id){return document.getElementById(id)}
 function selectedValue(id,fallback=''){const e=byId(id);return e?e.value:fallback}
@@ -147,7 +148,10 @@ function organizerPanel(){
 }
 
 function renderLobby(){
-  const s=settings(),activeCount=activeSongs().length,ready=startReadiness(5);
+  const activeCount=activeSongs().length,ready=startReadiness(5);
+  if(!state.lobbySettings.fixedLeader && state.players.length > 0) {
+    state.lobbySettings.fixedLeader = state.players[0].id;
+  }
   app().innerHTML=`${topbar('Wachtruimte','leaveRoom()')}
   <section class="card hero"><div class="badge">Kamercode</div><div class="roomcode">${esc(state.room.code)}</div><div id="joinQR" class="joinqr"></div><p>Laat spelers deze QR-code scannen.</p><button class="btn ghost" onclick="shareRoom()">Deellink delen</button></section>
   <section class="card"><h2>Spelers · ${state.players.length}/5</h2>${playerList()}
@@ -155,12 +159,42 @@ function renderLobby(){
     ${ready.enoughPlayers&&!ready.allOnline?`<div class="notice red">Niet alle spelers worden als online gezien. Laat iedereen de wachtruimte openhouden en druk op ↻.</div>`:''}
   </section>
   ${host()?`<section class="card hostcard"><h2>Spelinstellingen</h2>
-    <div class="grid2"><div class="field"><label>Aantal songs</label><select id="roundCount">${[5,10,15,20,30].map(n=>`<option value="${n}">${n}</option>`).join('')}</select></div>
-    <div class="field"><label>Spelvorm</label><select id="gameMode"><option value="mix">Afwisselende mix</option><option value="full">Film, titel en jaar</option><option value="year">Alleen jaartallen</option><option value="film">Alleen film</option><option value="title">Alleen titel</option><option value="artist">Alleen uitvoerder</option></select></div></div>
-    <div class="field"><label>Spelleider</label><select id="leaderMode" onchange="document.getElementById('fixedLeaderWrap').style.display=this.value==='fixed'?'block':'none'"><option value="rotating">Roulerend</option><option value="fixed">Vast</option></select></div>
-    <div class="field" id="fixedLeaderWrap" style="display:none"><label>Vaste spelleider</label><select id="fixedLeader">${state.players.map(p=>`<option value="${p.id}">${esc(p.name)}</option>`).join('')}</select></div>
-    <h3>Extra spelregels</h3>${toggle('streaks','Muzikale streaks',s.streaks)}${toggle('powers','Attractiekrachten',s.powers)}${toggle('quick','Snelle gok',s.quick_guess)}${toggle('jackpot','Soundtrack Jackpot',s.jackpot)}${toggle('stats','Extra statistiektitels',s.stat_titles)}${toggle('bet','Geheime inzet finale',s.final_bet)}${toggle('anim','Feestelijke animaties',s.animations)}
-    <div class="notice ${activeCount>=5?'green':'red'}"><strong>${activeCount} actieve songs beschikbaar.</strong> Voor 5 rondes zijn minimaal 5 actieve songs met titel, film, jaar en Spotify-link/scancode nodig.</div>
+    <div class="grid2">
+      <div class="field"><label>Aantal songs</label>
+        <input id="roundCount" type="number" min="1" max="100" value="${state.lobbySettings.roundCount}" oninput="state.lobbySettings.roundCount = Number(this.value); renderLobby();" style="width:100%;max-width:120px;padding:8px;border-radius:8px;border:1px solid #234873;background:#0b1f40;color:white;font-weight:bold;">
+      </div>
+      <div class="field"><label>Spelvorm</label>
+        <select id="gameMode" onchange="state.lobbySettings.gameMode = this.value; renderLobby();">
+          <option value="mix" ${state.lobbySettings.gameMode === 'mix'?'selected':''}>Afwisselende mix</option>
+          <option value="full" ${state.lobbySettings.gameMode === 'full'?'selected':''}>Film, titel en jaar</option>
+          <option value="year" ${state.lobbySettings.gameMode === 'year'?'selected':''}>Alleen jaartallen</option>
+          <option value="film" ${state.lobbySettings.gameMode === 'film'?'selected':''}>Alleen film</option>
+          <option value="title" ${state.lobbySettings.gameMode === 'title'?'selected':''}>Alleen titel</option>
+          <option value="artist" ${state.lobbySettings.gameMode === 'artist'?'selected':''}>Alleen uitvoerder</option>
+        </select>
+      </div>
+    </div>
+    <div class="field"><label>Spelleider</label>
+      <select id="leaderMode" onchange="state.lobbySettings.leaderMode = this.value; renderLobby();">
+        <option value="rotating" ${state.lobbySettings.leaderMode === 'rotating'?'selected':''}>Roulerend</option>
+        <option value="fixed" ${state.lobbySettings.leaderMode === 'fixed'?'selected':''}>Vast</option>
+      </select>
+    </div>
+    <div class="field" id="fixedLeaderWrap" style="display: ${state.lobbySettings.leaderMode === 'fixed' ? 'block' : 'none'}">
+      <label>Vaste spelleider</label>
+      <select id="fixedLeader" onchange="state.lobbySettings.fixedLeader = this.value; renderLobby();">
+        ${state.players.map(p=>`<option value="${p.id}" ${state.lobbySettings.fixedLeader === p.id ? 'selected' : ''}>${esc(p.name)}</option>`).join('')}
+      </select>
+    </div>
+    <h3>Extra spelregels</h3>
+    ${toggle('streaks','Muzikale streaks',state.lobbySettings.streaks,'streaks')}
+    ${toggle('powers','Attractiekrachten',state.lobbySettings.powers,'powers')}
+    ${toggle('quick','Snelle gok',state.lobbySettings.quick_guess,'quick_guess')}
+    ${toggle('jackpot','Soundtrack Jackpot',state.lobbySettings.jackpot,'jackpot')}
+    ${toggle('stats','Extra statistiektitels',state.lobbySettings.stat_titles,'stat_titles')}
+    ${toggle('bet','Geheime inzet finale',state.lobbySettings.final_bet,'final_bet')}
+    ${toggle('anim','Feestelijke animaties',state.lobbySettings.animations,'animations')}
+    <div class="notice ${activeCount>=state.lobbySettings.roundCount?'green':'red'}"><strong>${activeCount} actieve songs beschikbaar.</strong> Voor ${state.lobbySettings.roundCount} rondes zijn minimaal ${state.lobbySettings.roundCount} actieve songs met titel, film, jaar en Spotify-link/scancode nodig.</div>
     ${state.startError?`<div class="notice red"><strong>Starten lukt niet:</strong> ${esc(state.startError)}</div>`:''}
     <div class="notice blue">Na starten kun jij naar Hitster wisselen.</div>
     <button class="btn primary full" ${ready.can?'':'disabled'} onclick="startGame()">Start Disney Music Quest</button>
@@ -172,19 +206,23 @@ function qtype(mode,s){if(mode!=='mix')return mode;let a=['full','film','title',
 async function startGame(){
   state.startError='';
   try{
-    const total=Number(selectedValue('roundCount','5'))||5;
-    const mode=selectedValue('gameMode','mix');
+    const total=state.lobbySettings.roundCount||5;
+    const mode=state.lobbySettings.gameMode||'mix';
     const songs=shuffle(activeSongs()).slice(0,total);
     if(state.players.length<2)throw new Error('Er zijn minimaal twee spelers nodig.');
     if(!state.players.every(online))throw new Error('Niet alle spelers worden als online gezien. Laat iedereen de wachtruimte openhouden en druk op ↻.');
     if(songs.length<total)throw new Error(`Er zijn ${songs.length} actieve songs, maar je hebt ${total} rondes gekozen. Activeer meer songs in Songbeheer · 100 songs.`);
-    const lm=selectedValue('leaderMode','rotating');
+    const lm=state.lobbySettings.leaderMode||'rotating';
     const set={
-      streaks:selectedChecked('streaks',true),powers:selectedChecked('powers',true),
-      quick_guess:selectedChecked('quick',false),jackpot:selectedChecked('jackpot',false),
-      stat_titles:selectedChecked('stats',true),final_bet:selectedChecked('bet',false),
-      animations:selectedChecked('anim',true),leader_mode:lm,
-      fixed_leader_player_id:lm==='fixed'?selectedValue('fixedLeader',state.players[0]?.id||null):null
+      streaks:state.lobbySettings.streaks,
+      powers:state.lobbySettings.powers,
+      quick_guess:state.lobbySettings.quick_guess,
+      jackpot:state.lobbySettings.jackpot,
+      stat_titles:state.lobbySettings.stat_titles,
+      final_bet:state.lobbySettings.final_bet,
+      animations:state.lobbySettings.animations,
+      leader_mode:lm,
+      fixed_leader_player_id:lm==='fixed'?(state.lobbySettings.fixedLeader||state.players[0]?.id||null):null
     };
     loading('Game starten…');
     const r=await state.sb.rpc('dmq_start_game_v2',{p_room_id:state.room.id,p_total_rounds:total,p_game_mode:mode,p_song_sequence:songs.map(s=>s.song_number),p_question_sequence:songs.map(s=>qtype(mode,s)),p_settings:set});
