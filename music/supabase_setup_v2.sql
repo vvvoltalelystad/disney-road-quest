@@ -8,6 +8,14 @@ alter table public.dmq_rounds add column if not exists power_used_by_player_id u
 alter table public.dmq_rounds add column if not exists power_started_at timestamptz;
 alter table public.dmq_answers add column if not exists revised_answer jsonb;
 alter table public.dmq_answers add column if not exists correctness jsonb;
+
+-- Alter phase check constraints to allow power phases (power_phantom, power_tower)
+alter table public.dmq_rounds drop constraint if exists dmq_rounds_phase_check;
+alter table public.dmq_rounds add constraint dmq_rounds_phase_check check (phase in ('claim','answer','review','standings','power_phantom','power_tower'));
+
+alter table public.dmq_rooms drop constraint if exists dmq_rooms_phase_check;
+alter table public.dmq_rooms add constraint dmq_rooms_phase_check check (phase in ('lobby','claim','answer','review','standings','finished','power_phantom','power_tower'));
+
 create unique index if not exists dmq_players_room_color_unique on public.dmq_players(room_id,color_id) where color_id is not null;
 create unique index if not exists dmq_players_room_avatar_unique on public.dmq_players(room_id,avatar_id) where avatar_id is not null;
 
