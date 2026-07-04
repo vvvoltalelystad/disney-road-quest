@@ -1,0 +1,14 @@
+DISNEY MUSIC QUEST v2.6
+
+1. Voer supabase_hotfix_v2_6.sql uit in Supabase SQL Editor.
+2. Vul je publieke Supabase-sleutel in config.js in.
+3. Upload de volledige map opnieuw naar Netlify.
+4. Open de site met ?v=26 en maak een nieuwe kamer.
+
+De startknop toont nu waarom starten niet lukt. Voor 5 rondes zijn minimaal 5 actieve songs nodig.
+De organisator kan via 'Wachtruimte beheren':
+- een nieuwe kamercode maken;
+- een spel herstellen naar de lobby;
+- spelers hernoemen;
+- kleur en avatar aanpassen;
+- spelers verwijderen.

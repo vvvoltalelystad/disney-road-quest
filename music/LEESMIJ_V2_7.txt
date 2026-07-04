@@ -1,0 +1,13 @@
+DISNEY MUSIC QUEST v2.7 — KNOPPENFIX
+
+1. Geen nieuwe SQL nodig als supabase_hotfix_v2_6.sql al is uitgevoerd.
+2. Vul je publieke Supabase-sleutel in config.js in.
+3. Upload de volledige map opnieuw naar Netlify.
+4. Open de site met ?v=27.
+
+Hersteld:
+- terugpijl in de wachtruimte werkt;
+- Songbeheer is direct vanuit Wachtruimte beheren te openen;
+- speler wijzigen en verwijderen geven altijd een zichtbare succes- of foutmelding;
+- beheerfuncties zijn expliciet beschikbaar voor de knoppen;
+- namen met bijzondere tekens breken de verwijderknop niet meer.
