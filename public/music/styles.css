@@ -199,3 +199,17 @@ hr{border:0;border-top:1px solid var(--line);margin:16px 0}
 .elevator-box{position:absolute;width:120px;height:120px;border:3px solid var(--purple);border-radius:16px;background:rgba(61,31,50,0.85);box-shadow:0 0 25px rgba(181,90,116,0.6);display:grid;place-items:center;font-size:60px;top:35%;left:calc(50% - 60px);animation:elev-drop 2.2s cubic-bezier(0.6, -0.28, 0.735, 0.045) forwards}
 @keyframes elev-drop{0%{transform:translateY(-100vh)}65%{transform:translateY(0)}68%{transform:translateY(-20px)}72%{transform:translateY(0)}75%{transform:translateY(-8px)}78%{transform:translateY(0)}100%{transform:translateY(0);opacity:0;transform:scale(0.8)}}
 
+/* Card Deck UI */
+.deck-container{display:flex;justify-content:center;gap:10px;margin-top:15px;perspective:1000px;overflow-x:auto;padding:10px 5px;scrollbar-width:none}.deck-container::-webkit-scrollbar{display:none}
+.power-card{background:rgba(11,31,64,0.75);backdrop-filter:blur(5px);-webkit-backdrop-filter:blur(5px);border:1.5px solid var(--line);border-radius:18px;padding:12px 10px;text-align:center;cursor:pointer;position:relative;display:flex;flex-direction:column;align-items:center;min-width:96px;max-width:115px;flex:1;transition:all 0.3s cubic-bezier(0.175,0.885,0.32,1.275);transform-style:preserve-3d;box-shadow:0 6px 14px rgba(0,0,0,0.35)}
+.power-card:hover{transform:translateY(-10px) rotateY(5deg);border-color:var(--gold);box-shadow:0 12px 20px rgba(255,212,92,0.25)}
+.power-card.used{opacity:0.3;pointer-events:none;filter:grayscale(0.85) blur(0.3px);border-color:rgba(255,255,255,0.08);transform:translateY(5px);box-shadow:none}
+.power-card.active{border-color:#bb86ff;box-shadow:0 0 16px rgba(187,134,255,0.4);animation:card-pulse 1.5s infinite alternate}
+.power-card.blocked{border-color:var(--red);box-shadow:0 0 16px rgba(233,95,114,0.4);opacity:0.4;text-decoration:line-through}
+.power-card .card-emoji{font-size:30px;line-height:1;margin-bottom:6px;filter:drop-shadow(0 4px 6px rgba(0,0,0,0.35))}
+.power-card .card-name{font-size:10.5px;font-weight:900;color:white;line-height:1.25;margin:0}
+.power-card .card-status{font-size:8px;color:var(--muted);margin-top:5px;font-weight:800;letter-spacing:0.5px;text-transform:uppercase}
+
+@keyframes card-pulse{from{box-shadow:0 0 8px rgba(187,134,255,0.2)}to{box-shadow:0 0 20px rgba(187,134,255,0.6);transform:scale(1.02)}}
+
+

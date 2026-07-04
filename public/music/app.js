@@ -1,8 +1,8 @@
-// Build trigger: 2026-07-04 22:51
+// Build trigger: 2026-07-04 23:22
 "use strict";
 const cfg=window.DMQ_CONFIG||{};
 const COLORS=[['blue','Blauw','#74d7ff'],['green','Groen','#69e58d'],['yellow','Geel','#ffe45f'],['pink','Roze','#ff7ac8'],['purple','Paars','#bb86ff']];
-const AVATARS=[['hyperspace','Hyperspace Mountain','🚀','hyperdrive'],['big_thunder','Big Thunder Mountain','🚂','wild_ride'],['phantom','Phantom Manor','👻','ghost_whisper'],['pirates','Pirates of the Caribbean','🏴‍☠️','hidden_treasure'],['tower','Tower of Terror','🏨','second_drop'],['star_tours','Star Tours','🛸','lightspeed'],['small_world','"it\'s a small world"','🌍','small_world']];
+const AVATARS=[['hyperspace','Hyperspace Mountain','🚀','hyperdrive'],['big_thunder','Big Thunder Mountain','🚂','wild_ride'],['phantom','Phantom Manor','👻','ghost_whisper'],['pirates','Pirates of the Caribbean','🏴‍☠️','hidden_treasure'],['tower','Tower of Terror','🏨','second_drop'],['star_tours','Star Tours','🛸','lightspeed'],['small_world','"it\'s a small world"','🌍','small_world'],['ratatouille','Ratatouille','🐭','ingredient_theft'],['buzz','Buzz Lightyear','🎯','laser_block']];
 const DEFAULT_SETTINGS={streaks:true,powers:true,quick_guess:false,jackpot:false,stat_titles:true,final_bet:false,animations:true,leader_mode:'rotating',fixed_leader_player_id:null};
 const state={sb:null,user:null,room:null,players:[],me:null,round:null,answers:[],songs:[],presence:{},channel:null,poll:null,view:'home',joinCode:'',joinName:'',joinColor:null,joinAvatar:null,adminPin:'',adminSelectedSong:1,refreshing:false,timer:null,startError:'',manageOpen:false,lobbySettings:{roundCount:10,gameMode:'mix',leaderMode:'rotating',fixedLeader:null,streaks:true,powers:true,quick_guess:false,jackpot:false,stat_titles:true,final_bet:false,animations:true},currentAnswer:{film:'',title:'',year:'',text:'',artist:''},timerSeconds:0,timerRoundId:null,timerPhase:null,lastShownPower:null,answerPhaseStartedAt:null};
 document.addEventListener('DOMContentLoaded',init);window.addEventListener('beforeunload',cleanup);
@@ -294,9 +294,52 @@ async function updateManagedPlayer(playerId){
   }catch(e){console.error(e);toast(`Wijzigen mislukt: ${e.message||e}`)}
 }
 
-function rules(type,p=null){let x=type==='full'?['Juiste film: +1','Juiste titel: +1','Exact filmjaar: +1','Maximum: 3']:type==='film'?['Juiste film: +2']:type==='title'?['Juiste titel: +2']:type==='artist'?['Juiste uitvoerder/personage: +2']:['Exact: +3','1 jaar verschil: +2','2 jaar verschil: +1','Verder: 0'];if(p==='hyperdrive')x.push('Hyperdrive: alle punten dubbel');if(p==='wild_ride'&&type==='year')x=['Exact: +3','Maximaal 2 jaar verschil: +2','Maximaal 4 jaar verschil: +1'];if(p==='hidden_treasure')x.push('Verborgen schat: minimaal 1 goed = +1 bonus');if(p==='ghost_whisper')x.push('Geestenfluistering: kies 10 seconden uit alle jaartallen');if(p==='second_drop')x.push('Tweede val: rode antwoorden 30 seconden aanpassen');if(p==='lightspeed')x.push('Lichtsnelheid: beantwoord binnen 8s = +1 bonus');if(p==='small_world')x.push('Kleine wereld harmonie: minder scorende spelers schenken +1 bonus');return `<div class="rulebox"><h3>Punten deze ronde</h3>${x.map(v=>`<div>• ${v}</div>`).join('')}</div>`}
+function rules(type,p=null){let x=type==='full'?['Juiste film: +1','Juiste titel: +1','Exact filmjaar: +1','Maximum: 3']:type==='film'?['Juiste film: +2']:type==='title'?['Juiste titel: +2']:type==='artist'?['Juiste uitvoerder/personage: +2']:['Exact: +3','1 jaar verschil: +2','2 jaar verschil: +1','Verder: 0'];if(p==='hyperdrive')x.push('Hyperdrive: alle punten dubbel');if(p==='wild_ride'&&type==='year')x=['Exact: +3','Maximaal 2 jaar verschil: +2','Maximaal 4 jaar verschil: +1'];if(p==='hidden_treasure')x.push('Verborgen schat: minimaal 1 goed = +1 bonus');if(p==='ghost_whisper')x.push('Geestenfluistering: kies 10 seconden uit alle jaartallen');if(p==='second_drop')x.push('Tweede val: rode antwoorden 30 seconden aanpassen');if(p==='lightspeed')x.push('Lichtsnelheid: beantwoord binnen 8s = +1 bonus');if(p==='small_world')x.push('Kleine wereld harmonie: minder scorende spelers schenken +1 bonus');if(p==='ingredient_theft')x.push('Remy\'s Keukendiefstal: gekopieerd antwoord');if(p==='laser_block')x.push('Laser Blokkade: neutraliseer een actieve kracht');if(p==='laser_blocked')x.push('Laser Blokkade: alle krachten zijn deze ronde geannuleerd! 💥');return `<div class="rulebox"><h3>Punten deze ronde</h3>${x.map(v=>`<div>• ${v}</div>`).join('')}</div>`}
 function power(){return state.round?.active_power||null}
-function powerButton(){if(!settings().powers||!state.me||state.me.power_used||power())return'';let a=A(state.me.avatar_id);if(a.power==='ghost_whisper'&&state.round.question_type!=='year')return'';return `<button class="btn secondary full" onclick="activatePower('${a.power}')">${a.icon} Gebruik ${esc(a.name)}-kracht</button>`}
+function powerButton(){
+  if(!settings().powers||!state.me)return '';
+  const cards=state.me.power_cards||[];
+  const used=state.me.used_cards||[];
+  const activePower=power();
+  if(cards.length===0)return '';
+  return `<div class="deck-container">
+    ${cards.map(pName=>{
+      const avatar=AVATARS.find(x=>x[3]===pName)||['','','❓',''];
+      const isUsed=used.includes(pName);
+      const isActive=activePower===pName;
+      const isBlocked=activePower==='laser_blocked' && state.round.power_used_by_player_id===state.me.id && isUsed;
+      let classes=['power-card'];
+      if(isUsed) classes.push('used');
+      if(isActive) classes.push('active');
+      if(isBlocked) classes.push('blocked');
+      let clickAction='';
+      if(!isUsed){
+        if(!activePower){
+          if(pName==='laser_block'){
+            clickAction=`toast('Er is geen actieve kracht om te blokkeren.')`;
+          } else if(pName==='ghost_whisper'&&state.round.question_type!=='year'){
+            clickAction=`toast('Geestenfluistering kan alleen bij jaartal-vragen!')`;
+          } else if(pName==='ingredient_theft'){
+            clickAction=`openStealDialog()`;
+          } else {
+            clickAction=`activatePower('${pName}')`;
+          }
+        } else {
+          if(pName==='laser_block' && activePower !== 'laser_blocked'){
+            clickAction=`activatePower('laser_block')`;
+          } else {
+            clickAction=`toast('Er is al een kracht actief in deze ronde.')`;
+          }
+        }
+      }
+      return `<div class="${classes.join(' ')}" onclick="${clickAction}">
+        <div class="card-emoji">${avatar[2]}</div>
+        <div class="card-name">${esc(avatar[1])}</div>
+        <div class="card-status">${isUsed?'Gebruikt':isActive?'Actief':'Beschikbaar'}</div>
+      </div>`;
+    }).join('')}
+  </div>`;
+}
 async function activatePower(p){let r=await state.sb.rpc('dmq_activate_power',{p_round_id:state.round.id,p_power:p});if(r.error)toast(r.error.message);else schedule()}
 function renderClaim(){let s=currentSong(),claimed=state.round.claimed_by_user_id,mine=claimed===state.user.id,cp=state.players.find(p=>p.user_id===claimed);app().innerHTML=`${topbar('Song starten')}${scorebar()}${progress()}<section class="card question" style="--accent:${cp?.color||'#bb86ff'}"><div class="badge">${esc(state.round.question_type)}</div><div class="songnumber">${esc(s?.label||'Song')}</div><p>Scan de code met de Hitster-telefoon.</p><div class="qrwrap" id="qrArea"></div>${rules(state.round.question_type,power())}${powerButton()}${!claimed?'<button class="btn primary full" onclick="claimSong()">▶ Ik laat deze song afspelen</button>':mine?'<div class="notice green">Jij bedient de muziek.</div><button class="btn primary full" onclick="confirmPlaying()">🔊 De song wordt afgespeeld</button><button class="btn ghost full" style="margin-top:8px" onclick="releaseSong()">Afspeelbeurt vrijgeven</button>':`<div class="notice blue">${esc(cp?.name||'Een speler')} laat de song afspelen.</div>${leader()?'<button class="btn ghost full" onclick="releaseSong()">Claim vrijgeven</button>':''}`}</section>`;setTimeout(()=>showCode(s),0)}
 function showCode(s){let e=document.getElementById('qrArea');if(!e)return;e.innerHTML='';if(s?.code_image_url)e.innerHTML=`<img src="${esc(s.code_image_url)}">`;else if(s?.spotify_url&&window.QRCode)new QRCode(e,{text:s.spotify_url,width:200,height:200,colorDark:'#07152e',colorLight:'#fff'});else e.innerHTML='<div class="qrplaceholder">Nog geen scancode ingesteld.</div>'}
@@ -345,17 +388,7 @@ async function shareRoom(){
       await navigator.share(shareData);
     }else{
       await navigator.clipboard.writeText(url);
-      toast('Deellink gekopieerd!');
-    }
-  }catch(e){
-    if(e.name!=='AbortError'){
-      try{await navigator.clipboard.writeText(url);toast('Deellink gekopieerd!');}catch(err){toast('Kopiëren mislukt.');}
-    }
-  }
-}
-
-
-function showPowersInfo(){
+      toast('Deellink gekopieerd!');function showPowersInfo(){
   let modal=document.createElement('div');
   modal.id='powersModal';
   modal.className='modal-overlay';
@@ -371,7 +404,9 @@ function showPowersInfo(){
         if(x[3]==='hidden_treasure') desc='<b>Verborgen Schat:</b> Krijg +1 bonuspunt als je ten minste één onderdeel van de vraag correct beantwoordt.';
         if(x[3]==='second_drop') desc='<b>Tweede Val:</b> Geldt voor iedereen. Iedereen mag gedurende 30 seconden zijn foutieve (rode) antwoorden herzien en aanpassen.';
         if(x[3]==='lightspeed') desc='<b>Lichtsnelheid:</b> Reageer bliksemsnel! Beantwoord de vraag binnen 8 seconden correct en verdien +1 bonuspunt voor je snelheid.';
-        if(x[3]==='small_world') desc='<b>Kleine Wereld Harmonie:</b> Delen is lief. Spelers die deze ronde minder punten halen dan jij, schenken jou +1 bonuspunt per persoon (max. +2), terwijl ze zelf hun eigen punten behouden.';
+        if(x[3]==='small_world') desc='<b>Kleine Wereld Harmonie:</b> Delen is lief. Spelers die deze ronde minder punten halen dan jij, schenken jou +1 bonuspunt per persoon (max. +2), terwijl ze zelf hun eigen score behouden.';
+        if(x[3]==='ingredient_theft') desc='<b>Remy\'s Keukendiefstal:</b> Kopiëer het antwoord van een tegenstander als je het zelf niet weet. (Alleen mogelijk als zij al hebben geantwoord).';
+        if(x[3]==='laser_block') desc='<b>Laser Blokkade:</b> Neutraliseer de actieve kracht van een tegenstander in deze ronde. (Wordt alleen klikbaar als iemand een kracht activeert).';
         return `<div class="modal-item"><div class="icon">${x[2]}</div><div><h3>${esc(x[1])}</h3><p>${desc}</p></div></div>`;
       }).join('')}
     </div>
@@ -395,6 +430,9 @@ function getPowerMiniDesc(power){
   if(power==='second_drop') return 'Tweede val! Pas rode antwoorden aan!';
   if(power==='lightspeed') return 'Lichtsnelheid! Snelheidsbonus actief!';
   if(power==='small_world') return 'Kleine Wereld Harmonie actief!';
+  if(power==='ingredient_theft') return 'Keukendiefstal! Remy kopieert een antwoord!';
+  if(power==='laser_block') return 'Laser Blokkade! Een kracht wordt geannuleerd!';
+  if(power==='laser_blocked') return 'Gecancelled! Alle krachten deze ronde geannuleerd! 💥';
   return 'Kracht geactiveerd!';
 }
 
@@ -402,16 +440,28 @@ function playPowerTakeover(power,playerName){
   let takeover=document.createElement('div');
   takeover.className='takeover-overlay';
   const avatar=AVATARS.find(x=>x[3]===power)||['','','❓',''];
-  const colors={hyperdrive:'#ff7ac8',wild_ride:'#ffd45c',ghost_whisper:'#69e58d',hidden_treasure:'#74d7ff',second_drop:'#bb86ff',lightspeed:'#69e58d',small_world:'#ffe45f'};
+  const colors={hyperdrive:'#ff7ac8',wild_ride:'#ffd45c',ghost_whisper:'#69e58d',hidden_treasure:'#74d7ff',second_drop:'#bb86ff',lightspeed:'#69e58d',small_world:'#ffe45f',ingredient_theft:'#ff7ac8',laser_block:'#e95f72',laser_blocked:'#e95f72'};
   const color=colors[power]||'#ffffff';
-  takeover.innerHTML=`
-    <div class="takeover-content">
-      <div class="takeover-avatar">${avatar[2]}</div>
-      <h1 class="takeover-title" style="color:${color}">${esc(playerName)} zet in:</h1>
-      <h2 class="takeover-title" style="font-size:32px">${esc(avatar[1])}</h2>
-      <p class="takeover-desc">${esc(getPowerMiniDesc(power))}</p>
-    </div>
-  `;
+  
+  if(power==='laser_block'||power==='laser_blocked'){
+    takeover.innerHTML=`
+      <div class="takeover-content">
+        <div class="takeover-avatar">🎯</div>
+        <h1 class="takeover-title" style="color:${color}">${esc(playerName)} activeert:</h1>
+        <h2 class="takeover-title" style="font-size:32px">Laser Blokkade!</h2>
+        <p class="takeover-desc">De actieve kracht is geneutraliseerd! 💥</p>
+      </div>
+    `;
+  } else {
+    takeover.innerHTML=`
+      <div class="takeover-content">
+        <div class="takeover-avatar">${avatar[2]}</div>
+        <h1 class="takeover-title" style="color:${color}">${esc(playerName)} zet in:</h1>
+        <h2 class="takeover-title" style="font-size:32px">${esc(avatar[1])}</h2>
+        <p class="takeover-desc">${esc(getPowerMiniDesc(power))}</p>
+      </div>
+    `;
+  }
   document.body.appendChild(takeover);
   setTimeout(()=>takeover.classList.add('show'),10);
   triggerPowerEffectEffects(power,takeover);
@@ -430,8 +480,8 @@ function triggerPowerEffectEffects(power,overlay){
       star.textContent='✦';
       let tx=(Math.random()-0.5)*window.innerWidth*1.2;
       let ty=(Math.random()-0.5)*window.innerHeight*1.2;
-      star.style.setProperty('--tx', star.style.setProperty('--tx', `${tx}px`));
-      star.style.setProperty('--ty', star.style.setProperty('--ty', `${ty}px`));
+      star.style.setProperty('--tx', `${tx}px`);
+      star.style.setProperty('--ty', `${ty}px`);
       star.style.left='50%';
       star.style.top='50%';
       star.style.animationDelay=`${Math.random()*0.8}s`;
@@ -480,6 +530,18 @@ function triggerPowerEffectEffects(power,overlay){
       overlay.appendChild(coin);
     }
   }
+  if(power==='ingredient_theft'){
+    const char=Math.random()>0.5?'🧀':'🐭';
+    for(let i=0;i<35;i++){
+      let coin=document.createElement('div');
+      coin.className='coin-particle';
+      coin.textContent=char;
+      coin.style.left=`${Math.random()*100}%`;
+      coin.style.top=`-${Math.random()*50}px`;
+      coin.style.animationDelay=`${Math.random()*1.5}s`;
+      overlay.appendChild(coin);
+    }
+  }
   if(power==='second_drop'){
     let box=document.createElement('div');
     box.className='elevator-box';
@@ -490,6 +552,93 @@ function triggerPowerEffectEffects(power,overlay){
       setTimeout(()=>document.body.classList.remove('rumble-screen'),400);
     },1400);
   }
+  if(power==='laser_block'||power==='laser_blocked'){
+    for(let i=0;i<8;i++){
+      let laser=document.createElement('div');
+      laser.style.position='absolute';
+      laser.style.background='red';
+      laser.style.boxShadow='0 0 10px red';
+      if(Math.random()>0.5){
+        laser.style.width='100vw';
+        laser.style.height='3px';
+        laser.style.left='0';
+        laser.style.top=`${Math.random()*100}%`;
+        laser.style.transform=`rotate(${(Math.random()-0.5)*10}deg)`;
+      } else {
+        laser.style.width='3px';
+        laser.style.height='100vh';
+        laser.style.top='0';
+        laser.style.left=`${Math.random()*100}%`;
+        laser.style.transform=`rotate(${(Math.random()-0.5)*10}deg)`;
+      }
+      laser.style.opacity='0';
+      laser.style.transition='opacity 0.2s';
+      overlay.appendChild(laser);
+      setTimeout(()=>laser.style.opacity='0.8', 200 + i*150);
+      setTimeout(()=>laser.style.opacity='0', 400 + i*150);
+    }
+  }
+}
+
+function openStealDialog(){
+  let modal=document.createElement('div');
+  modal.id='stealModal';
+  modal.className='modal-overlay';
+  const others=state.players.filter(p=>p.id!==state.me.id);
+  modal.innerHTML=`<div class="modal-content">
+    <button class="modal-close" onclick="closeStealDialog()">×</button>
+    <h2 class="modal-title">🐭 Remy's Keukendiefstal</h2>
+    <p>Kies een speler om zijn/haar ingevulde antwoord te kopiëren:</p>
+    <div class="modal-body" style="gap:10px;margin-top:12px">
+      ${others.map(p=>{
+        const hasAnswered=state.answers.some(ans=>ans.player_id===p.id);
+        return `<button class="btn secondary full" style="justify-content:flex-start;text-align:left;--choice:${p.color};margin-bottom:8px" ${hasAnswered?'':'disabled'} onclick="stealFromPlayer('${p.id}')">
+          <span style="font-size:20px;margin-right:8px">${A(p.avatar_id).icon}</span>
+          <strong>${esc(p.name)}</strong>
+          <span style="margin-left:auto;font-size:11px;opacity:0.6">${hasAnswered?'✓ Antwoord binnen':'⏳ Denkt nog na'}</span>
+        </button>`;
+      }).join('')}
+    </div>
+  </div>`;
+  document.body.appendChild(modal);
+  setTimeout(()=>modal.classList.add('show'),10);
+}
+function closeStealDialog(){
+  let modal=document.getElementById('stealModal');
+  if(modal){
+    modal.classList.remove('show');
+    setTimeout(()=>modal.remove(),300);
+  }
+}
+async function stealFromPlayer(targetPlayerId){
+  closeStealDialog();
+  const ansRow=state.answers.find(ans=>ans.player_id===targetPlayerId);
+  if(!ansRow || !ansRow.answer){
+    toast('Kon antwoord niet ophalen.');
+    return;
+  }
+  const a=ansRow.answer;
+  const t=state.round.question_type;
+  if(t==='full'){
+    state.currentAnswer.film=a.film||'';
+    state.currentAnswer.title=a.title||'';
+    state.currentAnswer.year=a.year||'';
+    let f=document.getElementById('ansFilm');if(f)f.value=state.currentAnswer.film;
+    let ti=document.getElementById('ansTitle');if(ti)ti.value=state.currentAnswer.title;
+    let y=document.getElementById('ansYear');if(y)y.value=state.currentAnswer.year;
+  } else if(t==='year'){
+    state.currentAnswer.year=a.year||'';
+    let y=document.getElementById('ansYear');if(y)y.value=state.currentAnswer.year;
+  } else {
+    state.currentAnswer.text=a[t]||'';
+    let tx=document.getElementById('ansText');if(tx)tx.value=state.currentAnswer.text;
+  }
+  let r=await state.sb.rpc('dmq_activate_power',{p_round_id:state.round.id,p_power:'ingredient_theft'});
+  if(r.error)toast(r.error.message);
+  else {
+    toast('Antwoord gekopieerd!');
+    schedule();
+  }
 }
 
 Object.assign(window,{
@@ -497,5 +646,5 @@ Object.assign(window,{
   removeManagedPlayer,updateManagedPlayer,startGame,refreshAll,shareRoom,
   createRoom,goJoin,chooseJoinColor,chooseJoinAvatar,joinRoom,render,
   renderLobby,saveSong,nextRound,confirmMyPoints,completeMyRound,
-  showPowersInfo,closePowersInfo
+  showPowersInfo,closePowersInfo,openStealDialog,closeStealDialog,stealFromPlayer
 });
