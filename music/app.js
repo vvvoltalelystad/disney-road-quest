@@ -45,7 +45,35 @@ let rt=null;function schedule(){clearTimeout(rt);rt=setTimeout(refreshAll,130)}
 async function refreshAll(){if(state.refreshing||!state.room)return;state.refreshing=true;try{let r=await state.sb.from('dmq_rooms').select('*').eq('id',state.room.id).single();let p=await state.sb.from('dmq_players').select('*').eq('room_id',state.room.id).order('joined_at');if(r.data)state.room=r.data;if(p.data){state.players=p.data;state.me=p.data.find(x=>x.user_id===state.user.id)||state.me}await fetchRound();render()}finally{state.refreshing=false}}
 function subscribe(){cleanup();state.channel=state.sb.channel('dmq2-'+state.room.id,{config:{presence:{key:state.user.id}}}).on('presence',{event:'sync'},()=>{state.presence=state.channel.presenceState();render()}).on('postgres_changes',{event:'*',schema:'public',table:'dmq_rooms',filter:`id=eq.${state.room.id}`},schedule).on('postgres_changes',{event:'*',schema:'public',table:'dmq_players',filter:`room_id=eq.${state.room.id}`},schedule).on('postgres_changes',{event:'*',schema:'public',table:'dmq_rounds',filter:`room_id=eq.${state.room.id}`},schedule).on('postgres_changes',{event:'*',schema:'public',table:'dmq_answers',filter:`room_id=eq.${state.room.id}`},schedule).subscribe(async s=>{if(s==='SUBSCRIBED')await state.channel.track({user_id:state.user.id,name:state.me?.name||'organisator'})});state.poll=setInterval(refreshAll,4500)}
 function cleanup(){if(state.poll)clearInterval(state.poll);state.poll=null;if(state.channel&&state.sb)state.sb.removeChannel(state.channel).catch(()=>{});state.channel=null}
-function render(){if(!state.room){if(state.view==='join')renderJoin();else if(state.view==='admin')renderAdmin();else renderHome();return}if(state.room.status==='lobby'){renderLobby();return}if(state.room.status==='finished'){renderFinal();return}if(!state.round){loading('Ronde laden…');return}({claim:renderClaim,answer:renderAnswer,power_phantom:renderPhantom,power_tower:renderTower,review:renderReview,standings:renderStandings}[state.round.phase]||renderAnswer)()}
+function render(){
+  const activeId=document.activeElement?.id;
+  const selStart=document.activeElement?.selectionStart;
+  const selEnd=document.activeElement?.selectionEnd;
+
+  if(!state.room){
+    if(state.view==='join')renderJoin();
+    else if(state.view==='admin')renderAdmin();
+    else renderHome();
+  } else if(state.room.status==='lobby'){
+    renderLobby();
+  } else if(state.room.status==='finished'){
+    renderFinal();
+  } else if(!state.round){
+    loading('Ronde laden…');
+  } else {
+    ({claim:renderClaim,answer:renderAnswer,power_phantom:renderPhantom,power_tower:renderTower,review:renderReview,standings:renderStandings}[state.round.phase]||renderAnswer)();
+  }
+
+  if(activeId){
+    const el=document.getElementById(activeId);
+    if(el){
+      el.focus();
+      if(typeof selStart==='number'&&typeof selEnd==='number'){
+        try{el.setSelectionRange(selStart,selEnd)}catch(e){}
+      }
+    }
+  }
+}
 
 async function loadJoinChoices(code){
   state.players=[];
