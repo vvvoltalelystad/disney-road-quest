@@ -383,8 +383,9 @@ create policy "answers_insert_own" on dmq_answers for insert to authenticated wi
   user_id=auth.uid() and exists(select 1 from dmq_players p where p.id=player_id and p.user_id=auth.uid() and p.room_id=room_id)
 );
 drop policy if exists "answers_update_own_or_host" on dmq_answers;
-create policy "answers_update_own_or_host" on dmq_answers for update to authenticated using(
-  user_id=auth.uid() or dmq_is_room_host(room_id)
+drop policy if exists "answers_update_own_or_host_or_leader" on dmq_answers;
+create policy "answers_update_own_or_host_or_leader" on dmq_answers for update to authenticated using(
+  user_id=auth.uid() or dmq_is_room_host(room_id) or dmq_is_leader(room_id)
 );
 
 drop policy if exists "songs_select" on dmq_songs;
