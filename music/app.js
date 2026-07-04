@@ -1,4 +1,4 @@
-// Build trigger: 2026-07-04 22:51
+// Build trigger: 2026-07-04 23:22
 "use strict";
 const cfg=window.DMQ_CONFIG||{};
 const COLORS=[['blue','Blauw','#74d7ff'],['green','Groen','#69e58d'],['yellow','Geel','#ffe45f'],['pink','Roze','#ff7ac8'],['purple','Paars','#bb86ff']];
