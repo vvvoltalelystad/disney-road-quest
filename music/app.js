@@ -442,7 +442,13 @@ async function completeRound(){let r=await state.sb.rpc('dmq_complete_round',{p_
 function renderStandings(){let sorted=[...state.players].sort((a,b)=>b.score-a.score);app().innerHTML=`${topbar('Tussenstand')}${rules(state.round.question_type,power())}<section class="card"><div class="standings">${sorted.map((p,i)=>`<div class="rank" style="border-color:${p.color}"><div class="rankicon">${['🥇','🥈','🥉','🎵','🎶'][i]}</div><div><strong>${A(p.avatar_id).icon} ${esc(p.name)}</strong><small class="muted">${esc(A(p.avatar_id).name)}</small></div><div class="rankscore">${p.score} ★</div></div>`).join('')}</div>${leader()?`<button class="btn primary full" style="margin-top:14px" onclick="nextRound()">${state.room.current_round_no>=state.room.total_rounds?'Einduitslag':'Volgende song'}</button>`:`<div class="notice blue">${esc(state.players.find(p=>p.id===leaderId())?.name||'De spelleider')} start de volgende ronde.</div>`}</section>`}
 async function nextRound(){state.reviewFinalPoints=null;state.reviewCorrectionNote=null;let r=await state.sb.rpc('dmq_next_round_v2',{p_room_id:state.room.id});if(r.error)toast(r.error.message);else schedule()}
 const TITLES=[['De Maestro van Main Street','De Gouden Groove van het Kasteel','De Onbetwiste Oorwurmkoning','De Headliner van de Magische Hitlijst','De Dirigent van de Disney-deuntjes'],['De Eeuwige Encore','De Zilveren Soundtrackheld','De Bijna-Banger van Big Thunder','De Ster van het Voorprogramma','De Remix die nét niet won'],['De Phantom van het Vergeten Refrein','De Shuffleknop in Mensenvorm','De FastPass naar het Foute Jaartal','De Piraat met de Verkeerde Playlist','De Toonzoeker van de Tower']];
-function renderFinal(){let s=[...state.players].sort((a,b)=>b.score-a.score);app().innerHTML=`${topbar('Einduitslag','leaveRoom()')}<section class="card hero"><div class="logo">♫</div><h1>${esc(s[0]?.name)} wint!</h1></section><section class="card"><div class="standings">${s.map((p,i)=>`<div class="rank" style="border-color:${p.color}"><div class="rankicon">${A(p.avatar_id).icon}</div><div><strong>${esc(p.name)}</strong><small class="gold">${esc(TITLES[Math.min(i,2)][i%5])}</small></div><div class="rankscore">${p.score} ★</div></div>`).join('')}</div><button class="btn ghost full" style="margin-top:14px" onclick="leaveRoom()">Terug</button></section>`}
+function renderFinal(){
+  let s=[...state.players].sort((a,b)=>b.score-a.score);
+  app().innerHTML=`${topbar('Einduitslag','leaveRoom()')}<section class="card hero"><div class="logo">♫</div><h1>${esc(s[0]?.name)} wint!</h1></section><section class="card"><div class="standings">${s.map((p,i)=>`<div class="rank" style="border-color:${p.color}"><div class="rankicon">${A(p.avatar_id).icon}</div><div><strong>${esc(p.name)}</strong><small class="gold">${esc(TITLES[Math.min(i,2)][i%5])}</small></div><div class="rankscore">${p.score} ★</div></div>`).join('')}</div><button class="btn ghost full" style="margin-top:14px" onclick="leaveRoom()">Terug</button></section>`;
+  if(state.lobbySettings.animations&&s.length>0){
+    setTimeout(()=>playWinnerCelebration(s[0],s.slice(1)),150);
+  }
+}
 function renderAdmin(){let s=state.songs.find(x=>+x.song_number===+state.adminSelectedSong)||{};app().innerHTML=`${topbar('Songbeheer · 100 songs',"state.view='home';render()")}
 <section class="card"><div class="field"><label>Beheer-PIN</label><input id="adminPin" type="password" value="${esc(state.adminPin)}"></div><div class="field"><label>Song</label><select id="songSelect" onchange="state.adminPin=adminPin.value;state.adminSelectedSong=+this.value;renderAdmin()">${state.songs.map(x=>`<option value="${x.song_number}" ${+x.song_number===+state.adminSelectedSong?'selected':''}>${esc(x.label)} · ${esc(x.title||'leeg')}</option>`).join('')}</select></div></section>
 <section class="card"><div class="field"><label>Titel</label><input id="songTitle" value="${esc(s.title||'')}"></div><div class="field"><label>Film</label><input id="songFilm" value="${esc(s.film||'')}"></div><div class="grid2"><div class="field"><label>Jaar</label><input id="songYear" type="number" value="${esc(s.year||'')}"></div><div class="field"><label>Uitvoerder</label><input id="songArtist" value="${esc(s.artist||'')}"></div></div><div class="field"><label>Spotify-link</label><input id="songSpotify" value="${esc(s.spotify_url||'')}"></div><div class="field"><label>Codeafbeelding-URL</label><input id="songCode" value="${esc(s.code_image_url||'')}"></div><div class="field"><label>Film-aliases</label><input id="filmAliases" value="${esc((s.film_aliases||[]).join(', '))}"></div><div class="field"><label>Titel-aliases</label><input id="titleAliases" value="${esc((s.title_aliases||[]).join(', '))}"></div><div class="field"><label>Uitvoerder-aliases</label><input id="artistAliases" value="${esc((s.artist_aliases||[]).join(', '))}"></div><label class="toggleline">Song actief<input id="songEnabled" type="checkbox" ${s.enabled?'checked':''}></label><button class="btn primary full" onclick="saveSong()">Opslaan</button></section>`}
@@ -706,6 +712,64 @@ async function stealFromPlayer(targetPlayerId){
   else {
     toast('Antwoord gekopieerd!');
     schedule();
+  }
+}
+
+function playWinnerCelebration(winner,others){
+  const overlay=document.createElement('div');
+  overlay.className='celebration-overlay';
+  const winAv=A(winner.avatar_id);
+  const color=winner.color||'#ffd45c';
+  overlay.innerHTML=`
+    <div class="celebration-container">
+      <div class="celebration-shine" style="background: radial-gradient(circle, ${color}33 0%, transparent 70%)"></div>
+      <div class="winner-crown">👑</div>
+      <div class="winner-avatar-large animate-winner">${winAv.icon}</div>
+      <h1 class="winner-name-large" style="text-shadow: 0 0 20px ${color}aa">${esc(winner.name)}</h1>
+      <p class="winner-title-large">${esc(TITLES[0][Math.floor(Math.random()*5)])}</p>
+      <div class="winner-score-large">${winner.score} ★</div>
+      
+      <div class="cheering-section">
+        ${others.map((o,i)=>{
+          const av=A(o.avatar_id);
+          return `
+            <div class="cheering-player" style="animation-delay:${i*0.15}s">
+              <div class="cheer-emoji">${av.icon}</div>
+              <div class="cheer-name">${esc(o.name)}</div>
+            </div>
+          `;
+        }).join('')}
+      </div>
+      <button class="btn primary close-celebration" onclick="this.closest('.celebration-overlay').remove()">Bekijk uitslag</button>
+    </div>
+  `;
+  document.body.appendChild(overlay);
+  spawnThemeParticles(winner.avatar_id,overlay);
+}
+
+function spawnThemeParticles(avatarId,parent){
+  let emojis=['✨','🎉','🏆','⭐'];
+  if(avatarId==='elsa')emojis=['❄️','✨','🩵'];
+  else if(avatarId==='buzz')emojis=['🚀','⭐','🔫','✨'];
+  else if(avatarId==='jack')emojis=['🪙','💰','🏴‍☠️'];
+  else if(avatarId==='remy'||avatarId==='linguini')emojis=['🧀','👨‍🍳','🥖','✨'];
+  else if(avatarId==='peter'||avatarId==='wendy')emojis=['✨','🧚‍♂️','⭐','💫'];
+  else if(avatarId==='donald')emojis=['🦆','✨','🗯️'];
+  else if(avatarId==='simba')emojis=['🦁','🍂','🍁','⭐'];
+  else if(avatarId==='taran')emojis=['⚔️','✨','🔮'];
+  else if(avatarId==='heihei')emojis=['🐔','🪶','🤪'];
+  for(let i=0;i<60;i++){
+    setTimeout(()=>{
+      if(!parent.parentNode)return;
+      const p=document.createElement('div');
+      p.className='celebration-particle';
+      p.textContent=emojis[Math.floor(Math.random()*emojis.length)];
+      p.style.left=Math.random()*100+'vw';
+      p.style.fontSize=(Math.random()*20+16)+'px';
+      p.style.animationDuration=(Math.random()*2.5+2)+'s';
+      p.style.animationDelay=(Math.random()*2)+'s';
+      parent.appendChild(p);
+    },i*50);
   }
 }
 
