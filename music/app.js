@@ -444,8 +444,9 @@ async function nextRound(){state.reviewFinalPoints=null;state.reviewCorrectionNo
 const TITLES=[['De Maestro van Main Street','De Gouden Groove van het Kasteel','De Onbetwiste Oorwurmkoning','De Headliner van de Magische Hitlijst','De Dirigent van de Disney-deuntjes'],['De Eeuwige Encore','De Zilveren Soundtrackheld','De Bijna-Banger van Big Thunder','De Ster van het Voorprogramma','De Remix die nét niet won'],['De Phantom van het Vergeten Refrein','De Shuffleknop in Mensenvorm','De FastPass naar het Foute Jaartal','De Piraat met de Verkeerde Playlist','De Toonzoeker van de Tower']];
 function renderFinal(){
   let s=[...state.players].sort((a,b)=>b.score-a.score);
-  app().innerHTML=`${topbar('Einduitslag','leaveRoom()')}<section class="card hero"><div class="logo">♫</div><h1>${esc(s[0]?.name)} wint!</h1></section><section class="card"><div class="standings">${s.map((p,i)=>`<div class="rank" style="border-color:${p.color}"><div class="rankicon">${A(p.avatar_id).icon}</div><div><strong>${esc(p.name)}</strong><small class="gold">${esc(TITLES[Math.min(i,2)][i%5])}</small></div><div class="rankscore">${p.score} ★</div></div>`).join('')}</div><button class="btn ghost full" style="margin-top:14px" onclick="leaveRoom()">Terug</button></section>`;
-  if(state.lobbySettings.animations&&s.length>0){
+  app().innerHTML=`${topbar('Einduitslag','leaveRoom()')}<section class="card hero"><div class="logo">♫</div><h1>${esc(s[0]?.name)} wint!</h1></section><section class="card"><div class="standings">${s.map((p,i)=>`<div class="rank" style="border-color:${p.color}"><div class="rankicon">${['🥇','🥈','🥉','🎵','🎶'][Math.min(i,4)]}</div><div><strong>${A(p.avatar_id).icon} ${esc(p.name)}</strong><small class="gold">${esc(TITLES[Math.min(i,2)][i%5])}</small></div><div class="rankscore">${p.score} ★</div></div>`).join('')}</div><button class="btn ghost full" style="margin-top:14px" onclick="leaveRoom()">Terug</button></section>`;
+  if(state.lobbySettings.animations&&s.length>0&&!state.celebrationShown){
+    state.celebrationShown=true;
     setTimeout(()=>playWinnerCelebration(s[0],s.slice(1)),150);
   }
 }
@@ -740,7 +741,7 @@ function playWinnerCelebration(winner,others){
           `;
         }).join('')}
       </div>
-      <button class="btn primary close-celebration" onclick="this.closest('.celebration-overlay').remove()">Bekijk uitslag</button>
+      <button class="btn primary close-celebration" onclick="closeCelebration()">Bekijk uitslag</button>
     </div>
   `;
   document.body.appendChild(overlay);
@@ -773,10 +774,16 @@ function spawnThemeParticles(avatarId,parent){
   }
 }
 
+function closeCelebration(){
+  const o=document.querySelector('.celebration-overlay');
+  if(o)o.remove();
+}
+
 Object.assign(window,{
   leaveRoom,openSongAdminFromLobby,regenerateRoomCode,resetRoomToLobby,
   removeManagedPlayer,updateManagedPlayer,startGame,refreshAll,shareRoom,
   createRoom,goJoin,chooseJoinColor,chooseJoinAvatar,joinRoom,render,
   renderLobby,saveSong,nextRound,confirmMyPoints,completeMyRound,
-  showPowersInfo,closePowersInfo,openStealDialog,closeStealDialog,stealFromPlayer
+  showPowersInfo,closePowersInfo,openStealDialog,closeStealDialog,stealFromPlayer,
+  closeCelebration
 });
