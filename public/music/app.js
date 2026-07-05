@@ -1,5 +1,6 @@
 // Build trigger: 2026-07-04 23:22
 "use strict";
+const DMQ_VERSION='52';
 const cfg=window.DMQ_CONFIG||{};
 const COLORS=[['blue','Blauw','#74d7ff'],['green','Groen','#69e58d'],['yellow','Geel','#ffe45f'],['pink','Roze','#ff7ac8'],['purple','Paars','#bb86ff'],['orange','Oranje','#ff9233']];
 const AVATARS=[['linguini','Alfredo Linguini','avatars/linguini.webp'],['donald','Donald Duck','avatars/donald.webp'],['stitch','Stitch','👽'],['elsa','Elsa','❄️'],['buzz','Buzz Lightyear','👨‍🚀'],['jack','Jack Sparrow','🏴‍☠️'],['simba','Simba','🦁'],['remy','Remy','🐭'],['peter','Peter Pan','🧚‍♂️'],['taran','Taran','⚔️'],['wendy','Wendy Darling','👧'],['heihei','Heihei','🐔']];
@@ -17,7 +18,7 @@ function loading(m='Even laden…'){app().innerHTML=`<section class="card hero">
 function fatal(m,e){console.error(e);app().innerHTML=`<section class="card"><h2>Er ging iets mis</h2><p>${esc(m)}</p><div class="notice red">${esc(e?.message||e)}</div><button class="btn primary full" onclick="location.reload()">Opnieuw</button></section>`}
 function topbar(t,b=''){const action=b||(state.room?'leaveRoom()':'');return `<div class="topbar">${action?`<button class="iconbtn" onclick="${action}">←</button>`:'<span></span>'}<h1>${esc(t)}</h1><button class="iconbtn" onclick="refreshAll()">↻</button></div>`}
 function C(id){const x=COLORS.find(v=>v[0]===id)||COLORS[0];return{id:x[0],name:x[1],hex:x[2]}}
-function A(id){const map={hyperspace:'buzz',big_thunder:'taran',phantom:'stitch',pirates:'jack',tower:'stitch',star_tours:'buzz',small_world:'linguini',ratatouille:'remy',buzz:'buzz'};const targetId=map[id]||id;const x=AVATARS.find(v=>v[0]===targetId)||AVATARS[0];const isImg=x[2].includes('/')||x[2].endsWith('.webp')||x[2].endsWith('.png');const iconHtml=isImg?`<img src="${x[2]}" class="avatar-img-inline" alt="${x[1]}">`:x[2];return{id:x[0],name:x[1],icon:iconHtml,power:x[3]}}
+function A(id){const map={hyperspace:'buzz',big_thunder:'taran',phantom:'stitch',pirates:'jack',tower:'stitch',star_tours:'buzz',small_world:'linguini',ratatouille:'remy',buzz:'buzz'};const targetId=map[id]||id;const x=AVATARS.find(v=>v[0]===targetId)||AVATARS[0];const isImg=x[2].includes('/')||x[2].endsWith('.webp')||x[2].endsWith('.png');const iconHtml=isImg?`<img src="${x[2]}" class="avatar-img-inline" style="width:1.1em;height:1.1em;border-radius:50%;object-fit:cover;vertical-align:-0.15em;display:inline-block;" onload="removeBg(this)" alt="${x[1]}">`:x[2];return{id:x[0],name:x[1],icon:iconHtml,power:x[3]}}
 function online(p){return Object.values(state.presence||{}).flat().some(x=>x.user_id===p.user_id)}
 function host(){return state.room?.host_user_id===state.user?.id}
 function settings(){return{...DEFAULT_SETTINGS,...(state.room?.settings||{})}}
@@ -104,9 +105,9 @@ async function loadJoinChoices(code){
 }
 
 
-function leaveRoom(){if(state.room&&state.room.status==='playing'){if(!confirm('Weet je zeker dat je het actieve spel wilt verlaten?'))return}cleanup();state.room=null;state.players=[];state.me=null;state.round=null;state.answers=[];state.presence={};state.manageOpen=false;state.startError='';state.view='home';state.celebrationShown=false;localStorage.removeItem('dmq-v2-room');history.replaceState(null,'',location.pathname+'?v=31');render()}
+function leaveRoom(){if(state.room&&state.room.status==='playing'){if(!confirm('Weet je zeker dat je het actieve spel wilt verlaten?'))return}cleanup();state.room=null;state.players=[];state.me=null;state.round=null;state.answers=[];state.presence={};state.manageOpen=false;state.startError='';state.view='home';state.celebrationShown=false;localStorage.removeItem('dmq-v2-room');history.replaceState(null,'',location.pathname+'?v='+DMQ_VERSION);render()}
 function openSongAdminFromLobby(){
-  const url=`${location.origin}${location.pathname}?admin=1&v=29`;
+  const url=`${location.origin}${location.pathname}?admin=1&v=${DMQ_VERSION}`;
   const w=window.open(url,'_blank');
   if(!w){location.href=url}
 }
@@ -128,8 +129,8 @@ app().innerHTML=`${topbar('Deelnemen',"state.view='home';render()")}
 <section class="card"><div class="field"><label>Kamercode</label><input id="joinCode" value="${esc(state.joinCode)}"></div><div class="field"><label>Jouw naam</label><input id="joinName" maxlength="18" value="${esc(state.joinName)}"></div></section>
 <section class="card"><h2>Kies een kleur</h2><div class="choicegrid">${COLORS.map(x=>{let taken=state.players.some(p=>p.color_id===x[0]);return `<button class="colorchoice ${state.joinColor===x[0]?'selected':''} ${taken?'taken':''}" style="--choice:${x[2]}" ${taken?'disabled':''} onclick="chooseJoinColor('${x[0]}')"><span class="colororb"></span>${x[1]}</button>`}).join('')}</div></section>
 <section class="card"><h2>Kies een Disney-karakter</h2><div class="avatargrid">${AVATARS.map(x=>{let taken=state.players.some(p=>p.avatar_id===x[0]);return `<button class="avatarchoice ${state.joinAvatar===x[0]?'selected':''} ${taken?'taken':''}" ${taken?'disabled':''} onclick="chooseJoinAvatar('${x[0]}')"><span class="avataricon">${A(x[0]).icon}</span>${x[1]}</button>`}).join('')}</div></section><section class="card"><h2>Magische Attractiekaarten</h2><p class="small muted" style="margin-bottom:12px">Tijdens het spel krijgt elke speler 3 willekeurige kaarten toebedeeld:</p><div style="display:grid;gap:8px">${POWERS_EXPLAIN.map(x=>`<div style="display:flex;align-items:center;gap:10px;font-size:12px;background:rgba(25,50,90,0.2);padding:8px 10px;border-radius:12px;border:1px solid rgba(255,255,255,0.06)"><span style="font-size:22px;line-height:1">${x.icon}</span><div style="text-align:left"><strong>${esc(x.name)}:</strong> <span class="muted">${esc(x.desc)}</span></div></div>`).join('')}</div></section><section class="card"><button class="btn primary full" onclick="joinRoom()">Bevestigen</button></section>`}
-async function createRoom(){loading('Kamer maken…');let r=await state.sb.rpc('dmq_create_host_room');if(r.error){fatal('Kamer maken mislukt.',r.error);return}let row=Array.isArray(r.data)?r.data[0]:r.data;history.replaceState(null,'',`${location.pathname}?host=${row.room_code}&v=29`);await loadRoom(row.room_id,false)}
-async function joinRoom(){state.joinCode=(document.getElementById('joinCode').value||'').trim().toUpperCase();state.joinName=(document.getElementById('joinName').value||'').trim();if(!state.joinCode||!state.joinName||!state.joinColor||!state.joinAvatar){toast('Vul naam, kleur en avatar in.');return}let c=C(state.joinColor);loading('Deelnemen…');let r=await state.sb.rpc('dmq_join_room_v2',{p_code:state.joinCode,p_player_name:state.joinName,p_color_id:c.id,p_color:c.hex,p_avatar_id:state.joinAvatar});if(r.error){fatal('Deelnemen mislukt.',r.error);return}let row=Array.isArray(r.data)?r.data[0]:r.data;history.replaceState(null,'',`${location.pathname}?room=${state.joinCode}&v=29`);await loadRoom(row.room_id,false)}
+async function createRoom(){loading('Kamer maken…');let r=await state.sb.rpc('dmq_create_host_room');if(r.error){fatal('Kamer maken mislukt.',r.error);return}let row=Array.isArray(r.data)?r.data[0]:r.data;history.replaceState(null,'',`${location.pathname}?host=${row.room_code}&v=${DMQ_VERSION}`);await loadRoom(row.room_id,false)}
+async function joinRoom(){state.joinCode=(document.getElementById('joinCode').value||'').trim().toUpperCase();state.joinName=(document.getElementById('joinName').value||'').trim();if(!state.joinCode||!state.joinName||!state.joinColor||!state.joinAvatar){toast('Vul naam, kleur en avatar in.');return}let c=C(state.joinColor);loading('Deelnemen…');let r=await state.sb.rpc('dmq_join_room_v2',{p_code:state.joinCode,p_player_name:state.joinName,p_color_id:c.id,p_color:c.hex,p_avatar_id:state.joinAvatar});if(r.error){fatal('Deelnemen mislukt.',r.error);return}let row=Array.isArray(r.data)?r.data[0]:r.data;history.replaceState(null,'',`${location.pathname}?room=${state.joinCode}&v=${DMQ_VERSION}`);await loadRoom(row.room_id,false)}
 function toggle(id,label,on,key){return `<label class="toggleline"><span>${label}</span><input id="${id}" type="checkbox" ${on?'checked':''} onchange="state.lobbySettings['${key}']=this.checked; renderLobby();"></label>`}
 
 function byId(id){return document.getElementById(id)}
@@ -190,7 +191,7 @@ function renderLobby(){
     state.lobbySettings.fixedLeader = state.players[0].id;
   }
   app().innerHTML=`${topbar('Wachtruimte','leaveRoom()')}
-  <section class="card hero"><div class="badge">Kamercode</div><div class="roomcode">${esc(state.room.code)}</div><div id="joinQR" class="joinqr"></div><p>Laat spelers deze QR-code scannen of deel de link:</p><div style="margin:12px 0;background:#051024;padding:10px;border-radius:8px;border:1px solid #1a365d;font-size:12px;word-break:break-all;color:#74d7ff;font-family:monospace;line-height:1.4;">${location.origin}${location.pathname}?join=${state.room.code}&v=29</div><button class="btn ghost" onclick="shareRoom()">🔗 Kopieer & deel link</button></section>
+  <section class="card hero"><div class="badge">Kamercode</div><div class="roomcode">${esc(state.room.code)}</div><div id="joinQR" class="joinqr"></div><p>Laat spelers deze QR-code scannen of deel de link:</p><div style="margin:12px 0;background:#051024;padding:10px;border-radius:8px;border:1px solid #1a365d;font-size:12px;word-break:break-all;color:#74d7ff;font-family:monospace;line-height:1.4;">${location.origin}${location.pathname}?join=${state.room.code}&v=${DMQ_VERSION}</div><button class="btn ghost" onclick="shareRoom()">🔗 Kopieer & deel link</button></section>
   <section class="card"><h2>Spelers · ${state.players.length}/6</h2>${playerList()}
     ${!ready.enoughPlayers?`<div class="notice blue">Minimaal twee spelers nodig.</div>`:''}
     ${ready.enoughPlayers&&!ready.allOnline?`<div class="notice red">Niet alle spelers worden als online gezien. Laat iedereen de wachtruimte openhouden en druk op ↻.</div>`:''}
@@ -246,7 +247,7 @@ function renderLobby(){
     <button class="btn primary full" ${ready.can?'':'disabled'} onclick="startGame()">Start Disney Music Quest</button>
   </section>`:'<section class="card"><div class="notice blue">De organisator start de game.</div></section>'}
   ${organizerPanel()}`;
-  setTimeout(()=>{let e=document.getElementById('joinQR');if(e&&window.QRCode)new QRCode(e,{text:`${location.origin}${location.pathname}?join=${state.room.code}&v=29`,width:210,height:210,colorDark:'#07152e',colorLight:'#fff'})},0)
+  setTimeout(()=>{let e=document.getElementById('joinQR');if(e&&window.QRCode)new QRCode(e,{text:`${location.origin}${location.pathname}?join=${state.room.code}&v=${DMQ_VERSION}`,width:210,height:210,colorDark:'#07152e',colorLight:'#fff'})},0)
 }
 function qtype(mode,s){if(mode!=='mix')return mode;let a=['full','film','title','year'];if(s.artist)a.push('artist');return a[Math.floor(Math.random()*a.length)]}
 async function startGame(){
@@ -286,7 +287,7 @@ async function regenerateRoomCode(){
     const r=await state.sb.rpc('dmq_host_regenerate_code',{p_room_id:state.room.id});
     if(r.error)throw r.error;
     state.room.code=Array.isArray(r.data)?r.data[0]?.new_code||r.data[0]:r.data;
-    history.replaceState(null,'',`${location.pathname}?host=${state.room.code}&v=29`);
+    history.replaceState(null,'',`${location.pathname}?host=${state.room.code}&v=${DMQ_VERSION}`);
     toast('Nieuwe kamercode gemaakt.');await refreshAll();
   }catch(e){console.error(e);toast(`Kamercode wijzigen mislukt: ${e.message||e}`)}
 }
@@ -461,7 +462,7 @@ function renderAdmin(){let s=state.songs.find(x=>+x.song_number===+state.adminSe
 function list(v){return String(v||'').split(',').map(x=>x.trim()).filter(Boolean)}
 async function saveSong(){state.adminPin=adminPin.value;let s=state.songs.find(x=>+x.song_number===+state.adminSelectedSong);let r=await state.sb.rpc('dmq_admin_upsert_song',{p_pin:state.adminPin,p_song_number:s.song_number,p_title:songTitle.value.trim(),p_film:songFilm.value.trim(),p_year:+songYear.value||null,p_artist:songArtist.value.trim(),p_spotify_url:songSpotify.value.trim(),p_code_image_url:songCode.value.trim(),p_film_aliases:list(filmAliases.value),p_title_aliases:list(titleAliases.value),p_artist_aliases:list(artistAliases.value),p_enabled:songEnabled.checked});if(r.error)toast(r.error.message);else{await fetchSongs();toast('Song opgeslagen.');renderAdmin()}}
 async function shareRoom(){
-  const url=`${location.origin}${location.pathname}?join=${state.room.code}&v=29`;
+  const url=`${location.origin}${location.pathname}?join=${state.room.code}&v=${DMQ_VERSION}`;
   const shareData={title:'Disney Music Quest',text:`Doe mee met de Disney Music Quest! Kamercode: ${state.room.code}`,url:url};
   try{
     if(navigator.share&&navigator.canShare&&navigator.canShare(shareData)){
@@ -786,11 +787,33 @@ function closeCelebration(){
   if(o)o.remove();
 }
 
+function removeBg(img){
+  if(!img||img.dataset.processed)return;
+  img.dataset.processed="true";
+  const canvas=document.createElement('canvas');
+  canvas.width=img.naturalWidth||img.width;
+  canvas.height=img.naturalHeight||img.height;
+  if(!canvas.width||!canvas.height)return;
+  const ctx=canvas.getContext('2d');
+  ctx.drawImage(img,0,0);
+  try{
+    const imgData=ctx.getImageData(0,0,canvas.width,canvas.height);
+    const data=imgData.data;
+    for(let i=0;i<data.length;i+=4){
+      if(data[i]>240&&data[i+1]>240&&data[i+2]>240){
+        data[i+3]=0;
+      }
+    }
+    ctx.putImageData(imgData,0,0);
+    img.src=canvas.toDataURL();
+  }catch(e){console.error(e)}
+}
+
 Object.assign(window,{
   leaveRoom,openSongAdminFromLobby,regenerateRoomCode,resetRoomToLobby,
   removeManagedPlayer,updateManagedPlayer,startGame,refreshAll,shareRoom,
   createRoom,goJoin,chooseJoinColor,chooseJoinAvatar,joinRoom,render,
   renderLobby,saveSong,nextRound,confirmMyPoints,completeMyRound,
   showPowersInfo,closePowersInfo,openStealDialog,closeStealDialog,stealFromPlayer,
-  closeCelebration
+  closeCelebration,removeBg
 });
