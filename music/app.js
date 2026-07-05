@@ -132,7 +132,7 @@ function selectedValue(id,fallback=''){const e=byId(id);return e?e.value:fallbac
 function selectedChecked(id,fallback=false){const e=byId(id);return e?!!e.checked:fallback}
 function startReadiness(totalOverride=null){
   const total=Number(totalOverride??selectedValue('roundCount','5'))||5;
-  const enoughPlayers=state.players.length>=2&&state.players.length<=5;
+  const enoughPlayers=state.players.length>=2&&state.players.length<=6;
   const allOnline=enoughPlayers&&state.players.every(online);
   const enoughSongs=activeSongs().length>=total;
   return {total,enoughPlayers,allOnline,enoughSongs,can:host()&&enoughPlayers&&allOnline&&enoughSongs};
@@ -170,14 +170,23 @@ function organizerPanel(){
   </section>`;
 }
 
+function validateCardsCount(){
+  const count=state.lobbySettings.cards_per_player||3;
+  const maxAllowed=Math.floor(12/Math.max(state.players.length,1));
+  if(count>maxAllowed){
+    state.lobbySettings.cards_per_player=Math.min(3,maxAllowed);
+  }
+}
+
 function renderLobby(){
-  const activeCount=activeSongs().length,ready=startReadiness(5);
+  validateCardsCount();
+  const activeCount=activeSongs().length,ready=startReadiness(6);
   if(!state.lobbySettings.fixedLeader && state.players.length > 0) {
     state.lobbySettings.fixedLeader = state.players[0].id;
   }
   app().innerHTML=`${topbar('Wachtruimte','leaveRoom()')}
   <section class="card hero"><div class="badge">Kamercode</div><div class="roomcode">${esc(state.room.code)}</div><div id="joinQR" class="joinqr"></div><p>Laat spelers deze QR-code scannen of deel de link:</p><div style="margin:12px 0;background:#051024;padding:10px;border-radius:8px;border:1px solid #1a365d;font-size:12px;word-break:break-all;color:#74d7ff;font-family:monospace;line-height:1.4;">${location.origin}${location.pathname}?join=${state.room.code}&v=29</div><button class="btn ghost" onclick="shareRoom()">🔗 Kopieer & deel link</button></section>
-  <section class="card"><h2>Spelers · ${state.players.length}/5</h2>${playerList()}
+  <section class="card"><h2>Spelers · ${state.players.length}/6</h2>${playerList()}
     ${!ready.enoughPlayers?`<div class="notice blue">Minimaal twee spelers nodig.</div>`:''}
     ${ready.enoughPlayers&&!ready.allOnline?`<div class="notice red">Niet alle spelers worden als online gezien. Laat iedereen de wachtruimte openhouden en druk op ↻.</div>`:''}
   </section>
@@ -197,11 +206,20 @@ function renderLobby(){
         </select>
       </div>
     </div>
-    <div class="field"><label>Spelleider</label>
-      <select id="leaderMode" onchange="state.lobbySettings.leaderMode = this.value; renderLobby();">
-        <option value="rotating" ${state.lobbySettings.leaderMode === 'rotating'?'selected':''}>Roulerend</option>
-        <option value="fixed" ${state.lobbySettings.leaderMode === 'fixed'?'selected':''}>Vast</option>
-      </select>
+    <div class="grid2" style="margin-top:10px">
+      <div class="field"><label>Krachten per speler</label>
+        <select id="cardsPerPlayer" onchange="state.lobbySettings.cards_per_player = Number(this.value); validateCardsCount(); renderLobby();">
+          <option value="1" ${state.lobbySettings.cards_per_player === 1?'selected':''}>1 kaart</option>
+          <option value="2" ${state.lobbySettings.cards_per_player === 2?'selected':''}>2 kaarten</option>
+          <option value="3" ${(state.lobbySettings.cards_per_player === 3 || !state.lobbySettings.cards_per_player)?'selected':''}${state.players.length>=5?' disabled':''}>3 kaarten (max 4 spl)</option>
+        </select>
+      </div>
+      <div class="field"><label>Spelleider</label>
+        <select id="leaderMode" onchange="state.lobbySettings.leaderMode = this.value; renderLobby();">
+          <option value="rotating" ${state.lobbySettings.leaderMode === 'rotating'?'selected':''}>Roulerend</option>
+          <option value="fixed" ${state.lobbySettings.leaderMode === 'fixed'?'selected':''}>Vast</option>
+        </select>
+      </div>
     </div>
     <div class="field" id="fixedLeaderWrap" style="display: ${state.lobbySettings.leaderMode === 'fixed' ? 'block' : 'none'}">
       <label>Vaste spelleider</label>
@@ -245,7 +263,8 @@ async function startGame(){
       final_bet:state.lobbySettings.final_bet,
       animations:state.lobbySettings.animations,
       leader_mode:lm,
-      fixed_leader_player_id:lm==='fixed'?(state.lobbySettings.fixedLeader||state.players[0]?.id||null):null
+      fixed_leader_player_id:lm==='fixed'?(state.lobbySettings.fixedLeader||state.players[0]?.id||null):null,
+      cards_per_player:state.lobbySettings.cards_per_player||3
     };
     loading('Game starten…');
     const r=await state.sb.rpc('dmq_start_game_v2',{p_room_id:state.room.id,p_total_rounds:total,p_game_mode:mode,p_song_sequence:songs.map(s=>s.song_number),p_question_sequence:songs.map(s=>qtype(mode,s)),p_settings:set});
@@ -295,7 +314,7 @@ async function updateManagedPlayer(playerId){
   }catch(e){console.error(e);toast(`Wijzigen mislukt: ${e.message||e}`)}
 }
 
-function rules(type,p=null){let x=type==='full'?['Juiste film: +1','Juiste titel: +1','Exact filmjaar: +1','Maximum: 3']:type==='film'?['Juiste film: +2']:type==='title'?['Juiste titel: +2']:type==='artist'?['Juiste uitvoerder/personage: +2']:['Exact: +3','1 jaar verschil: +2','2 jaar verschil: +1','Verder: 0'];if(p==='hyperdrive')x.push('Hyperdrive: alle punten dubbel');if(p==='wild_ride'&&type==='year')x=['Exact: +3','Maximaal 2 jaar verschil: +2','Maximaal 4 jaar verschil: +1'];if(p==='hidden_treasure')x.push('Verborgen schat: minimaal 1 goed = +1 bonus');if(p==='ghost_whisper')x.push('Geestenfluistering: kies 10 seconden uit alle jaartallen');if(p==='second_drop')x.push('Tweede val: rode antwoorden 30 seconden aanpassen');if(p==='lightspeed')x.push('Lichtsnelheid: beantwoord binnen 8s = +1 bonus');if(p==='small_world')x.push('Kleine wereld harmonie: minder scorende spelers schenken +1 bonus');if(p==='ingredient_theft')x.push('Remy\'s Keukendiefstal: gekopieerd antwoord');if(p==='laser_block')x.push('Laser Blokkade: neutraliseer een actieve kracht');if(p==='laser_blocked')x.push('Laser Blokkade: alle krachten zijn deze ronde geannuleerd! 💥');return `<div class="rulebox"><h3>Punten deze ronde</h3>${x.map(v=>`<div>• ${v}</div>`).join('')}</div>`}
+function rules(type,p=null){let x=type==='full'?['Juiste film: +1','Juiste titel: +1','Exact filmjaar: +1','Maximum: 3']:type==='film'?['Juiste film: +2']:type==='title'?['Juiste titel: +2']:type==='artist'?['Juiste uitvoerder/personage: +2']:['Exact: +3','1 jaar verschil: +2','2 jaar verschil: +1','Verder: 0'];if(p==='hyperdrive')x.push('Hyperdrive: alle punten dubbel');if(p==='wild_ride'&&type==='year')x=['Exact: +3','Maximaal 2 jaar verschil: +2','Maximaal 4 jaar verschil: +1'];if(p==='hidden_treasure')x.push('Verborgen schat: minimaal 1 goed = +1 bonus');if(p==='ghost_whisper')x.push('Geestenfluistering: kies 10 seconden uit alle jaartallen');if(p==='second_drop')x.push('Tweede val: rode antwoorden 30 seconden aanpassen');if(p==='lightspeed')x.push('Lichtsnelheid: beantwoord binnen 8s = +1 bonus');if(p==='small_world')x.push('Kleine wereld harmonie: minder scorende spelers schenken +1 bonus');if(p==='ingredient_theft')x.push('Remy\'s Keukendiefstal: gekopieerd antwoord');if(p==='laser_block')x.push('Laser Blokkade: neutraliseer een actieve kracht');if(p==='laser_blocked')x.push('Laser Blokkade: alle krachten zijn deze ronde geannuleerd! 💥');if(p==='temple_run')x.push('Temple of Peril: verdubbel bij juist, -1 bij fout!');if(p==='spider_bot')x.push('Spider-Bot: kopieer de topscore van deze ronde!');if(p==='turbo_boost')x.push('Turbo Boost: +1 bonus voor de allersnelste correcte speler!');return `<div class="rulebox"><h3>Punten deze ronde</h3>${x.map(v=>`<div>• ${v}</div>`).join('')}</div>`}
 function power(){return state.round?.active_power||null}
 function powerButton(){
   if(!settings().powers||!state.me)return '';
@@ -356,9 +375,47 @@ async function submitAnswer(){if(host())return;let a=collect(state.round.questio
 function norm(v){return String(v||'').normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLowerCase().replace(/&/g,' and ').replace(/\b(the|a|an|de|het|een|la|le|les|un|une|der|die|das)\b/g,' ').replace(/[^a-z0-9]+/g,' ').trim().replace(/\s+/g,' ')}
 function lev(a,b){if(a===b)return 0;if(!a.length)return b.length;if(!b.length)return a.length;let r=Array.from({length:b.length+1},(_,i)=>i);for(let i=1;i<=a.length;i++){let p=r[0];r[0]=i;for(let j=1;j<=b.length;j++){let t=r[j];r[j]=Math.min(r[j]+1,r[j-1]+1,p+(a[i-1]===b[j-1]?0:1));p=t}}return r[b.length]}
 function match(v,targets){let a=norm(v);if(!a)return false;return targets.filter(Boolean).some(t=>{let b=norm(t);return a===b||(a.length>=6&&(a.includes(b)||b.includes(a)))||(1-lev(a,b)/Math.max(a.length,b.length)>=.72)})}
-function points(a,s,t,p){let film=[s.film,...(s.film_aliases||[])],title=[s.title,...(s.title_aliases||[])],artist=[s.artist,...(s.artist_aliases||[])],q=0;if(t==='full')q=(match(a.film,film)?1:0)+(match(a.title,title)?1:0)+(+a.year===+s.year?1:0);if(t==='film')q=match(a.film,film)?2:0;if(t==='title')q=match(a.title,title)?2:0;if(t==='artist')q=match(a.artist,artist)?2:0;if(t==='year'){let d=Math.abs(+a.year-+s.year);q=p==='wild_ride'?(d===0?3:d<=2?2:d<=4?1:0):(d===0?3:d===1?2:d===2?1:0)}if(p==='hidden_treasure'&&q>0)q++;if(p==='hyperdrive')q*=2;if(p==='lightspeed'&&a.speed_bonus&&q>0)q++;return q}
+function isMyPower(playerId){
+  if(!state.round?.active_power) return false;
+  if(state.round.active_power==='ghost_whisper'||state.round.active_power==='second_drop') return true;
+  return state.round.power_used_by_player_id===playerId;
+}
+function points(a,s,t,activePower,playerId){
+  let film=[s.film,...(s.film_aliases||[])],title=[s.title,...(s.title_aliases||[])],artist=[s.artist,...(s.artist_aliases||[])],q=0;
+  const p=isMyPower(playerId)?activePower:null;
+  if(t==='full')q=(match(a.film,film)?1:0)+(match(a.title,title)?1:0)+(+a.year===+s.year?1:0);
+  if(t==='film')q=match(a.film,film)?2:0;
+  if(t==='title')q=match(a.title,title)?2:0;
+  if(t==='artist')q=match(a.artist,artist)?2:0;
+  if(t==='year'){
+    let d=Math.abs(+a.year-+s.year);
+    q=p==='wild_ride'?(d===0?3:d<=2?2:d<=4?1:0):(d===0?3:d===1?2:d===2?1:0)
+  }
+  if(p==='hidden_treasure'&&q>0)q++;
+  if(p==='hyperdrive')q*=2;
+  if(p==='lightspeed'&&a.speed_bonus&&q>0)q++;
+  if(p==='temple_run'){
+    if(q>0)q*=2;
+    else q=-1;
+  }
+  if(p==='turbo_boost'&&q>0){
+    const sortedAns=[...state.answers].sort((x,y)=>new Date(x.created_at)-new Date(y.created_at));
+    if(sortedAns[0]?.player_id===playerId) q++;
+  }
+  if(p==='spider_bot'){
+    let maxOther=0;
+    state.answers.forEach(ans=>{
+      if(ans.player_id!==playerId){
+        const otherScore=points(ans.answer,s,t,null,ans.player_id);
+        if(otherScore>maxOther)maxOther=otherScore;
+      }
+    });
+    if(q<maxOther)q=maxOther;
+  }
+  return q;
+}
 async function afterAnswers(){if(power()==='ghost_whisper'){let r=await state.sb.rpc('dmq_begin_power_phase',{p_round_id:state.round.id,p_phase:'power_phantom'});if(r.error)toast(r.error.message);return}if(power()==='second_drop'){await prepareTower();return}await reveal()}
-async function reveal(){let s=currentSong();let basePoints=[];for(const a of state.answers){let q=points(a.revised_answer||a.answer||{},s,state.round.question_type,power());basePoints.push({ans:a,pts:q})}if(power()==='small_world'){const activatorPlayerId=state.round.power_used_by_player_id;const activatorEntry=basePoints.find(bp=>bp.ans.player_id===activatorPlayerId);if(activatorEntry&&activatorEntry.pts>0){let bonus=0;basePoints.forEach(bp=>{if(bp.ans.player_id!==activatorPlayerId&&bp.pts<activatorEntry.pts){bonus++}});activatorEntry.pts+=Math.min(bonus,2)}}for(const bp of basePoints){let r=await state.sb.from('dmq_answers').update({proposed_points:bp.pts,final_points:bp.pts}).eq('id',bp.ans.id);if(r.error){fatal('Beoordelen mislukt.',r.error);return}}let r=await state.sb.rpc('dmq_set_phase',{p_round_id:state.round.id,p_phase:'review'});if(r.error)toast(r.error.message);else schedule()}
+async function reveal(){let s=currentSong();let basePoints=[];for(const a of state.answers){let q=points(a.revised_answer||a.answer||{},s,state.round.question_type,power(),a.player_id);basePoints.push({ans:a,pts:q})}if(power()==='small_world'){const activatorPlayerId=state.round.power_used_by_player_id;const activatorEntry=basePoints.find(bp=>bp.ans.player_id===activatorPlayerId);if(activatorEntry&&activatorEntry.pts>0){let bonus=0;basePoints.forEach(bp=>{if(bp.ans.player_id!==activatorPlayerId&&bp.pts<activatorEntry.pts){bonus++}});activatorEntry.pts+=Math.min(bonus,2)}}for(const bp of basePoints){let r=await state.sb.from('dmq_answers').update({proposed_points:bp.pts,final_points:bp.pts}).eq('id',bp.ans.id);if(r.error){fatal('Beoordelen mislukt.',r.error);return}}let r=await state.sb.rpc('dmq_set_phase',{p_round_id:state.round.id,p_phase:'review'});if(r.error)toast(r.error.message);else schedule()}
 function startTimer(seconds,done){clearInterval(state.timer);state.timerSeconds=seconds;state.timerFinished=false;state.timer=setInterval(async()=>{state.timerSeconds--;let e=document.getElementById('countNum');if(e)e.textContent=state.timerSeconds;if(state.timerSeconds<=0){clearInterval(state.timer);state.timer=null;state.timerFinished=true;await done()}},1000)}
 function renderPhantom(){let mine=own(),counts={};state.answers.forEach(a=>{let y=+a.answer?.year;if(y)counts[y]=(counts[y]||0)+1});let ys=Object.keys(counts).map(Number).sort((a,b)=>a-b),selected=+(mine?.revised_answer?.year||mine?.answer?.year),same=ys.length===1;const duration=same?3:10;const secondsLeft=(state.timerRoundId===state.round.id&&state.timerPhase===state.round.phase&&state.timerFinished)?0:(state.timerRoundId===state.round.id&&state.timerPhase===state.round.phase&&state.timer)?state.timerSeconds:duration;app().innerHTML=`${topbar('Phantom Manor')}${scorebar()}${progress()}<section class="card phantom"><div class="powerbanner">👻 Geestenfluistering geldt voor iedereen</div>${rules('year','ghost_whisper')}<h2>De geesten fluisteren…</h2><p>Alle jaartallen zijn anoniem samengevoegd. ${host()?'Wacht tot de spelers kiezen.':'Jouw antwoord staat geselecteerd.'}</p><div class="yearchoices">${ys.map(y=>`<button class="yearbtn ${selected===y?'selected':''}" ${host()?'disabled':''} onclick="chooseYear(${y})">${y}${counts[y]>1?` × ${counts[y]}`:''}</button>`).join('')}</div><div class="countdown phantom"><div class="small">De klokken tikken…</div><div id="countNum" class="number">${secondsLeft}</div><div>🕯️ 👻 🕯️</div></div></section>`;if((state.timerRoundId!==state.round.id||state.timerPhase!==state.round.phase)&&!state.timerFinished){state.timerRoundId=state.round.id;state.timerPhase=state.round.phase;startTimer(duration,finishPhantom)}}
 async function chooseYear(y){let r=await state.sb.from('dmq_answers').update({revised_answer:{year:y}}).eq('id',own().id);if(r.error)toast(r.error.message);else schedule()}
@@ -368,8 +425,17 @@ function renderTower(){let mine=own(),a=mine?.revised_answer||mine?.answer||{},c
 async function completeTower(){let mine=own(),c=mine?.correctness||{},t=state.round.question_type,a={...(mine?.revised_answer||mine?.answer||{})},keys=t==='full'?['film','title','year']:[t];keys.forEach(k=>{if(c[k]!==true){let e=document.getElementById('tower_'+k);if(e)a[k]=k==='year'?+e.value||null:e.value.trim()}});let r=await state.sb.from('dmq_answers').update({revised_answer:a,tower_completed:true}).eq('id',mine.id);if(r.error)toast(r.error.message);else schedule()}
 async function finishTower(){if(!leader()&&!host())return;let r=await state.sb.rpc('dmq_finalize_tower',{p_round_id:state.round.id});if(r.error)toast(r.error.message);else{await refreshAll();await reveal()}}
 function answerText(a,t){if(t==='full')return `${a.film||'—'} · ${a.title||'—'} · ${a.year||'—'}`;return String(a[t]||'—')}
-function maxPoints(t,p){let m=t==='full'||t==='year'?3:2;if(p==='hidden_treasure'||p==='lightspeed')m++;if(p==='small_world')m+=2;if(p==='hyperdrive')m*=2;return m}
-function renderReview(){let s=currentSong(),mine=own();if(!s||(!mine&&!host())){loading('Laden…');return}let a=mine?.revised_answer||mine?.answer||{},p=power();if(mine){if(state.reviewFinalPoints===null)state.reviewFinalPoints=mine.final_points;if(state.reviewCorrectionNote===null)state.reviewCorrectionNote=mine.note||''}const fpVal=(mine&&state.reviewFinalPoints!==null)?state.reviewFinalPoints:(mine?.final_points||0);const noteVal=(mine&&state.reviewCorrectionNote!==null)?state.reviewCorrectionNote:(mine?.note||'');app().innerHTML=`${topbar('Punten controleren')}${scorebar()}${progress()}<section class="card question" style="--accent:${state.me?.color||'#00e5ff'}"><div class="correctbox"><strong>Het juiste antwoord</strong><p style="margin:7px 0 0">${esc(s.title)} · ${esc(s.film)} · ${esc(s.year)}${s.artist?` · ${esc(s.artist)}`:''}</p></div>${rules(state.round.question_type,p)}${host()?'':`<div class="answerline"><small>Jouw definitieve antwoord</small><strong>${esc(answerText(a,state.round.question_type))}</strong></div>`}${host()?'<div class="notice blue">Jij bent de organisator. Wacht tot de spelers hun punten bevestigen.</div>':!mine.points_confirmed?`<div class="field"><label>Mijn definitieve punten</label><select id="finalPoints" onchange="state.reviewFinalPoints=+this.value">${Array.from({length:maxPoints(state.round.question_type,p)+1},(_,i)=>`<option value="${i}" ${+fpVal===i?'selected':''}>${i}</option>`).join('')}</select></div><div class="field"><label>Toelichting bij correctie</label><input id="correctionNote" value="${esc(noteVal)}" oninput="state.reviewCorrectionNote=this.value"></div><button class="btn primary full" onclick="confirmPoints()">Punten bevestigen</button>`:`<div class="notice green">Je hebt +${mine.final_points} bevestigd.</div>${!mine.round_completed?'<button class="btn primary full" onclick="completeRound()">Ik ben klaar met deze ronde</button>':'<button class="btn ghost full" disabled>Ronde afgerond ✓</button>'}`}</section><section class="card"><h2>Puntenstatus</h2>${playerList(pl=>{let x=state.answers.find(a=>a.player_id===pl.id);if(!x?.points_confirmed)return['Controleert nog','wait'];return x.round_completed?[`+${x.final_points} · klaar`,'ok']:[`+${x.final_points} · afronden`,'wait']})}</section>`}
+function maxPoints(t,p,playerId){
+  let m=t==='full'||t==='year'?3:2;
+  const activeP=isMyPower(playerId)?p:null;
+  if(activeP==='hidden_treasure'||activeP==='lightspeed')m++;
+  if(activeP==='small_world')m+=2;
+  if(activeP==='hyperdrive')m*=2;
+  if(activeP==='temple_run')m*=2;
+  if(activeP==='spider_bot')m=t==='full'||t==='year'?6:4;
+  return m;
+}
+function renderReview(){let s=currentSong(),mine=own();if(!s||(!mine&&!host())){loading('Laden…');return}let a=mine?.revised_answer||mine?.answer||{},p=power();if(mine){if(state.reviewFinalPoints===null)state.reviewFinalPoints=mine.final_points;if(state.reviewCorrectionNote===null)state.reviewCorrectionNote=mine.note||''}const fpVal=(mine&&state.reviewFinalPoints!==null)?state.reviewFinalPoints:(mine?.final_points||0);const noteVal=(mine&&state.reviewCorrectionNote!==null)?state.reviewCorrectionNote:(mine?.note||'');const minP=p==='temple_run'&&isMyPower(state.me?.id)?-1:0;app().innerHTML=`${topbar('Punten controleren')}${scorebar()}${progress()}<section class="card question" style="--accent:${state.me?.color||'#00e5ff'}"><div class="correctbox"><strong>Het juiste antwoord</strong><p style="margin:7px 0 0">${esc(s.title)} · ${esc(s.film)} · ${esc(s.year)}${s.artist?` · ${esc(s.artist)}`:''}</p></div>${rules(state.round.question_type,p)}${host()?'':`<div class="answerline"><small>Jouw definitieve antwoord</small><strong>${esc(answerText(a,state.round.question_type))}</strong></div>`}${host()?'<div class="notice blue">Jij bent de organisator. Wacht tot de spelers hun punten bevestigen.</div>':!mine.points_confirmed?`<div class="field"><label>Mijn definitieve punten</label><select id="finalPoints" onchange="state.reviewFinalPoints=+this.value">${Array.from({length:maxPoints(state.round.question_type,p,state.me?.id)-minP+1},(_,i)=>{const val=minP+i;return`<option value="${val}" ${+fpVal===val?'selected':''}>${val}</option>`}).join('')}</select></div><div class="field"><label>Toelichting bij correctie</label><input id="correctionNote" value="${esc(noteVal)}" oninput="state.reviewCorrectionNote=this.value"></div><button class="btn primary full" onclick="confirmPoints()">Punten bevestigen</button>`:`<div class="notice green">Je hebt +${mine.final_points} bevestigd.</div>${!mine.round_completed?'<button class="btn primary full" onclick="completeRound()">Ik ben klaar met deze ronde</button>':'<button class="btn ghost full" disabled>Ronde afgerond ✓</button>'}`}</section><section class="card"><h2>Puntenstatus</h2>${playerList(pl=>{let x=state.answers.find(a=>a.player_id===pl.id);if(!x?.points_confirmed)return['Controleert nog','wait'];return x.round_completed?[`+${x.final_points} · klaar`,'ok']:[`+${x.final_points} · afronden`,'wait']})}</section>`}
 async function confirmPoints(){let r=await state.sb.rpc('dmq_confirm_points',{p_answer_id:own().id,p_final_points:state.reviewFinalPoints,p_note:state.reviewCorrectionNote||''});if(r.error)toast(r.error.message);else schedule()}
 async function completeRound(){let r=await state.sb.rpc('dmq_complete_round',{p_answer_id:own().id});if(r.error)toast(r.error.message);else schedule()}
 function renderStandings(){let sorted=[...state.players].sort((a,b)=>b.score-a.score);app().innerHTML=`${topbar('Tussenstand')}${rules(state.round.question_type,power())}<section class="card"><div class="standings">${sorted.map((p,i)=>`<div class="rank" style="border-color:${p.color}"><div class="rankicon">${['🥇','🥈','🥉','🎵','🎶'][i]}</div><div><strong>${A(p.avatar_id).icon} ${esc(p.name)}</strong><small class="muted">${esc(A(p.avatar_id).name)}</small></div><div class="rankscore">${p.score} ★</div></div>`).join('')}</div>${leader()?`<button class="btn primary full" style="margin-top:14px" onclick="nextRound()">${state.room.current_round_no>=state.room.total_rounds?'Einduitslag':'Volgende song'}</button>`:`<div class="notice blue">${esc(state.players.find(p=>p.id===leaderId())?.name||'De spelleider')} start de volgende ronde.</div>`}</section>`}
@@ -431,6 +497,9 @@ function getPowerMiniDesc(power){
   if(power==='ingredient_theft') return 'Keukendiefstal! Remy kopieert een antwoord!';
   if(power==='laser_block') return 'Laser Blokkade! Een kracht wordt geannuleerd!';
   if(power==='laser_blocked') return 'Gecancelled! Alle krachten deze ronde geannuleerd! 💥';
+  if(power==='temple_run') return 'Indiana Jones tempelavontuur! Dubbel of -1!';
+  if(power==='spider_bot') return 'Spider-Bot kopieert de topscore!';
+  if(power==='turbo_boost') return 'Turbo Boost! +1 bonuspunt voor de snelste speler!';
   return 'Kracht geactiveerd!';
 }
 
@@ -438,7 +507,7 @@ function playPowerTakeover(power,playerName){
   let takeover=document.createElement('div');
   takeover.className='takeover-overlay';
   const powerInfo=POWERS_EXPLAIN.find(x=>x.id===power)||{name:'Onbekend',icon:'❓'};
-  const colors={hyperdrive:'#ff7ac8',wild_ride:'#ffd45c',ghost_whisper:'#69e58d',hidden_treasure:'#74d7ff',second_drop:'#bb86ff',lightspeed:'#69e58d',small_world:'#ffe45f',ingredient_theft:'#ff7ac8',laser_block:'#e95f72',laser_blocked:'#e95f72'};
+  const colors={hyperdrive:'#ff7ac8',wild_ride:'#ffd45c',ghost_whisper:'#69e58d',hidden_treasure:'#74d7ff',second_drop:'#bb86ff',lightspeed:'#69e58d',small_world:'#ffe45f',ingredient_theft:'#ff7ac8',laser_block:'#e95f72',laser_blocked:'#e95f72',temple_run:'#ffd45c',spider_bot:'#74d7ff',turbo_boost:'#69e58d'};
   const color=colors[power]||'#ffffff';
   
   if(power==='laser_block'||power==='laser_blocked'){
