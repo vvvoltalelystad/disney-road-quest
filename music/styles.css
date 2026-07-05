@@ -136,30 +136,105 @@ hr{border:0;border-top:1px solid var(--line);margin:16px 0}
 .qrplaceholder{color:#23344e;text-align:center;font-size:13px;font-weight:800}
 .progress{height:9px;background:#071831;border-radius:999px;overflow:hidden;border:1px solid #234873}
 .progress i{display:block;height:100%;background:linear-gradient(90deg,var(--purple),var(--gold));border-radius:inherit}
-.scorebar{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-bottom:12px}
-.scorechip{
-  background:rgba(11,31,64,0.55);
-  backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px);
-  border:1px solid var(--chip-color, var(--line));
-  border-radius:20px;padding:10px 8px;text-align:center;
-  box-shadow:0 6px 16px rgba(0,0,0,0.3), 0 0 10px color-mix(in srgb, var(--chip-color) 15%, transparent);
-  transition:all 0.3s cubic-bezier(0.25, 0.8, 0.25, 1);
-  display:flex;flex-direction:column;align-items:center;justify-content:center;gap:4px;
+.scorebar {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 10px;
+  margin-bottom: 14px;
 }
-.scorechip:hover{
-  transform:translateY(-2px);
-  box-shadow:0 8px 24px rgba(0,0,0,0.38), 0 0 16px color-mix(in srgb, var(--chip-color) 35%, transparent);
+.scorebar.cols-2 .scorechip,
+.scorebar.cols-4 .scorechip {
+  flex: 0 1 calc(50% - 6px);
 }
-.scorechip.leader{
-  background:rgba(255,212,92,0.08);
-  border-color:var(--gold) !important;
-  box-shadow:0 6px 18px rgba(0,0,0,0.3), 0 0 14px rgba(255,212,92,0.3);
+.scorebar.cols-3 .scorechip {
+  flex: 0 1 calc(33.33% - 7px);
 }
-.status-dot{width:6px;height:6px;border-radius:50%;background:#556b8f;display:inline-block;transition:all 0.3s}
-.status-dot.online{background:var(--green);box-shadow:0 0 8px var(--green);animation:status-pulse 1.8s infinite alternate}
-@keyframes status-pulse{from{opacity:0.4}to{opacity:1}}
-.scorechip strong{display:block;font-size:13px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-.scorechip span{color:var(--gold);font-size:17px;font-weight:950}
+.scorebar.cols-5 .scorechip {
+  flex: 0 1 calc(33.33% - 7px);
+}
+.scorebar.cols-5 .scorechip:nth-child(n+4) {
+  flex: 0 1 calc(45% - 6px);
+}
+.scorechip {
+  background: rgba(11, 31, 64, 0.45);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border: 1.5px solid rgba(255, 255, 255, 0.08);
+  border-radius: 22px;
+  padding: 12px 8px;
+  text-align: center;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.35);
+  transition: all 0.3s cubic-bezier(0.25, 0.8, 0.25, 1);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+}
+.scorechip:hover {
+  transform: translateY(-3px);
+  box-shadow: 0 12px 30px rgba(0, 0, 0, 0.45), 0 0 16px color-mix(in srgb, var(--chip-color) 25%, transparent);
+}
+.scorechip.leader {
+  background: rgba(255, 212, 92, 0.06);
+  border-color: var(--gold) !important;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.35), 0 0 12px rgba(255, 212, 92, 0.22);
+}
+.avatar-frame {
+  position: relative;
+  width: 48px;
+  height: 48px;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.06);
+  border: 2px solid var(--chip-color, var(--line));
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 4px 10px rgba(0, 0, 0, 0.25);
+}
+.avatar-emoji {
+  font-size: 26px;
+  line-height: 1;
+}
+.status-dot {
+  position: absolute;
+  bottom: -2px;
+  right: -2px;
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  background: #556b8f;
+  border: 2px solid #06142d;
+  transition: all 0.3s;
+}
+.status-dot.online {
+  background: var(--green);
+  box-shadow: 0 0 8px var(--green);
+  animation: status-pulse 1.8s infinite alternate;
+}
+@keyframes status-pulse {
+  from { opacity: 0.45; }
+  to { opacity: 1; }
+}
+.scorechip-name {
+  font-size: 13px;
+  font-weight: 700;
+  color: white;
+  white-space: nowrap;
+  max-width: 90px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.scorechip-score {
+  font-size: 13px;
+  font-weight: 800;
+  color: var(--gold);
+  background: rgba(255, 212, 92, 0.12);
+  padding: 2px 10px;
+  border-radius: 99px;
+  border: 1px solid rgba(255, 212, 92, 0.25);
+  display: inline-block;
+}
 .question{
   border:1.5px solid var(--accent,var(--purple));
   box-shadow:0 0 7px color-mix(in srgb,var(--accent,var(--purple)) 45%,transparent),0 0 17px color-mix(in srgb,var(--accent,var(--purple)) 20%,transparent);
