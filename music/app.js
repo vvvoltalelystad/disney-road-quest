@@ -75,6 +75,11 @@ function render(){
       }
     }
   }
+  if(window.twemoji){
+    window.twemoji.parse(document.getElementById('app'),{
+      base:'https://cdn.jsdelivr.net/gh/jdecked/twemoji@latest/assets/'
+    });
+  }
 }
 
 async function loadJoinChoices(code){
@@ -538,6 +543,7 @@ function playPowerTakeover(power,playerName){
     `;
   }
   document.body.appendChild(takeover);
+  if(window.twemoji){window.twemoji.parse(takeover,{base:'https://cdn.jsdelivr.net/gh/jdecked/twemoji@latest/assets/'});}
   setTimeout(()=>takeover.classList.add('show'),10);
   triggerPowerEffectEffects(power,takeover);
   setTimeout(()=>{
@@ -745,6 +751,7 @@ function playWinnerCelebration(winner,others){
     </div>
   `;
   document.body.appendChild(overlay);
+  if(window.twemoji){window.twemoji.parse(overlay,{base:'https://cdn.jsdelivr.net/gh/jdecked/twemoji@latest/assets/'});}
   spawnThemeParticles(winAv.id,overlay);
 }
 

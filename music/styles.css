@@ -515,4 +515,13 @@ hr{border:0;border-top:1px solid var(--line);margin:16px 0}
   }
 }
 
+/* Twemoji Images sizing & rendering */
+img.emoji {
+  height: 1.1em;
+  width: 1.1em;
+  margin: 0 .05em 0 .1em;
+  vertical-align: -0.15em;
+  display: inline-block;
+}
+
 
