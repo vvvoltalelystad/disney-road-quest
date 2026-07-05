@@ -3,7 +3,7 @@
 const cfg=window.DMQ_CONFIG||{};
 const COLORS=[['blue','Blauw','#74d7ff'],['green','Groen','#69e58d'],['yellow','Geel','#ffe45f'],['pink','Roze','#ff7ac8'],['purple','Paars','#bb86ff']];
 const AVATARS=[['linguini','Alfredo Linguini','👨‍🍳'],['donald','Donald Duck','🦆'],['stitch','Stitch','👽'],['elsa','Elsa','❄️'],['buzz','Buzz Lightyear','👨‍🚀'],['jack','Jack Sparrow','🏴‍☠️'],['simba','Simba','🦁'],['remy','Remy','🐭'],['peter','Peter Pan','🧚‍♂️'],['taran','Taran','⚔️'],['wendy','Wendy Darling','👧'],['heihei','Heihei','🐔']];
-const POWERS_EXPLAIN=[{name:'Hyperdrive (Hyperspace Mountain)',icon:'🚀',desc:'Verdubbel al jouw behaalde punten in de huidige ronde!'},{name:'Wild Ride (Big Thunder Mountain)',icon:'🚂',desc:'Bij jaartal-vragen krijg je ook punten bij een afwijking van max. 4 jaar.'},{name:'Geestenfluistering (Phantom Manor)',icon:'👻',desc:'Kies anoniem uit de ingevoerde jaartallen van alle spelers.'},{name:'Verborgen Schat (Pirates of the Caribbean)',icon:'🏴‍☠️',desc:'Krijg +1 bonuspunt als je ten minste één onderdeel correct beantwoordt.'},{name:'Tweede Val (Tower of Terror)',icon:'🏨',desc:'Iedereen mag gedurende 30 seconden zijn foutieve (rode) antwoorden herzien.'},{name:'Lichtsnelheid (Star Tours)',icon:'🛸',desc:'Beantwoord de vraag correct binnen 8 seconden voor +1 snelheidsbonus.'},{name:'Kleine Wereld Harmonie ("it\'s a small world")',icon:'🌍',desc:'Spelers die minder scoren dan jij, schenken jou +1 bonuspunt (max. +2).'},{name:'Remy\'s Keukendiefstal (Ratatouille)',icon:'🐭',desc:'Kopiëer het antwoord van een tegenstander als je het zelf niet weet.'},{name:'Laser Blokkade (Buzz Lightyear)',icon:'🎯',desc:'Neutraliseer de geactiveerde kracht van een tegenstander in deze ronde.'}];
+const POWERS_EXPLAIN=[{id:'hyperdrive',name:'Hyperdrive (Hyperspace Mountain)',icon:'🚀',desc:'Verdubbel al jouw behaalde punten in de huidige ronde!'},{id:'wild_ride',name:'Wild Ride (Big Thunder Mountain)',icon:'🚂',desc:'Bij jaartal-vragen krijg je ook punten bij een afwijking van max. 4 jaar.'},{id:'ghost_whisper',name:'Geestenfluistering (Phantom Manor)',icon:'👻',desc:'Kies anoniem uit de ingevoerde jaartallen van alle spelers.'},{id:'hidden_treasure',name:'Verborgen Schat (Pirates of the Caribbean)',icon:'🏴‍☠️',desc:'Krijg +1 bonuspunt als je ten minste één onderdeel correct beantwoordt.'},{id:'second_drop',name:'Tweede Val (Tower of Terror)',icon:'🏨',desc:'Iedereen mag gedurende 30 seconden zijn foutieve (rode) antwoorden herzien.'},{id:'lightspeed',name:'Lichtsnelheid (Star Tours)',icon:'🛸',desc:'Beantwoord de vraag correct binnen 8 seconden voor +1 snelheidsbonus.'},{id:'small_world',name:'Kleine Wereld Harmonie ("it\'s a small world")',icon:'🌍',desc:'Spelers die minder scoren dan jij, schenken jou +1 bonuspunt (max. +2).'},{id:'ingredient_theft',name:'Remy\'s Keukendiefstal (Ratatouille)',icon:'🐭',desc:'Kopiëer het antwoord van een tegenstander als je het zelf niet weet.'},{id:'laser_block',name:'Laser Blokkade (Buzz Lightyear)',icon:'🎯',desc:'Neutraliseer de geactiveerde kracht van een tegenstander in deze ronde.'}];
 const DEFAULT_SETTINGS={streaks:true,powers:true,quick_guess:false,jackpot:false,stat_titles:true,final_bet:false,animations:true,leader_mode:'rotating',fixed_leader_player_id:null};
 const state={sb:null,user:null,room:null,players:[],me:null,round:null,answers:[],songs:[],presence:{},channel:null,poll:null,view:'home',joinCode:'',joinName:'',joinColor:null,joinAvatar:null,adminPin:'',adminSelectedSong:1,refreshing:false,timer:null,startError:'',manageOpen:false,lobbySettings:{roundCount:10,gameMode:'mix',leaderMode:'rotating',fixedLeader:null,streaks:true,powers:true,quick_guess:false,jackpot:false,stat_titles:true,final_bet:false,animations:true},currentAnswer:{film:'',title:'',year:'',text:'',artist:''},timerSeconds:0,timerRoundId:null,timerPhase:null,lastShownPower:null,answerPhaseStartedAt:null,reviewFinalPoints:null,reviewCorrectionNote:null};
 document.addEventListener('DOMContentLoaded',init);window.addEventListener('beforeunload',cleanup);
@@ -305,7 +305,7 @@ function powerButton(){
   if(cards.length===0)return '';
   return `<div class="deck-container">
     ${cards.map(pName=>{
-      const avatar=AVATARS.find(x=>x[3]===pName)||['','','❓',''];
+      const powerInfo=POWERS_EXPLAIN.find(x=>x.id===pName)||{name:'Onbekend',icon:'❓'};
       const isUsed=used.includes(pName);
       const isActive=activePower===pName;
       const isBlocked=activePower==='laser_blocked' && state.round.power_used_by_player_id===state.me.id && isUsed;
@@ -334,8 +334,8 @@ function powerButton(){
         }
       }
       return `<div class="${classes.join(' ')}" onclick="${clickAction}">
-        <div class="card-emoji">${avatar[2]}</div>
-        <div class="card-name">${esc(avatar[1])}</div>
+        <div class="card-emoji">${powerInfo.icon}</div>
+        <div class="card-name">${esc(powerInfo.name.split(' (')[0])}</div>
         <div class="card-status">${isUsed?'Gebruikt':isActive?'Actief':'Beschikbaar'}</div>
       </div>`;
     }).join('')}
@@ -437,7 +437,7 @@ function getPowerMiniDesc(power){
 function playPowerTakeover(power,playerName){
   let takeover=document.createElement('div');
   takeover.className='takeover-overlay';
-  const avatar=AVATARS.find(x=>x[3]===power)||['','','❓',''];
+  const powerInfo=POWERS_EXPLAIN.find(x=>x.id===power)||{name:'Onbekend',icon:'❓'};
   const colors={hyperdrive:'#ff7ac8',wild_ride:'#ffd45c',ghost_whisper:'#69e58d',hidden_treasure:'#74d7ff',second_drop:'#bb86ff',lightspeed:'#69e58d',small_world:'#ffe45f',ingredient_theft:'#ff7ac8',laser_block:'#e95f72',laser_blocked:'#e95f72'};
   const color=colors[power]||'#ffffff';
   
@@ -453,9 +453,9 @@ function playPowerTakeover(power,playerName){
   } else {
     takeover.innerHTML=`
       <div class="takeover-content">
-        <div class="takeover-avatar">${avatar[2]}</div>
+        <div class="takeover-avatar">${powerInfo.icon}</div>
         <h1 class="takeover-title" style="color:${color}">${esc(playerName)} zet in:</h1>
-        <h2 class="takeover-title" style="font-size:32px">${esc(avatar[1])}</h2>
+        <h2 class="takeover-title" style="font-size:32px">${esc(powerInfo.name.split(' (')[0])}</h2>
         <p class="takeover-desc">${esc(getPowerMiniDesc(power))}</p>
       </div>
     `;
