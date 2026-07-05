@@ -314,7 +314,7 @@ async function updateManagedPlayer(playerId){
   }catch(e){console.error(e);toast(`Wijzigen mislukt: ${e.message||e}`)}
 }
 
-function rules(type,p=null){let x=type==='full'?['Juiste film: +1','Juiste titel: +1','Exact filmjaar: +1','Maximum: 3']:type==='film'?['Juiste film: +2']:type==='title'?['Juiste titel: +2']:type==='artist'?['Juiste uitvoerder/personage: +2']:['Exact: +3','1 jaar verschil: +2','2 jaar verschil: +1','Verder: 0'];if(p==='hyperdrive')x.push('Hyperdrive: alle punten dubbel');if(p==='wild_ride'&&type==='year')x=['Exact: +3','Maximaal 2 jaar verschil: +2','Maximaal 4 jaar verschil: +1'];if(p==='hidden_treasure')x.push('Verborgen schat: minimaal 1 goed = +1 bonus');if(p==='ghost_whisper')x.push('Geestenfluistering: kies 10 seconden uit alle jaartallen');if(p==='second_drop')x.push('Tweede val: rode antwoorden 30 seconden aanpassen');if(p==='lightspeed')x.push('Lichtsnelheid: beantwoord binnen 8s = +1 bonus');if(p==='small_world')x.push('Kleine wereld harmonie: minder scorende spelers schenken +1 bonus');if(p==='ingredient_theft')x.push('Remy\'s Keukendiefstal: gekopieerd antwoord');if(p==='laser_block')x.push('Laser Blokkade: neutraliseer een actieve kracht');if(p==='laser_blocked')x.push('Laser Blokkade: alle krachten zijn deze ronde geannuleerd! 💥');if(p==='temple_run')x.push('Temple of Peril: verdubbel bij juist, -1 bij fout!');if(p==='spider_bot')x.push('Spider-Bot: kopieer de topscore van deze ronde!');if(p==='turbo_boost')x.push('Turbo Boost: +1 bonus voor de allersnelste correcte speler!');return `<div class="rulebox"><h3>Punten deze ronde</h3>${x.map(v=>`<div>• ${v}</div>`).join('')}</div>`}
+function rules(type,p=null){let x=type==='full'?['Juiste film: +1','Juiste titel: +1','Exact filmjaar: +1','Maximum: 3']:type==='film'?['Juiste film: +2']:type==='title'?['Juiste titel: +2']:type==='artist'?['Juiste uitvoerder/personage: +2']:['Exact: +3','1 jaar verschil: +2','2 jaar verschil: +1','Verder: 0'];if(p==='hyperdrive')x.push('Hyperdrive: alle punten dubbel');if(p==='wild_ride'&&type==='year')x=['Exact: +3','Maximaal 2 jaar verschil: +2','Maximaal 4 jaar verschil: +1'];if(p==='hidden_treasure')x.push('Verborgen schat: minimaal 1 goed = +1 bonus');if(p==='ghost_whisper')x.push('Geestenfluistering: kies 10 seconden uit alle jaartallen');if(p==='second_drop')x.push('Tweede val: rode antwoorden 30 seconden aanpassen');if(p==='lightspeed')x.push('Lichtsnelheid: beantwoord binnen 10s = +1 bonus');if(p==='small_world')x.push('Kleine wereld harmonie: minder scorende spelers schenken +1 bonus');if(p==='ingredient_theft')x.push('Remy\'s Keukendiefstal: gekopieerd antwoord');if(p==='laser_block')x.push('Laser Blaster: neutraliseer de geactiveerde kracht van een tegenstander!');if(p==='laser_blocked')x.push('Laser Blaster: alle krachten zijn deze ronde geannuleerd! 💥');if(p==='temple_run')x.push('Temple of Peril: verdrievoudig bij juist, -1 bij fout!');if(p==='spider_bot')x.push('Spider-Bot: kopieer de topscore van deze ronde!');if(p==='turbo_boost')x.push('Turbo Boost: +1 bonus voor de allersnelste correcte speler!');return `<div class="rulebox"><h3>Punten deze ronde</h3>${x.map(v=>`<div>• ${v}</div>`).join('')}</div>`}
 function power(){return state.round?.active_power||null}
 function powerButton(){
   if(!settings().powers||!state.me)return '';
@@ -371,7 +371,7 @@ function form(t,a={}){const fVal=state.currentAnswer.film!==undefined?state.curr
 function collect(t){if(t==='full')return{film:ansFilm.value.trim(),title:ansTitle.value.trim(),year:+ansYear.value||null};if(t==='year')return{year:+ansYear.value||null};return{[t]:ansText.value.trim()}}
 function filled(t,a){return t==='full'?!!(a.film&&a.title&&a.year):t==='year'?!!a.year:!!a[t]}
 function renderAnswer(){if(!state.answerPhaseStartedAt)state.answerPhaseStartedAt=Date.now();let mine=own(),done=new Set(state.answers.map(a=>a.user_id)),all=state.answers.length===state.players.length;app().innerHTML=`${topbar('Geheim antwoorden')}${scorebar()}${progress()}<section class="card question" style="--accent:${state.me?.color||'#00e5ff'}"><div class="prompt">${esc(prompt(state.round.question_type))}</div>${rules(state.round.question_type,power())}${powerButton()}${mine?'<div class="notice green">Je antwoord is opgeslagen.</div>':host()?'<div class="notice blue">Jij bent de organisator. Wacht tot de spelers antwoorden.</div>':`${form(state.round.question_type)}<button class="btn primary full" onclick="submitAnswer()">Antwoord vastleggen</button>`}</section><section class="card"><h2>Wie heeft geantwoord?</h2>${playerList(p=>done.has(p.user_id)?['Antwoord binnen','ok']:['Denkt nog na','wait'])}${leader()||host()?`<button class="btn secondary full" style="margin-top:12px" ${all?'':'disabled'} onclick="afterAnswers()">Verder</button>`:`<div class="notice blue">${all?'Alle antwoorden zijn binnen.':'Wachten op alle spelers.'}</div>`}</section>`}
-async function submitAnswer(){if(host())return;let a=collect(state.round.question_type);if(!filled(state.round.question_type,a)){toast('Vul je antwoord in.');return}const elapsed=(Date.now()-(state.answerPhaseStartedAt||Date.now()))/1000;if(elapsed<=8)a.speed_bonus=true;let r=await state.sb.from('dmq_answers').insert({room_id:state.room.id,round_id:state.round.id,player_id:state.me.id,user_id:state.user.id,answer:a});if(r.error)toast(r.error.message);else schedule()}
+async function submitAnswer(){if(host())return;let a=collect(state.round.question_type);if(!filled(state.round.question_type,a)){toast('Vul je antwoord in.');return}const elapsed=(Date.now()-(state.answerPhaseStartedAt||Date.now()))/1000;if(elapsed<=10)a.speed_bonus=true;let r=await state.sb.from('dmq_answers').insert({room_id:state.room.id,round_id:state.round.id,player_id:state.me.id,user_id:state.user.id,answer:a});if(r.error)toast(r.error.message);else schedule()}
 function norm(v){return String(v||'').normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLowerCase().replace(/&/g,' and ').replace(/\b(the|a|an|de|het|een|la|le|les|un|une|der|die|das)\b/g,' ').replace(/[^a-z0-9]+/g,' ').trim().replace(/\s+/g,' ')}
 function lev(a,b){if(a===b)return 0;if(!a.length)return b.length;if(!b.length)return a.length;let r=Array.from({length:b.length+1},(_,i)=>i);for(let i=1;i<=a.length;i++){let p=r[0];r[0]=i;for(let j=1;j<=b.length;j++){let t=r[j];r[j]=Math.min(r[j]+1,r[j-1]+1,p+(a[i-1]===b[j-1]?0:1));p=t}}return r[b.length]}
 function match(v,targets){let a=norm(v);if(!a)return false;return targets.filter(Boolean).some(t=>{let b=norm(t);return a===b||(a.length>=6&&(a.includes(b)||b.includes(a)))||(1-lev(a,b)/Math.max(a.length,b.length)>=.72)})}
@@ -495,9 +495,9 @@ function getPowerMiniDesc(power){
   if(power==='lightspeed') return 'Lichtsnelheid! Snelheidsbonus actief!';
   if(power==='small_world') return 'Kleine Wereld Harmonie actief!';
   if(power==='ingredient_theft') return 'Keukendiefstal! Remy kopieert een antwoord!';
-  if(power==='laser_block') return 'Laser Blokkade! Een kracht wordt geannuleerd!';
+  if(power==='laser_block') return 'Laser Blaster! Een kracht is uit de lucht geschoten! 💥';
   if(power==='laser_blocked') return 'Gecancelled! Alle krachten deze ronde geannuleerd! 💥';
-  if(power==='temple_run') return 'Indiana Jones tempelavontuur! Dubbel of -1!';
+  if(power==='temple_run') return 'Indiana Jones tempelavontuur! Drie keer of -1!';
   if(power==='spider_bot') return 'Spider-Bot kopieert de topscore!';
   if(power==='turbo_boost') return 'Turbo Boost! +1 bonuspunt voor de snelste speler!';
   return 'Kracht geactiveerd!';
@@ -515,8 +515,8 @@ function playPowerTakeover(power,playerName){
       <div class="takeover-content">
         <div class="takeover-avatar">🎯</div>
         <h1 class="takeover-title" style="color:${color}">${esc(playerName)} activeert:</h1>
-        <h2 class="takeover-title" style="font-size:32px">Laser Blokkade!</h2>
-        <p class="takeover-desc">De actieve kracht is geneutraliseerd! 💥</p>
+        <h2 class="takeover-title" style="font-size:32px">Laser Blaster!</h2>
+        <p class="takeover-desc">De actieve kracht is uit de lucht geschoten! 💥</p>
       </div>
     `;
   } else {
