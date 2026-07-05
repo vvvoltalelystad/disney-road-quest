@@ -3,7 +3,7 @@
 const cfg=window.DMQ_CONFIG||{};
 const COLORS=[['blue','Blauw','#74d7ff'],['green','Groen','#69e58d'],['yellow','Geel','#ffe45f'],['pink','Roze','#ff7ac8'],['purple','Paars','#bb86ff']];
 const AVATARS=[['linguini','Alfredo Linguini','👨‍🍳'],['donald','Donald Duck','🦆'],['stitch','Stitch','👽'],['elsa','Elsa','❄️'],['buzz','Buzz Lightyear','👨‍🚀'],['jack','Jack Sparrow','🏴‍☠️'],['simba','Simba','🦁'],['remy','Remy','🐭'],['peter','Peter Pan','🧚‍♂️'],['taran','Taran','⚔️'],['wendy','Wendy Darling','👧'],['heihei','Heihei','🐔']];
-const POWERS_EXPLAIN=[{id:'hyperdrive',name:'Hyperdrive (Hyperspace Mountain)',icon:'🚀',desc:'Verdubbel al jouw behaalde punten in de huidige ronde!'},{id:'wild_ride',name:'Wild Ride (Big Thunder Mountain)',icon:'🚂',desc:'Bij jaartal-vragen krijg je ook punten bij een afwijking van max. 4 jaar.'},{id:'ghost_whisper',name:'Geestenfluistering (Phantom Manor)',icon:'👻',desc:'Kies anoniem uit de ingevoerde jaartallen van alle spelers.'},{id:'hidden_treasure',name:'Verborgen Schat (Pirates of the Caribbean)',icon:'🏴‍☠️',desc:'Krijg +1 bonuspunt als je ten minste één onderdeel correct beantwoordt.'},{id:'second_drop',name:'Tweede Val (Tower of Terror)',icon:'🏨',desc:'Iedereen mag gedurende 30 seconden zijn foutieve (rode) antwoorden herzien.'},{id:'lightspeed',name:'Lichtsnelheid (Star Tours)',icon:'🛸',desc:'Beantwoord de vraag correct binnen 8 seconden voor +1 snelheidsbonus.'},{id:'small_world',name:'Kleine Wereld Harmonie ("it\'s a small world")',icon:'🌍',desc:'Spelers die minder scoren dan jij, schenken jou +1 bonuspunt (max. +2).'},{id:'ingredient_theft',name:'Remy\'s Keukendiefstal (Ratatouille)',icon:'🐭',desc:'Kopiëer het antwoord van een tegenstander als je het zelf niet weet.'},{id:'laser_block',name:'Laser Blokkade (Buzz Lightyear)',icon:'🎯',desc:'Neutraliseer de geactiveerde kracht van een tegenstander in deze ronde.'}];
+const POWERS_EXPLAIN=[{id:'hyperdrive',name:'Hyperdrive (Hyperspace Mountain)',icon:'🚀',desc:'Verdubbel al jouw behaalde punten in de huidige ronde!'},{id:'wild_ride',name:'Wild Ride (Big Thunder Mountain)',icon:'🚂',desc:'Bij jaartal-vragen krijg je ook punten bij een afwijking van max. 4 jaar.'},{id:'ghost_whisper',name:'Geestenfluistering (Phantom Manor)',icon:'👻',desc:'Kies anoniem uit de ingevoerde jaartallen van alle spelers.'},{id:'hidden_treasure',name:'Verborgen Schat (Pirates of the Caribbean)',icon:'🏴‍☠️',desc:'Krijg +1 bonuspunt als je ten minste één onderdeel correct beantwoordt.'},{id:'second_drop',name:'Tweede Val (Tower of Terror)',icon:'🏨',desc:'Iedereen mag gedurende 30 seconden zijn foutieve (rode) antwoorden herzien.'},{id:'lightspeed',name:'Lichtsnelheid (Star Tours)',icon:'🛸',desc:'Beantwoord de vraag correct binnen 8 seconden voor +1 snelheidsbonus.'},{id:'small_world',name:'Kleine Wereld Harmonie ("it\'s a small world")',icon:'🌍',desc:'Spelers die minder scoren dan jij, schenken jou +1 bonuspunt (max. +2).'},{id:'ingredient_theft',name:'Remy\'s Keukendiefstal (Ratatouille)',icon:'🐭',desc:'Kopiëer het antwoord van een tegenstander als je het zelf niet weet.'},{id:'laser_block',name:'Laser Blokkade (Buzz Lightyear)',icon:'🎯',desc:'Neutraliseer de geactiveerde kracht van een tegenstander in deze ronde.'},{id:'temple_run',name:'Temple of Peril (Indiana Jones)',icon:'🤠',desc:'Verdrievoudig je score bij een goed antwoord, maar krijg -1 punt bij een fout antwoord.'},{id:'spider_bot',name:'Spider-Bot (WEB Adventure)',icon:'🕷️',desc:'Kopieer de score van de hoogst scorende speler in deze ronde (indien jouw score lager is).'},{id:'turbo_boost',name:'Turbo Boost (Autopia)',icon:'🏎️',desc:'Krijg +1 bonuspunt als je antwoord correct is en je de allersnelste correcte speler was.'}];
 const DEFAULT_SETTINGS={streaks:true,powers:true,quick_guess:false,jackpot:false,stat_titles:true,final_bet:false,animations:true,leader_mode:'rotating',fixed_leader_player_id:null};
 const state={sb:null,user:null,room:null,players:[],me:null,round:null,answers:[],songs:[],presence:{},channel:null,poll:null,view:'home',joinCode:'',joinName:'',joinColor:null,joinAvatar:null,adminPin:'',adminSelectedSong:1,refreshing:false,timer:null,startError:'',manageOpen:false,lobbySettings:{roundCount:10,gameMode:'mix',leaderMode:'rotating',fixedLeader:null,streaks:true,powers:true,quick_guess:false,jackpot:false,stat_titles:true,final_bet:false,animations:true},currentAnswer:{film:'',title:'',year:'',text:'',artist:''},timerSeconds:0,timerRoundId:null,timerPhase:null,lastShownPower:null,answerPhaseStartedAt:null,reviewFinalPoints:null,reviewCorrectionNote:null};
 document.addEventListener('DOMContentLoaded',init);window.addEventListener('beforeunload',cleanup);
@@ -395,7 +395,7 @@ function points(a,s,t,activePower,playerId){
   if(p==='hyperdrive')q*=2;
   if(p==='lightspeed'&&a.speed_bonus&&q>0)q++;
   if(p==='temple_run'){
-    if(q>0)q*=2;
+    if(q>0)q*=3;
     else q=-1;
   }
   if(p==='turbo_boost'&&q>0){
@@ -431,7 +431,7 @@ function maxPoints(t,p,playerId){
   if(activeP==='hidden_treasure'||activeP==='lightspeed')m++;
   if(activeP==='small_world')m+=2;
   if(activeP==='hyperdrive')m*=2;
-  if(activeP==='temple_run')m*=2;
+  if(activeP==='temple_run')m*=3;
   if(activeP==='spider_bot')m=t==='full'||t==='year'?6:4;
   return m;
 }
