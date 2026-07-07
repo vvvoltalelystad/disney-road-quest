@@ -1,6 +1,6 @@
 // Build trigger: 2026-07-04 23:22
 "use strict";
-const DMQ_VERSION='58';
+const DMQ_VERSION='59';
 const cfg=window.DMQ_CONFIG||{};
 const COLORS=[['blue','Blauw','#00e5ff'],['green','Groen','#2eff7d'],['yellow','Geel','#ffd615'],['pink','Roze','#ff2a85'],['purple','Paars','#bd53ed'],['orange','Oranje','#ff6b00']];
 const AVATARS=[['linguini','Alfredo Linguini','avatars/linguini.webp'],['bruno','Bruno','avatars/bruno.png'],['buzz','Buzz Lightyear','avatars/buzz.png'],['heihei','Heihei','avatars/heihei.png'],['jack','Jack Sparrow','avatars/jack.png'],['kuzco','Kuzco','avatars/kuzco.png'],['medusa','Madame Medusa','avatars/medusa.png'],['maximus','Maximus','avatars/maximus.png'],['miguel','Miguel','avatars/miguel.png'],['mufasa','Mufasa','avatars/mufasa.png'],['mushu','Mushu','avatars/mushu.png'],['olaf','Olaf','avatars/olaf.png'],['pascal','Pascal','avatars/pascal.png'],['percy','Percy','avatars/percy.png'],['peter','Peter Pan','avatars/peter.png'],['redpanda','Red Panda','avatars/redpanda.png'],['remy','Remy','avatars/remy.png'],['stitch','Stitch','avatars/stitch.png']];
@@ -798,20 +798,49 @@ function removeBg(img){
   if(!img||img.dataset.processed)return;
   img.dataset.processed="true";
   const canvas=document.createElement('canvas');
-  canvas.width=img.naturalWidth||img.width;
-  canvas.height=img.naturalHeight||img.height;
-  if(!canvas.width||!canvas.height)return;
+  const w=img.naturalWidth||img.width;
+  const h=img.naturalHeight||img.height;
+  canvas.width=w;
+  canvas.height=h;
+  if(!w||!h)return;
   const ctx=canvas.getContext('2d');
   ctx.drawImage(img,0,0);
   try{
-    const imgData=ctx.getImageData(0,0,canvas.width,canvas.height);
+    const imgData=ctx.getImageData(0,0,w,h);
     const data=imgData.data;
     for(let i=0;i<data.length;i+=4){
       if(data[i]>240&&data[i+1]>240&&data[i+2]>240){
         data[i+3]=0;
       }
     }
+    let minX=w,minY=h,maxX=0,maxY=0;
+    let found=false;
+    for(let y=0;y<h;y++){
+      for(let x=0;x<w;x++){
+        const alpha=data[((y*w)+x)*4+3];
+        if(alpha>0){
+          found=true;
+          if(x<minX)minX=x;
+          if(x>maxX)maxX=x;
+          if(y<minY)minY=y;
+          if(y>maxY)maxY=y;
+        }
+      }
+    }
     ctx.putImageData(imgData,0,0);
+    if(found){
+      const cropW=maxX-minX+1;
+      const cropH=maxY-minY+1;
+      if(cropW>0&&cropH>0&&(cropW<w||cropH<h)){
+        const cropCanvas=document.createElement('canvas');
+        cropCanvas.width=cropW;
+        cropCanvas.height=cropH;
+        const cropCtx=cropCanvas.getContext('2d');
+        cropCtx.drawImage(canvas,minX,minY,cropW,cropH,0,0,cropW,cropH);
+        img.src=cropCanvas.toDataURL();
+        return;
+      }
+    }
     img.src=canvas.toDataURL();
   }catch(e){console.error(e)}
 }
