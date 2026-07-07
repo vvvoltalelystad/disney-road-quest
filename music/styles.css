@@ -609,11 +609,3 @@ img.emoji {
   margin-right: 0px;
   padding: 4px;
 }
-
-/* Custom scale overrides for Olaf and Percy to compensate for internal whitespace in their source files */
-.avatar-img-inline[alt="Olaf"],
-.avatar-img-inline[alt="Percy"] {
-  transform: scale(1.25) !important;
-}
-
-
