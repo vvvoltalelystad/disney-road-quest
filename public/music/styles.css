@@ -524,4 +524,84 @@ img.emoji {
   display: inline-block;
 }
 
+/* Custom Avatar Image Sizing & Layout updates */
+.avatar-img-inline {
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  object-fit: cover;
+  vertical-align: middle;
+  margin-right: 6px;
+  display: inline-block;
+  border: 1px solid rgba(255,255,255,0.15);
+  background: rgba(255,255,255,0.05);
+}
+
+/* 1. Join choice screen button adjustments */
+.avatarchoice {
+  display: flex !important;
+  flex-direction: column !important;
+  align-items: center !important;
+  justify-content: center !important;
+  text-align: center !important;
+  padding: 12px 6px !important;
+  min-height: 110px !important;
+  font-size: 13px !important;
+}
+.avataricon {
+  display: block !important;
+  font-size: 34px !important;
+  margin-bottom: 6px !important;
+  line-height: 1 !important;
+}
+.avataricon .avatar-img-inline {
+  width: 58px;
+  height: 58px;
+  border: 2px solid rgba(255, 255, 255, 0.2);
+  margin-bottom: 0px;
+  margin-right: 0px;
+}
+
+/* 2. Lobby screen player badge sizes */
+.avatarbadge {
+  font-size: 32px !important;
+}
+.avatarbadge .avatar-img-inline {
+  width: 44px;
+  height: 44px;
+  border: 1.5px solid rgba(255,255,255,0.25);
+  margin-right: 0px;
+}
+
+/* 3. In-game scorebar frames */
+.avatar-emoji {
+  font-size: 32px !important;
+}
+.avatar-emoji .avatar-img-inline {
+  width: 40px;
+  height: 40px;
+  border: 1.5px solid rgba(255,255,255,0.2);
+  margin-right: 0px;
+}
+
+/* 4. Winner Celebration overlay avatar size */
+.winner-avatar-large .avatar-img-inline {
+  width: 112px;
+  height: 112px;
+  border: 3px solid rgba(255, 255, 255, 0.25);
+  box-shadow: 0 0 20px rgba(255, 212, 92, 0.4);
+  margin-right: 0px;
+}
+
+/* 5. Cheering section avatar size */
+.cheer-emoji {
+  font-size: 40px !important;
+}
+.cheer-emoji .avatar-img-inline {
+  width: 52px;
+  height: 52px;
+  border: 1.5px solid rgba(255,255,255,0.2);
+  margin-right: 0px;
+}
+
 
