@@ -593,6 +593,201 @@ img.emoji {
   width: 112px;
   height: 112px;
   border: 3px solid rgba(255, 255, 255, 0.25);
+-webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  z-index: 1;
+}
+.winner-title-large {
+  font-size: 14px;
+  font-weight: 800;
+  color: var(--gold);
+  margin: 0 0 12px 0;
+  letter-spacing: 0.5px;
+  text-transform: uppercase;
+  z-index: 1;
+}
+.winner-score-large {
+  font-size: 24px;
+  font-weight: 900;
+  background: rgba(255, 212, 92, 0.15);
+  border: 1px solid rgba(255, 212, 92, 0.3);
+  padding: 6px 16px;
+  border-radius: 20px;
+  margin-bottom: 24px;
+  color: #ffd45c;
+  box-shadow: 0 0 12px rgba(255, 212, 92, 0.2);
+  z-index: 1;
+}
+.cheering-section {
+  display: flex;
+  justify-content: center;
+  gap: 15px;
+  width: 100%;
+  margin-bottom: 24px;
+  border-top: 1px solid rgba(255, 255, 255, 0.08);
+  padding-top: 18px;
+  z-index: 1;
+  overflow-x: auto;
+  scrollbar-width: none;
+}
+.cheering-section::-webkit-scrollbar { display: none; }
+.cheering-player {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  animation: cheer-bounce 1.2s ease-in-out infinite alternate;
+}
+.cheer-emoji {
+  font-size: 36px;
+  line-height: 1;
+  margin-bottom: 4px;
+}
+.cheer-name {
+  font-size: 10px;
+  font-weight: 800;
+  color: var(--muted);
+  max-width: 65px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.close-celebration {
+  z-index: 1;
+  width: 100%;
+  max-width: 220px;
+}
+.celebration-particle {
+  position: absolute;
+  top: -50px;
+  pointer-events: none;
+  z-index: 2050;
+  animation: particle-fall 3s linear forwards;
+}
+
+/* Celebration Keyframes */
+@keyframes modal-enter {
+  from { transform: scale(0.85); opacity: 0; }
+  to { transform: scale(1); opacity: 1; }
+}
+@keyframes pulse-shine {
+  from { transform: scale(0.9); opacity: 0.7; }
+  to { transform: scale(1.1); opacity: 1; }
+}
+@keyframes float-crown {
+  from { transform: translateY(0) rotate(-10deg); }
+  to { transform: translateY(-8px) rotate(-5deg); }
+}
+@keyframes cheer-bounce {
+  from { transform: translateY(0); }
+  to { transform: translateY(-12px); }
+}
+@keyframes particle-fall {
+  0% {
+    transform: translateY(-50px) rotate(0deg);
+    opacity: 1;
+  }
+  90% {
+    opacity: 1;
+  }
+  100% {
+    transform: translateY(105vh) rotate(720deg);
+    opacity: 0;
+  }
+}
+.animate-winner {
+  animation: winner-pulse-glow 2.5s ease-in-out infinite alternate;
+}
+@keyframes winner-pulse-glow {
+  from {
+    transform: scale(1);
+    border-color: rgba(255, 255, 255, 0.15);
+    box-shadow: 0 10px 25px rgba(0,0,0,0.4);
+  }
+  to {
+    transform: scale(1.06);
+    border-color: rgba(255, 212, 92, 0.6);
+    box-shadow: 0 10px 35px rgba(255, 212, 92, 0.4);
+  }
+}
+
+/* Twemoji Images sizing & rendering */
+img.emoji {
+  height: 1.1em;
+  width: 1.1em;
+  margin: 0 .05em 0 .1em;
+  vertical-align: -0.15em;
+  display: inline-block;
+}
+
+/* Custom Avatar Image Sizing & Layout updates */
+.avatar-img-inline {
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  object-fit: contain;
+  vertical-align: middle;
+  margin-right: 6px;
+  display: inline-block;
+  border: 1px solid rgba(255,255,255,0.15);
+  background: rgba(255,255,255,0.05);
+  padding: 2px;
+}
+
+/* 1. Join choice screen button adjustments */
+.avatarchoice {
+  display: flex !important;
+  flex-direction: column !important;
+  align-items: center !important;
+  justify-content: center !important;
+  text-align: center !important;
+  padding: 12px 6px !important;
+  min-height: 110px !important;
+  font-size: 13px !important;
+}
+.avataricon {
+  display: block !important;
+  font-size: 34px !important;
+  margin-bottom: 6px !important;
+  line-height: 1 !important;
+}
+.avataricon .avatar-img-inline {
+  width: 58px;
+  height: 58px;
+  border: 2px solid rgba(255, 255, 255, 0.2);
+  margin-bottom: 0px;
+  margin-right: 0px;
+  padding: 4px;
+}
+
+/* 2. Lobby screen player badge sizes */
+.avatarbadge {
+  font-size: 32px !important;
+}
+.avatarbadge .avatar-img-inline {
+  width: 44px;
+  height: 44px;
+  border: 1.5px solid rgba(255,255,255,0.25);
+  margin-right: 0px;
+  padding: 3px;
+}
+
+/* 3. In-game scorebar frames */
+.avatar-emoji {
+  font-size: 32px !important;
+}
+.avatar-emoji .avatar-img-inline {
+  width: 40px;
+  height: 40px;
+  border: 1.5px solid rgba(255,255,255,0.2);
+  margin-right: 0px;
+  padding: 3px;
+}
+
+/* 4. Winner Celebration overlay avatar size */
+.winner-avatar-large .avatar-img-inline {
+  width: 112px;
+  height: 112px;
+  border: 3px solid rgba(255, 255, 255, 0.25);
   box-shadow: 0 0 20px rgba(255, 212, 92, 0.4);
   margin-right: 0px;
   padding: 8px;
@@ -608,4 +803,47 @@ img.emoji {
   border: 1.5px solid rgba(255,255,255,0.2);
   margin-right: 0px;
   padding: 4px;
+}
+
+/* Attraction Cards Image Sizing & Layout updates */
+.attraction-img-inline {
+  width: 32px;
+  height: 32px;
+  border-radius: 8px;
+  object-fit: contain;
+  vertical-align: middle;
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  padding: 2px;
+  display: inline-block;
+}
+
+/* 1. Deck UI Card Attraction image size */
+.card-emoji .attraction-img-inline {
+  width: 44px;
+  height: 44px;
+  border-radius: 10px;
+  border: 1.5px solid rgba(255, 255, 255, 0.2);
+  margin-bottom: 0px;
+  padding: 3px;
+  box-shadow: 0 4px 8px rgba(0,0,0,0.3);
+}
+
+/* 2. Powers info modal list attraction image size */
+.modal-item .icon .attraction-img-inline {
+  width: 46px;
+  height: 46px;
+  border-radius: 10px;
+  border: 1.5px solid rgba(255, 255, 255, 0.2);
+  padding: 3px;
+}
+
+/* 3. Takeover overlay banner attraction image size */
+.takeover-avatar .attraction-img-inline {
+  width: 100px;
+  height: 100px;
+  border-radius: 18px;
+  border: 3px solid rgba(255, 255, 255, 0.25);
+  box-shadow: 0 0 25px rgba(255, 255, 255, 0.2);
+  padding: 6px;
 }
