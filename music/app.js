@@ -1,9 +1,9 @@
 // Build trigger: 2026-07-04 23:22
 "use strict";
-const DMQ_VERSION='54';
+const DMQ_VERSION='55';
 const cfg=window.DMQ_CONFIG||{};
 const COLORS=[['blue','Blauw','#74d7ff'],['green','Groen','#69e58d'],['yellow','Geel','#ffe45f'],['pink','Roze','#ff7ac8'],['purple','Paars','#bb86ff'],['orange','Oranje','#ff9233']];
-const AVATARS=[['linguini','Alfredo Linguini','avatars/linguini.webp'],['donald','Donald Duck','avatars/donald.webp'],['stitch','Stitch','avatars/stitch.png'],['elsa','Elsa','avatars/elsa.png'],['buzz','Buzz Lightyear','avatars/buzz.png'],['jack','Jack Sparrow','avatars/jack.png'],['mufasa','Mufasa','avatars/mufasa.png'],['remy','Remy','avatars/remy.png'],['peter','Peter Pan','avatars/peter.png'],['bruno','Bruno','avatars/bruno.png'],['miguel','Miguel','avatars/miguel.png'],['heihei','Heihei','avatars/heihei.png']];
+const AVATARS=[['linguini','Alfredo Linguini','avatars/linguini.webp'],['donald','Donald Duck','avatars/donald.webp'],['stitch','Stitch','avatars/stitch.png'],['olaf','Olaf','avatars/olaf.png'],['buzz','Buzz Lightyear','avatars/buzz.png'],['jack','Jack Sparrow','avatars/jack.png'],['mufasa','Mufasa','avatars/mufasa.png'],['remy','Remy','avatars/remy.png'],['peter','Peter Pan','avatars/peter.png'],['bruno','Bruno','avatars/bruno.png'],['miguel','Miguel','avatars/miguel.png'],['heihei','Heihei','avatars/heihei.png'],['mushu','Mushu','avatars/mushu.png'],['kuzco','Kuzco','avatars/kuzco.png'],['medusa','Madame Medusa','avatars/medusa.png'],['percy','Percy','avatars/percy.png'],['redpanda','Red Panda','avatars/redpanda.png'],['pascal','Pascal','avatars/pascal.png'],['maximus','Maximus','avatars/maximus.png']];
 const POWERS_EXPLAIN=[{id:'hyperdrive',name:'Hyperdrive (Hyperspace Mountain)',icon:'🚀',desc:'Verdubbel al jouw behaalde punten in de huidige ronde!'},{id:'wild_ride',name:'Wild Ride (Big Thunder Mountain)',icon:'🚂',desc:'Bij jaartal-vragen krijg je ook punten bij een afwijking van max. 4 jaar.'},{id:'ghost_whisper',name:'Geestenfluistering (Phantom Manor)',icon:'👻',desc:'Kies anoniem uit de ingevoerde jaartallen van alle spelers.'},{id:'hidden_treasure',name:'Verborgen Schat (Pirates of the Caribbean)',icon:'🏴‍☠️',desc:'Krijg +1 bonuspunt als je ten minste één onderdeel correct beantwoordt.'},{id:'second_drop',name:'Tweede Val (Tower of Terror)',icon:'🏨',desc:'Iedereen mag gedurende 30 seconden zijn foutieve (rode) antwoorden herzien.'},{id:'lightspeed',name:'Lichtsnelheid (Star Tours)',icon:'🛸',desc:'Beantwoord de vraag correct binnen 10 seconden voor +1 snelheidsbonus.'},{id:'small_world',name:'Kleine Wereld Harmonie ("it\'s a small world")',icon:'🌍',desc:'Spelers die minder scoren dan jij, schenken jou +1 bonuspunt (max. +2).'},{id:'ingredient_theft',name:'Remy\'s Keukendiefstal (Ratatouille)',icon:'🐭',desc:'Kopiëer het antwoord van een tegenstander als je het zelf niet weet.'},{id:'laser_block',name:'Laser Blaster (Buzz Lightyear)',icon:'🎯',desc:'Schiet de actieve kracht van een tegenstander uit de lucht om deze te neutraliseren.'},{id:'temple_run',name:'Temple of Peril (Indiana Jones)',icon:'🤠',desc:'Verdrievoudig je score bij een goed antwoord, maar krijg -1 punt bij een fout antwoord.'},{id:'spider_bot',name:'Spider-Bot (WEB Adventure)',icon:'🕷️',desc:'Kopieer de score van de hoogst scorende speler in deze ronde (indien jouw score lager is).'},{id:'turbo_boost',name:'Turbo Boost (Autopia)',icon:'🏎️',desc:'Krijg +1 bonuspunt als je antwoord correct is en je de allersnelste correcte speler was.'}];
 const DEFAULT_SETTINGS={streaks:true,powers:true,quick_guess:false,jackpot:false,stat_titles:true,final_bet:false,animations:true,leader_mode:'rotating',fixed_leader_player_id:null};
 const state={sb:null,user:null,room:null,players:[],me:null,round:null,answers:[],songs:[],presence:{},channel:null,poll:null,view:'home',joinCode:'',joinName:'',joinColor:null,joinAvatar:null,adminPin:'',adminSelectedSong:1,refreshing:false,timer:null,startError:'',manageOpen:false,lobbySettings:{roundCount:10,gameMode:'mix',leaderMode:'rotating',fixedLeader:null,streaks:true,powers:true,quick_guess:false,jackpot:false,stat_titles:true,final_bet:false,animations:true},currentAnswer:{film:'',title:'',year:'',text:'',artist:''},timerSeconds:0,timerRoundId:null,timerPhase:null,lastShownPower:null,answerPhaseStartedAt:null,reviewFinalPoints:null,reviewCorrectionNote:null,celebrationShown:false};
@@ -18,7 +18,7 @@ function loading(m='Even laden…'){app().innerHTML=`<section class="card hero">
 function fatal(m,e){console.error(e);app().innerHTML=`<section class="card"><h2>Er ging iets mis</h2><p>${esc(m)}</p><div class="notice red">${esc(e?.message||e)}</div><button class="btn primary full" onclick="location.reload()">Opnieuw</button></section>`}
 function topbar(t,b=''){const action=b||(state.room?'leaveRoom()':'');return `<div class="topbar">${action?`<button class="iconbtn" onclick="${action}">←</button>`:'<span></span>'}<h1>${esc(t)}</h1><button class="iconbtn" onclick="refreshAll()">↻</button></div>`}
 function C(id){const x=COLORS.find(v=>v[0]===id)||COLORS[0];return{id:x[0],name:x[1],hex:x[2]}}
-function A(id){const map={hyperspace:'buzz',big_thunder:'bruno',phantom:'stitch',pirates:'jack',tower:'stitch',star_tours:'buzz',small_world:'linguini',ratatouille:'remy',buzz:'buzz'};const targetId=map[id]||id;const x=AVATARS.find(v=>v[0]===targetId)||AVATARS[0];const isImg=x[2].includes('/')||x[2].endsWith('.webp')||x[2].endsWith('.png');const iconHtml=isImg?`<img src="${x[2]}" class="avatar-img-inline" style="width:1.1em;height:1.1em;border-radius:50%;object-fit:cover;vertical-align:-0.15em;display:inline-block;" onload="removeBg(this)" alt="${x[1]}">`:x[2];return{id:x[0],name:x[1],icon:iconHtml,power:x[3]}}
+function A(id){const map={hyperspace:'buzz',big_thunder:'bruno',phantom:'stitch',pirates:'jack',tower:'stitch',star_tours:'buzz',small_world:'linguini',ratatouille:'remy',buzz:'buzz'};const targetId=map[id]||id;const x=AVATARS.find(v=>v[0]===targetId)||AVATARS[0];const isImg=x[2].includes('/')||x[2].endsWith('.webp')||x[2].endsWith('.png');const iconHtml=isImg?`<img src="${x[2]}" class="avatar-img-inline" onload="removeBg(this)" alt="${x[1]}">`:x[2];return{id:x[0],name:x[1],icon:iconHtml,power:x[3]}}
 function online(p){return Object.values(state.presence||{}).flat().some(x=>x.user_id===p.user_id)}
 function host(){return state.room?.host_user_id===state.user?.id}
 function settings(){return{...DEFAULT_SETTINGS,...(state.room?.settings||{})}}
@@ -758,7 +758,7 @@ function playWinnerCelebration(winner,others){
 
 function spawnThemeParticles(avatarId,parent){
   let emojis=['✨','🎉','🏆','⭐'];
-  if(avatarId==='elsa')emojis=['❄️','✨','🩵'];
+  if(avatarId==='olaf')emojis=['⛄','🥕','❄️','✨'];
   else if(avatarId==='buzz')emojis=['🚀','⭐','🔫','✨'];
   else if(avatarId==='jack')emojis=['🪙','💰','🏴‍☠️'];
   else if(avatarId==='remy'||avatarId==='linguini')emojis=['🧀','👨‍🍳','🥖','✨'];
@@ -768,6 +768,13 @@ function spawnThemeParticles(avatarId,parent){
   else if(avatarId==='mufasa')emojis=['🦁','🍂','🍁','⭐'];
   else if(avatarId==='bruno')emojis=['⏳','🐀','💚','✨'];
   else if(avatarId==='heihei')emojis=['🐔','🪶','🤪'];
+  else if(avatarId==='mushu')emojis=['🐉','🔥','⚔️','💥'];
+  else if(avatarId==='kuzco')emojis=['🦙','👑','🧪','✨'];
+  else if(avatarId==='medusa')emojis=['💎','🐊','🚗','💀'];
+  else if(avatarId==='percy')emojis=['🐶','🍒','🪶','🎀'];
+  else if(avatarId==='redpanda')emojis=['🐼','🎵','🏮','✨'];
+  else if(avatarId==='pascal')emojis=['🦎','🎨','🍳','🏮'];
+  else if(avatarId==='maximus')emojis=['🐴','🍎','⚔️','🛡️'];
   for(let i=0;i<60;i++){
     setTimeout(()=>{
       if(!parent.parentNode)return;
