@@ -529,12 +529,13 @@ img.emoji {
   width: 28px;
   height: 28px;
   border-radius: 50%;
-  object-fit: cover;
+  object-fit: contain;
   vertical-align: middle;
   margin-right: 6px;
   display: inline-block;
   border: 1px solid rgba(255,255,255,0.15);
   background: rgba(255,255,255,0.05);
+  padding: 2px;
 }
 
 /* 1. Join choice screen button adjustments */
@@ -560,6 +561,7 @@ img.emoji {
   border: 2px solid rgba(255, 255, 255, 0.2);
   margin-bottom: 0px;
   margin-right: 0px;
+  padding: 4px;
 }
 
 /* 2. Lobby screen player badge sizes */
@@ -571,6 +573,7 @@ img.emoji {
   height: 44px;
   border: 1.5px solid rgba(255,255,255,0.25);
   margin-right: 0px;
+  padding: 3px;
 }
 
 /* 3. In-game scorebar frames */
@@ -582,6 +585,7 @@ img.emoji {
   height: 40px;
   border: 1.5px solid rgba(255,255,255,0.2);
   margin-right: 0px;
+  padding: 3px;
 }
 
 /* 4. Winner Celebration overlay avatar size */
@@ -591,6 +595,7 @@ img.emoji {
   border: 3px solid rgba(255, 255, 255, 0.25);
   box-shadow: 0 0 20px rgba(255, 212, 92, 0.4);
   margin-right: 0px;
+  padding: 8px;
 }
 
 /* 5. Cheering section avatar size */
@@ -602,6 +607,7 @@ img.emoji {
   height: 52px;
   border: 1.5px solid rgba(255,255,255,0.2);
   margin-right: 0px;
+  padding: 4px;
 }
 
 
