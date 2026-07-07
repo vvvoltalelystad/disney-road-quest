@@ -847,3 +847,22 @@ img.emoji {
   box-shadow: 0 0 25px rgba(255, 255, 255, 0.2);
   padding: 6px;
 }
+
+/* 4. Join lobby list item attraction image size */
+.power-list-icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 48px;
+  height: 48px;
+  font-size: 30px;
+  flex-shrink: 0;
+}
+.power-list-icon .attraction-img-inline {
+  width: 48px;
+  height: 48px;
+  border-radius: 10px;
+  padding: 3px;
+  border: 1.5px solid rgba(255, 255, 255, 0.15);
+  margin-right: 0px;
+}
