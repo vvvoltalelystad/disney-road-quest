@@ -1,3 +1,4 @@
+@import url('https://fonts.cdnfonts.com/css/waltograph');
 
 :root{
   --bg:#08162f;--panel:#10264f;--panel2:#173564;--gold:#ffd45c;--gold2:#f2b736;
@@ -269,8 +270,9 @@ hr{border:0;border-top:1px solid var(--line);margin:18px 0}
 }
 
 .portal-title {
-  font-size: clamp(32px, 8vw, 44px);
-  font-weight: 900;
+  font-family: 'Waltograph', 'Plus Jakarta Sans', sans-serif;
+  font-size: clamp(42px, 10vw, 56px);
+  font-weight: 500;
   line-height: 1.1;
   margin: 0 0 12px 0;
   background: linear-gradient(135deg, #ffffff 30%, #ffd45c 100%);
@@ -279,6 +281,7 @@ hr{border:0;border-top:1px solid var(--line);margin:18px 0}
   text-shadow: 0 4px 15px rgba(0, 0, 0, 0.2);
   z-index: 1;
   position: relative;
+  letter-spacing: 1px;
 }
 
 .portal-subtitle {

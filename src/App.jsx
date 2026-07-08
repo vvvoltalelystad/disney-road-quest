@@ -835,7 +835,7 @@ export default function App() {
             <div className="portal-container">
               <div className="portal-header">
                 <div className="portal-logo-glow"></div>
-                <div className="portal-badge">✨ Magische Spelletjes Portal</div>
+                <div className="portal-badge">✨ MAGIC GAME PORTAL</div>
                 <h1 className="portal-title">Disney Game Portal</h1>
                 <p className="portal-subtitle">Kies een interactief multiplayer spel voor in de auto of thuis. Iedereen speelt op zijn eigen telefoon!</p>
               </div>
