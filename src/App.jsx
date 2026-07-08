@@ -790,7 +790,7 @@ export default function App() {
                 <button className="portal-card road-quest-card" onClick={() => setScreen('home')}>
                   <div className="portal-card-header">
                     <div className="portal-card-media">
-                      <img src="/portal/car.png" onLoad={removeBg} className="portal-media-img" alt="Road Quest Car" />
+                      <img src="portal/car.png" onLoad={removeBg} className="portal-media-img" alt="Road Quest Car" />
                     </div>
                     <span className="portal-card-badge">Aanbevolen</span>
                   </div>
@@ -810,7 +810,7 @@ export default function App() {
                 >
                   <div className="portal-card-header">
                     <div className="portal-card-media">
-                      <img src="/portal/mickey_singing.png" onLoad={removeBg} className="portal-media-img" alt="Mickey Singing" />
+                      <img src="portal/mickey_singing.png" onLoad={removeBg} className="portal-media-img" alt="Mickey Singing" />
                     </div>
                     <span className="portal-card-badge music">Hitster Editie</span>
                   </div>
