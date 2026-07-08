@@ -10,7 +10,7 @@ html,body{margin:0;min-height:100%;background:radial-gradient(circle at 50% -20%
 body{min-height:100dvh}
 button,input,select,textarea{font:inherit}
 button{cursor:pointer}
-.app{min-height:100dvh;padding:calc(env(safe-area-inset-top) + 14px) 16px calc(env(safe-area-inset-bottom) + 18px);max-width:760px;margin:auto}
+.app{position:relative;z-index:10;min-height:100dvh;padding:calc(env(safe-area-inset-top) + 14px) 16px calc(env(safe-area-inset-bottom) + 18px);max-width:760px;margin:auto}
 .topbar{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-bottom:14px}
 .brand{display:flex;align-items:center;gap:10px;font-weight:900;letter-spacing:.3px}
 .brand .castle{font-size:30px;filter:drop-shadow(0 2px 6px #0008)}
@@ -508,4 +508,9 @@ hr{border:0;border-top:1px solid var(--line);margin:18px 0}
   object-fit: contain;
   filter: drop-shadow(0 4px 6px rgba(0, 0, 0, 0.15));
 }
+
+body.night-theme {
+  background: radial-gradient(circle at 50% -20%, #0d1a33 0%, #050a1a 60%, #02040d 100%) !important;
+}
+
 

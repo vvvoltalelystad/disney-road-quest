@@ -281,6 +281,18 @@ export default function App() {
     recoverSession();
   }, []);
 
+  // Day/Night theme toggles class on document.body
+  useEffect(() => {
+    if (screen === 'game' && themeMode === 'night') {
+      document.body.classList.add('night-theme');
+    } else {
+      document.body.classList.remove('night-theme');
+    }
+    return () => {
+      document.body.classList.remove('night-theme');
+    };
+  }, [themeMode, screen]);
+
   const clearSession = () => {
     localStorage.removeItem('disney_room_id');
     localStorage.removeItem('disney_player_id');
@@ -1405,9 +1417,9 @@ export default function App() {
           left: 0;
           width: 100vw;
           height: 100vh;
-          z-index: -1;
+          z-index: 1;
           pointer-events: none;
-          background: radial-gradient(circle at 50% -20%, #0d1a33 0%, #050a1a 60%, #02040d 100%);
+          background: transparent;
           overflow: hidden;
         }
         .star {
