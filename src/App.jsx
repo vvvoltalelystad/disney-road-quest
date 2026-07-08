@@ -36,31 +36,84 @@ const STAGES = [
   "Welkom in het Park!"
 ];
 
+const assetPath = (path) => {
+  if (location.hostname.includes('github.io')) {
+    return '/disney-road-quest/' + path;
+  }
+  return '/' + path;
+};
+
 const removeBg = (e) => {
   const img = e.target;
   if (!img || img.dataset.processed) return;
   img.dataset.processed = "true";
+  
+  // Make sure image is loaded with crossOrigin if needed (same origin is fine)
   const canvas = document.createElement('canvas');
   const w = img.naturalWidth || img.width;
   const h = img.naturalHeight || img.height;
   canvas.width = w;
   canvas.height = h;
   if (!w || !h) return;
+  
   const ctx = canvas.getContext('2d');
   ctx.drawImage(img, 0, 0);
+  
   try {
     const imgData = ctx.getImageData(0, 0, w, h);
     const data = imgData.data;
-    for (let i = 0; i < data.length; i += 4) {
-      if (data[i] > 240 && data[i + 1] > 240 && data[i + 2] > 240) {
-        data[i + 3] = 0;
+    
+    // BFS Flood-fill to only remove white background connected to borders
+    const queue = [];
+    const visited = new Uint8Array(w * h);
+    
+    const isWhite = (x, y) => {
+      const idx = (y * w + x) * 4;
+      return data[idx] > 220 && data[idx + 1] > 220 && data[idx + 2] > 220;
+    };
+    
+    // Initialize border pixels
+    for (let x = 0; x < w; x++) {
+      if (isWhite(x, 0)) { queue.push(x, 0); visited[x] = 1; }
+      if (isWhite(x, h - 1)) { queue.push(x, h - 1); visited[(h - 1) * w + x] = 1; }
+    }
+    for (let y = 0; y < h; y++) {
+      if (isWhite(0, y)) { queue.push(0, y); visited[y * w] = 1; }
+      if (isWhite(w - 1, y)) { queue.push(w - 1, y); visited[y * w + w - 1] = 1; }
+    }
+    
+    let head = 0;
+    while (head < queue.length) {
+      const cx = queue[head++];
+      const cy = queue[head++];
+      
+      const idx = (cy * w + cx) * 4;
+      data[idx + 3] = 0; // Make transparent
+      
+      const neighbors = [
+        [cx + 1, cy],
+        [cx - 1, cy],
+        [cx, cy + 1],
+        [cx, cy - 1]
+      ];
+      
+      for (const [nx, ny] of neighbors) {
+        if (nx >= 0 && nx < w && ny >= 0 && ny < h) {
+          const nidx = ny * w + nx;
+          if (!visited[nidx] && isWhite(nx, ny)) {
+            visited[nidx] = 1;
+            queue.push(nx, ny);
+          }
+        }
       }
     }
+    
+    // Bounding box cropping
     let minX = w, minY = h, maxX = 0, maxY = 0;
     let found = false;
     for (let y = 0; y < h; y++) {
       for (let x = 0; x < w; x++) {
-        const alpha = data[((y * w) + x) * 4 + 3];
+        const alpha = data[(y * w + x) * 4 + 3];
         if (alpha > 0) {
           found = true;
           if (x < minX) minX = x;
@@ -70,7 +123,9 @@ const removeBg = (e) => {
         }
       }
     }
+    
     ctx.putImageData(imgData, 0, 0);
+    
     if (found) {
       const cropW = maxX - minX + 1;
       const cropH = maxY - minY + 1;
@@ -790,7 +845,7 @@ export default function App() {
                 <button className="portal-card road-quest-card" onClick={() => setScreen('home')}>
                   <div className="portal-card-header">
                     <div className="portal-card-media">
-                      <img src="portal/car.png" onLoad={removeBg} className="portal-media-img" alt="Road Quest Car" />
+                      <img src={assetPath("portal/car.png")} onLoad={removeBg} className="portal-media-img" alt="Road Quest Car" />
                     </div>
                     <span className="portal-card-badge">Aanbevolen</span>
                   </div>
@@ -810,7 +865,7 @@ export default function App() {
                 >
                   <div className="portal-card-header">
                     <div className="portal-card-media">
-                      <img src="portal/mickey_singing.png" onLoad={removeBg} className="portal-media-img" alt="Mickey Singing" />
+                      <img src={assetPath("portal/mickey_singing.png")} onLoad={removeBg} className="portal-media-img" alt="Mickey Singing" />
                     </div>
                     <span className="portal-card-badge music">Hitster Editie</span>
                   </div>
