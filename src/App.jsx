@@ -36,6 +36,60 @@ const STAGES = [
   "Welkom in het Park!"
 ];
 
+const removeBg = (e) => {
+  const img = e.target;
+  if (!img || img.dataset.processed) return;
+  img.dataset.processed = "true";
+  const canvas = document.createElement('canvas');
+  const w = img.naturalWidth || img.width;
+  const h = img.naturalHeight || img.height;
+  canvas.width = w;
+  canvas.height = h;
+  if (!w || !h) return;
+  const ctx = canvas.getContext('2d');
+  ctx.drawImage(img, 0, 0);
+  try {
+    const imgData = ctx.getImageData(0, 0, w, h);
+    const data = imgData.data;
+    for (let i = 0; i < data.length; i += 4) {
+      if (data[i] > 240 && data[i + 1] > 240 && data[i + 2] > 240) {
+        data[i + 3] = 0;
+      }
+    }
+    let minX = w, minY = h, maxX = 0, maxY = 0;
+    let found = false;
+    for (let y = 0; y < h; y++) {
+      for (let x = 0; x < w; x++) {
+        const alpha = data[((y * w) + x) * 4 + 3];
+        if (alpha > 0) {
+          found = true;
+          if (x < minX) minX = x;
+          if (x > maxX) maxX = x;
+          if (y < minY) minY = y;
+          if (y > maxY) maxY = y;
+        }
+      }
+    }
+    ctx.putImageData(imgData, 0, 0);
+    if (found) {
+      const cropW = maxX - minX + 1;
+      const cropH = maxY - minY + 1;
+      if (cropW > 0 && cropH > 0 && (cropW < w || cropH < h)) {
+        const cropCanvas = document.createElement('canvas');
+        cropCanvas.width = cropW;
+        cropCanvas.height = cropH;
+        const cropCtx = cropCanvas.getContext('2d');
+        cropCtx.drawImage(canvas, minX, minY, cropW, cropH, 0, 0, cropW, cropH);
+        img.src = cropCanvas.toDataURL();
+        return;
+      }
+    }
+    img.src = canvas.toDataURL();
+  } catch (err) {
+    console.error("Canvas background removal failed:", err);
+  }
+};
+
 export default function App() {
   // App navigation state
   const [screen, setScreen] = useState('portal'); // 'portal', 'home', 'setup', 'lobby', 'game', 'scores', 'scorelog', 'end', 'manage', 'versioninfo', 'gamehistory'
@@ -735,7 +789,9 @@ export default function App() {
                 {/* Game 1: Disney Road Quest */}
                 <button className="portal-card road-quest-card" onClick={() => setScreen('home')}>
                   <div className="portal-card-header">
-                    <span className="portal-card-icon">🚗</span>
+                    <div className="portal-card-media">
+                      <img src="/portal/car.png" onLoad={removeBg} className="portal-media-img" alt="Road Quest Car" />
+                    </div>
                     <span className="portal-card-badge">Aanbevolen</span>
                   </div>
                   <div className="portal-card-body">
@@ -753,7 +809,9 @@ export default function App() {
                   className="portal-card music-quiz-card"
                 >
                   <div className="portal-card-header">
-                    <span className="portal-card-icon">🎵</span>
+                    <div className="portal-card-media">
+                      <img src="/portal/mickey_singing.png" onLoad={removeBg} className="portal-media-img" alt="Mickey Singing" />
+                    </div>
                     <span className="portal-card-badge music">Hitster Editie</span>
                   </div>
                   <div className="portal-card-body">
