@@ -212,3 +212,269 @@ hr{border:0;border-top:1px solid var(--line);margin:18px 0}
  .rankpoints{font-size:17px}
 }
 
+/* Premium Portal Design System */
+.portal-container {
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+  animation: portal-fade-up 0.6s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+  max-width: 680px;
+  margin: 10px auto 30px;
+}
+
+@keyframes portal-fade-up {
+  from {
+    opacity: 0;
+    transform: translateY(20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.portal-header {
+  text-align: center;
+  position: relative;
+  padding: 30px 10px 10px 10px;
+}
+
+.portal-logo-glow {
+  position: absolute;
+  top: -20px;
+  left: calc(50% - 100px);
+  width: 200px;
+  height: 200px;
+  background: radial-gradient(circle, rgba(255, 212, 92, 0.15) 0%, transparent 70%);
+  z-index: 0;
+  pointer-events: none;
+}
+
+.portal-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  background: rgba(255, 212, 92, 0.08);
+  border: 1px solid rgba(255, 212, 92, 0.25);
+  color: var(--gold);
+  padding: 6px 14px;
+  border-radius: 999px;
+  font-size: 11px;
+  font-weight: 900;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+  margin-bottom: 16px;
+  z-index: 1;
+  position: relative;
+}
+
+.portal-title {
+  font-size: clamp(32px, 8vw, 44px);
+  font-weight: 900;
+  line-height: 1.1;
+  margin: 0 0 12px 0;
+  background: linear-gradient(135deg, #ffffff 30%, #ffd45c 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  text-shadow: 0 4px 15px rgba(0, 0, 0, 0.2);
+  z-index: 1;
+  position: relative;
+}
+
+.portal-subtitle {
+  font-size: 15px;
+  line-height: 1.5;
+  color: var(--muted);
+  max-width: 500px;
+  margin: 0 auto;
+  z-index: 1;
+  position: relative;
+}
+
+.portal-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 20px;
+}
+
+@media (max-width: 600px) {
+  .portal-grid {
+    grid-template-columns: 1fr;
+    gap: 16px;
+  }
+}
+
+.portal-card {
+  display: flex;
+  flex-direction: column;
+  background: linear-gradient(180deg, rgba(21, 49, 95, 0.45) 0%, rgba(13, 35, 72, 0.6) 100%);
+  border: 1.5px solid rgba(255, 255, 255, 0.08);
+  border-radius: 24px;
+  padding: 24px;
+  cursor: pointer;
+  text-decoration: none;
+  color: inherit;
+  transition: all 0.4s cubic-bezier(0.16, 1, 0.3, 1);
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.25);
+  position: relative;
+  overflow: hidden;
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+}
+
+.portal-card::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.08) 0%, transparent 100%);
+  opacity: 0;
+  transition: opacity 0.3s ease;
+}
+
+.portal-card:hover {
+  transform: translateY(-8px);
+  border-color: rgba(255, 255, 255, 0.2);
+  box-shadow: 0 20px 40px rgba(0, 0, 0, 0.35);
+}
+
+.portal-card:hover::before {
+  opacity: 1;
+}
+
+/* Specific glows for each game card on hover */
+.road-quest-card:hover {
+  border-color: rgba(255, 212, 92, 0.5);
+  box-shadow: 0 15px 30px rgba(255, 212, 92, 0.15);
+}
+.music-quiz-card:hover {
+  border-color: rgba(116, 215, 255, 0.5);
+  box-shadow: 0 15px 30px rgba(116, 215, 255, 0.15);
+}
+
+.portal-card-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 20px;
+  z-index: 1;
+}
+
+.portal-card-icon {
+  font-size: 38px;
+  filter: drop-shadow(0 4px 8px rgba(0,0,0,0.25));
+  transition: transform 0.3s ease;
+}
+
+.portal-card:hover .portal-card-icon {
+  transform: scale(1.15) rotate(5deg);
+}
+
+.portal-card-badge {
+  background: rgba(255, 212, 92, 0.1);
+  border: 1px solid rgba(255, 212, 92, 0.3);
+  color: var(--gold);
+  font-size: 10px;
+  font-weight: 800;
+  padding: 4px 10px;
+  border-radius: 999px;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.portal-card-badge.music {
+  background: rgba(116, 215, 255, 0.1);
+  border: 1px solid rgba(116, 215, 255, 0.3);
+  color: #74d7ff;
+}
+
+.portal-card-body {
+  flex-grow: 1;
+  z-index: 1;
+  text-align: left;
+}
+
+.portal-card-body h3 {
+  font-size: 21px;
+  font-weight: 800;
+  margin: 0 0 10px 0;
+  color: #ffffff;
+}
+
+.road-quest-card h3 {
+  background: linear-gradient(90deg, #ffffff, #ffd45c);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+}
+
+.music-quiz-card h3 {
+  background: linear-gradient(90deg, #ffffff, #74d7ff);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+}
+
+.portal-card-body p {
+  font-size: 13.5px;
+  line-height: 1.5;
+  color: var(--muted);
+  margin: 0;
+}
+
+.portal-card-footer {
+  margin-top: 24px;
+  z-index: 1;
+  text-align: left;
+}
+
+.btn-play {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  font-weight: 800;
+  font-size: 14px;
+  color: var(--gold);
+  transition: transform 0.2s ease;
+}
+
+.btn-play.music {
+  color: #74d7ff;
+}
+
+.portal-card:hover .btn-play {
+  transform: translateX(5px);
+}
+
+.portal-info-box {
+  display: flex;
+  align-items: flex-start;
+  gap: 16px;
+  background: rgba(23, 53, 100, 0.25);
+  border: 1px solid rgba(255, 255, 255, 0.05);
+  padding: 16px 20px;
+  border-radius: 20px;
+  margin-top: 10px;
+  text-align: left;
+}
+
+.portal-info-box .info-icon {
+  font-size: 22px;
+  line-height: 1;
+  flex-shrink: 0;
+  margin-top: 2px;
+}
+
+.portal-info-box .info-text {
+  font-size: 13px;
+  line-height: 1.45;
+  color: var(--muted);
+}
+
+.portal-info-box .info-text strong {
+  display: block;
+  color: #ffffff;
+  margin-bottom: 4px;
+  font-size: 14px;
+}
+

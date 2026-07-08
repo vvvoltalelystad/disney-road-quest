@@ -723,77 +723,55 @@ export default function App() {
         <>
           {/* SCREEN: PORTAL */}
           {screen === 'portal' && (
-            <div>
-              <div className="topbar">
-                <h1 style={{ textAlign: 'center', width: '100%', margin: 0 }}>🏰 Disney Game Portal</h1>
+            <div className="portal-container">
+              <div className="portal-header">
+                <div className="portal-logo-glow"></div>
+                <div className="portal-badge">✨ Magische Spelletjes Portal</div>
+                <h1 className="portal-title">Disney Game Portal</h1>
+                <p className="portal-subtitle">Kies een interactief multiplayer spel voor in de auto of thuis. Iedereen speelt op zijn eigen telefoon!</p>
               </div>
-              <section className="card hero">
-                <div className="badge">Reisspellen naar Parijs ✨</div>
-                <div className="bigicon">🚗🎶🪄</div>
-                <h1>Kies een Game</h1>
-                <p>Selecteer een spel voor in de auto. Iedereen speelt op zijn eigen telefoon!</p>
 
-                <div className="btnrow stack" style={{ marginTop: '20px', gap: '16px' }}>
-                  {/* Game 1: Disney Road Quest */}
-                  <button 
-                    className="modecard" 
-                    style={{ 
-                      display: 'flex', 
-                      alignItems: 'center', 
-                      width: '100%', 
-                      textAlign: 'left', 
-                      padding: '16px', 
-                      background: 'rgba(255, 255, 255, 0.05)',
-                      border: '1px solid rgba(255, 255, 255, 0.1)',
-                      borderRadius: '12px',
-                      cursor: 'pointer'
-                    }}
-                    onClick={() => setScreen('home')}
-                  >
-                    <span style={{ fontSize: '32px', marginRight: '16px' }}>🚗</span>
-                    <span style={{ display: 'flex', flexDirection: 'column', flex: 1 }}>
-                      <strong style={{ fontSize: '18px', color: 'var(--gold)' }}>Disney Road Quest</strong>
-                      <small style={{ opacity: 0.8, fontSize: '12px', marginTop: '4px' }}>
-                        De ultieme roadtrip game met quizzen, dilemma's en gezamenlijke opdrachten.
-                      </small>
-                    </span>
-                  </button>
+              <div className="portal-grid">
+                {/* Game 1: Disney Road Quest */}
+                <button className="portal-card road-quest-card" onClick={() => setScreen('home')}>
+                  <div className="portal-card-header">
+                    <span className="portal-card-icon">🚗</span>
+                    <span className="portal-card-badge">Aanbevolen</span>
+                  </div>
+                  <div className="portal-card-body">
+                    <h3>Disney Road Quest</h3>
+                    <p>De ultieme roadtrip game voor onderweg naar Disneyland Parijs! Test je kennis met quizzen, maak moeilijke keuzes en werk samen aan magische opdrachten.</p>
+                  </div>
+                  <div className="portal-card-footer">
+                    <span className="btn-play">Start Spel ➔</span>
+                  </div>
+                </button>
 
-                  {/* Game 2: Disney Music Quiz */}
-                  <a 
-                    href={room?.code ? `./music/index.html?room=${room.code}` : "./music/index.html"}
-                    className="modecard" 
-                    style={{ 
-                      display: 'flex', 
-                      alignItems: 'center', 
-                      width: '100%', 
-                      textAlign: 'left', 
-                      padding: '16px', 
-                      background: 'rgba(255, 255, 255, 0.05)',
-                      border: '1px solid rgba(255, 255, 255, 0.1)',
-                      borderRadius: '12px',
-                      cursor: 'pointer',
-                      textDecoration: 'none',
-                      color: 'inherit'
-                    }}
-                  >
-                    <span style={{ fontSize: '32px', marginRight: '16px' }}>🎵</span>
-                    <span style={{ display: 'flex', flexDirection: 'column', flex: 1 }}>
-                      <strong style={{ fontSize: '18px', color: '#74d7ff' }}>Disney Music Quiz</strong>
-                      <small style={{ opacity: 0.8, fontSize: '12px', marginTop: '4px' }}>
-                        Multiplayer muziekquiz. Scan Hitster-kaarten via Spotify en raad film en jaar.
-                      </small>
-                    </span>
-                  </a>
+                {/* Game 2: Disney Music Quiz */}
+                <a 
+                  href={room?.code ? `./music/index.html?room=${room.code}` : "./music/index.html"} 
+                  className="portal-card music-quiz-card"
+                >
+                  <div className="portal-card-header">
+                    <span className="portal-card-icon">🎵</span>
+                    <span className="portal-card-badge music">Hitster Editie</span>
+                  </div>
+                  <div className="portal-card-body">
+                    <h3>Disney Music Quiz</h3>
+                    <p>Dé interactieve muziekquiz met 100 betoverende Disney en Pixar songs. Scan scancodes met Spotify, raad de film, het jaartal of de uitvoerder en verover de troon!</p>
+                  </div>
+                  <div className="portal-card-footer">
+                    <span className="btn-play music">Speel Quiz ➔</span>
+                  </div>
+                </a>
+              </div>
+
+              <div className="portal-info-box">
+                <div className="info-icon">ℹ️</div>
+                <div className="info-text">
+                  <strong>Magische Verbinding</strong> Beide spellen maken gebruik van dezelfde database op Supabase, maar werken apart. Open een kamer, laat je medereizigers de code scannen en laat de magie beginnen!
                 </div>
-              </section>
-
-              <section className="card">
-                <h2 className="sectiontitle">Over de games</h2>
-                <div className="notice">
-                  Beide spellen maken gebruik van dezelfde database op Supabase, maar werken apart. Veel plezier met de voorpret en tijdens de autorit!
-                </div>
-              </section>
+              </div>
             </div>
           )}
 
