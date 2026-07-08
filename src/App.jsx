@@ -415,7 +415,11 @@ export default function App() {
     localStorage.setItem('disney_sound_enabled', String(newVal));
   };
 
-  const isGroupOnly = () => room?.game_mode === "Samen";
+  const isGroupOnly = () => {
+    if (room?.game_mode === "Samen") return true;
+    const cats = room?.current_task_state?.enabledCategories || [];
+    return cats.length === 1 && cats[0] === "Samen";
+  };
   const completedRounds = () => room?.round || 0;
   const getCurrentTask = () => {
     if (!room?.current_task_id) return null;
@@ -536,8 +540,9 @@ export default function App() {
     setLoading(true);
     setError(null);
     try {
-      const totalRounds = setupMode === 'Samen' ? roundsPerPlayer : roundsPerPlayer * playerNames.filter(n => n.trim()).length;
-      const { room: r, player: p } = await createRoom(setupMode, setupVersion, roundsPerPlayer, playerNameInput);
+      const mode = (selectedCats.length === 1 && selectedCats[0] === "Samen") ? "Samen" : "mix";
+      const totalRounds = mode === 'Samen' ? roundsPerPlayer : roundsPerPlayer * 4;
+      const { room: r, player: p } = await createRoom(mode, setupVersion, roundsPerPlayer, playerNameInput);
       
       await updateRoomState(r.id, { total_rounds: totalRounds });
       r.total_rounds = totalRounds;
@@ -1982,24 +1987,7 @@ export default function App() {
               </section>
 
               <section className="card">
-                <h2 className="sectiontitle">2. Kies het speltype</h2>
-                <div className="modegrid">
-                  {GAME_MODES.map(m => (
-                    <button 
-                      key={m.id} 
-                      type="button" 
-                      className={`modecard ${setupMode === m.id ? "selected" : ""}`}
-                      onClick={() => setSetupMode(m.id)}
-                    >
-                      <span className="modeicon">{m.icon}</span>
-                      <span><strong>{m.name}</strong><small>{m.description}</small></span>
-                    </button>
-                  ))}
-                </div>
-              </section>
-
-              <section className="card">
-                <h2 className="sectiontitle">3. Kies een spelversie</h2>
+                <h2 className="sectiontitle">2. Kies een spelversie</h2>
                 <div className="versiongrid">
                   {GAME_VERSIONS.map(v => (
                     <button 
@@ -2016,7 +2004,7 @@ export default function App() {
               </section>
 
               <section className="card">
-                <h2 className="sectiontitle">4. Spelers en lengte</h2>
+                <h2 className="sectiontitle">3. Spelers en lengte</h2>
                 <div className="field">
                   <label htmlFor="hostName">Jouw Naam (Host)</label>
                   <input 
