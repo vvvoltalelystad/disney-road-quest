@@ -1,5 +1,5 @@
-const CACHE='road-quest-v8';
-const ASSETS=['./','./index.html','./manifest.webmanifest','./icon-192.png','./icon-512.png'];
+const CACHE='road-quest-v10';
+const ASSETS=['./','./index.html','./manifest.webmanifest','./icon-192.png?v=3','./icon-512.png?v=3'];
 self.addEventListener('install',e=>e.waitUntil(caches.open(CACHE).then(c=>c.addAll(ASSETS))));
 self.addEventListener('activate',e=>e.waitUntil(Promise.all([
   self.clients.claim(),
