@@ -1,6 +1,6 @@
 {
-  "name": "Disney Music Quest Multiplayer v2.4",
-  "short_name": "Music Quest",
+  "name": "Disney Games",
+  "short_name": "Disney Games",
   "start_url": "./index.html",
   "display": "standalone",
   "background_color": "#06142d",
@@ -8,12 +8,12 @@
   "orientation": "portrait",
   "icons": [
     {
-      "src": "icon-192.png?v=4",
+      "src": "icon-192.png?v=5",
       "sizes": "192x192",
       "type": "image/png"
     },
     {
-      "src": "icon-512.png?v=4",
+      "src": "icon-512.png?v=5",
       "sizes": "512x512",
       "type": "image/png"
     }
