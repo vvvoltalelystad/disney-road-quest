@@ -1,4 +1,4 @@
-// Highly challenging Disney Road Quest questions for Disney experts.
+// Highly challenging Disney Road Quest questions for adult Disney experts.
 
 export const MAGIC_NEWS = [
   "Magisch Nieuws: Wist je dat de draak onder het kasteel van Disneyland Paris de grootste audio-animatronic is die Disney ooit heeft gebouwd? Hij is 24 meter lang en weegt meer dan 2.000 kilo!",
@@ -44,7 +44,7 @@ export const DEFAULT_TASKS = [
     type: "diary",
     title: "Geheim Dagboek",
     part1: "Ik zit op de troon waar ik al jaren recht op denk te hebben, maar die arrogante snotneus ontsloeg me zojuist als zijn adviseur. Mijn geheime laboratorium onder het paleis is de enige plek waar ik mijn wraak kan smeden met mijn gigantische gespierde assistent.",
-    part2: "Het plan was simpel: vergif in zijn drankje gieten. Maar mijn assistent verwisselde de flesjes en nu is de keizer veranderd in een pratende lama. We goouden hem in een zak op de kar van een boer.",
+    part2: "Het plan was simpel: vergif in zijn drankje gieten. Maar mijn assistent verwisselde de flesjes en nu is de keizer veranderd in een pratende lama. We gooiden hem in een zak op de kar van een boer.",
     part3: "Samen met Kronk probeer ik hem op te sporen in het oerwoud en de boer Pacha uit te schakelen voordat hij zijn menselijke gedaante teruggekregen heeft.",
     character: "Yzma",
     movie: "The Emperor's New Groove",
@@ -90,6 +90,32 @@ export const DEFAULT_TASKS = [
     character_aliases: ["wall-e", "walle"],
     movie_aliases: ["wall-e", "walle"]
   },
+  {
+    id: "diary-07",
+    cat: "Disney Dagboek",
+    type: "diary",
+    title: "Geheim Dagboek",
+    part1: "Ik sloot een vreselijk contract met de heerser van de onderwereld om het leven van mijn toenmalige geliefde te redden. Maar toen hij vrij was, verliet hij me meteen voor een ander meisje. Nu ben ik een gevangene van mijn eigen schuldgevoel.",
+    part2: "Ik kreeg de opdracht om een gespierde nieuwkomer te verleiden en zijn fysieke zwakke plek te vinden. Maar in plaats daarvan viel ik voor zijn oprechtheid en weigerde ik mee te werken aan zijn ondergang.",
+    part3: "Ik offerde mijn eigen leven op door onder een vallende stenen pilaar te springen om hem te redden. Hierdoor verbrak zijn deal met de god van de onderwereld.",
+    character: "Megara",
+    movie: "Hercules",
+    character_aliases: ["megara", "meg"],
+    movie_aliases: ["hercules", "herkules"]
+  },
+  {
+    id: "diary-08",
+    cat: "Disney Dagboek",
+    type: "diary",
+    title: "Geheim Dagboek",
+    part1: "Ik exploiteer de goedgelovigheid van de rijken in New Orleans met tarotkaarten en schaduw-magie. Mijn 'vrienden aan de andere kant' eisen echter een vreselijk hoge prijs voor hun diensten.",
+    part2: "Ik sloot een deal met de jaloerse assistent van de prins om de prins te veranderen in een kikker, zodat de assistent de erfenis van de rijke suikerbaron kon opstrijken via een magisch amulet.",
+    part3: "Mijn amulet werd vernietigd door een hardwerkend meisje dat ook een kikker was geworden. Als straf sleurden mijn schaduw-demonen me rechtstreeks mee naar de onderwereld.",
+    character: "Doctor Facilier",
+    movie: "The Princess and the Frog",
+    character_aliases: ["doctor facilier", "facilier", "dr facilier", "voodoo man"],
+    movie_aliases: ["the princess and the frog", "de prinses en de kikker"]
+  },
 
   // --- CATEGORY: PICTIONARY (type: 'draw') ---
   { id: "draw-01", cat: "Pictionary", type: "draw", title: "Teken het", text: "Glazen muiltje", points: 2 },
@@ -100,6 +126,10 @@ export const DEFAULT_TASKS = [
   { id: "draw-06", cat: "Pictionary", type: "draw", title: "Teken het", text: "De giftige appel", points: 2 },
   { id: "draw-07", cat: "Pictionary", type: "draw", title: "Teken het", text: "De roos in de glazen stolp", points: 2 },
   { id: "draw-08", cat: "Pictionary", type: "draw", title: "Teken het", text: "De klokkentoren van Notre Dame", points: 2 },
+  { id: "draw-09", cat: "Pictionary", type: "draw", title: "Teken het", text: "De glazen bol van Madame Leota", points: 2 },
+  { id: "draw-10", cat: "Pictionary", type: "draw", title: "Teken het", text: "De magische vishaak van Maui", points: 2 },
+  { id: "draw-11", cat: "Pictionary", type: "draw", title: "Teken het", text: "Het houten speelgoedvarken Hen Wen", points: 2 },
+  { id: "draw-12", cat: "Pictionary", type: "draw", title: "Teken het", text: "De koperen vogelkooi van Jafar", points: 2 },
 
   // --- CATEGORY: INSCHATTINGSVRAGEN (type: 'estimate') ---
   {
@@ -162,6 +192,46 @@ export const DEFAULT_TASKS = [
     unit: "eieren",
     points: 2
   },
+  {
+    id: "estimate-07",
+    cat: "Inschattingsvragen",
+    type: "estimate",
+    title: "Hoeveel is het?",
+    text: "Hoeveel meter hoog is de attractie Hollywood Tower Hotel (Tower of Terror) in het Walt Disney Studios Park in Parijs?",
+    correct_value: 56,
+    unit: "meter",
+    points: 2
+  },
+  {
+    id: "estimate-08",
+    cat: "Inschattingsvragen",
+    type: "estimate",
+    title: "Hoeveel is het?",
+    text: "Hoeveel skeletten van echte mensen werden er oorspronkelijk gebruikt bij de opening van Pirates of the Caribbean in Disneyland California in 1967?",
+    correct_value: 13,
+    unit: "skeletten",
+    points: 2
+  },
+  {
+    id: "estimate-09",
+    cat: "Inschattingsvragen",
+    type: "estimate",
+    title: "Hoeveel is het?",
+    text: "Hoeveel verschillende riddershelmen sieren de muren van de ridderzaal in het kasteel van Doornroosje in Parijs?",
+    correct_value: 10,
+    unit: "riddershelmen",
+    points: 2
+  },
+  {
+    id: "estimate-10",
+    cat: "Inschattingsvragen",
+    type: "estimate",
+    title: "Hoeveel is het?",
+    text: "Hoeveel meter lang is de totale track van Big Thunder Mountain in Disneyland Paris?",
+    correct_value: 1500,
+    unit: "meter",
+    points: 2
+  },
 
   // --- CATEGORY: DILEMMA (type: 'dilemma') ---
   {
@@ -202,6 +272,26 @@ export const DEFAULT_TASKS = [
     text: "Als je één Disney-schurk als buurman moet kiezen, wie veroorzaakt de minste overlast?",
     optionA: "Hades (gezellig en warm)",
     optionB: "Kapitein Haak (houdt van rust en structuur)",
+    points: 1
+  },
+  {
+    id: "dilemma-05",
+    cat: "Dilemma",
+    type: "dilemma",
+    title: "Kies je kant",
+    text: "In welke attractie in Disneyland Paris breng je liever 4 uur achter elkaar door?",
+    optionA: "Phantom Manor (in het donker)",
+    optionB: "it's a small world (met het nummer continu op herhaling)",
+    points: 1
+  },
+  {
+    id: "dilemma-06",
+    cat: "Dilemma",
+    type: "dilemma",
+    title: "Kies je kant",
+    text: "Met welke Disney-animator uit het verleden zou je liever een uur dineren?",
+    optionA: "Marc Davis (ontwerper van Maleficent en Ursula)",
+    optionB: "Eyvind Earle (artistiek ontwerper van Sleeping Beauty)",
     points: 1
   },
 
@@ -256,6 +346,56 @@ export const DEFAULT_TASKS = [
     correct: 0,
     points: 2
   },
+  {
+    id: "emoji-06",
+    cat: "Emoji Quiz",
+    type: "emoji",
+    title: "Raad de Emojis",
+    text: "👩‍🦰🏹🐻🏴󠁧󠁢󠁳󠁣󠁴󠁿",
+    answers: ["Brave", "Robin Hood", "Brother Bear", "The Fox and the Hound"],
+    correct: 0,
+    points: 2
+  },
+  {
+    id: "emoji-07",
+    cat: "Emoji Quiz",
+    type: "emoji",
+    title: "Raad de Emojis",
+    text: "👽🌺🏝️🎸",
+    answers: ["Lilo & Stitch", "Moana", "Finding Nemo", "Tarzan"],
+    correct: 0,
+    points: 2
+  },
+  {
+    id: "emoji-08",
+    cat: "Emoji Quiz",
+    type: "emoji",
+    title: "Raad de Emojis",
+    text: "👑🐷🍎🧙‍♀️",
+    answers: ["Snow White", "Cinderella", "Tangled", "The Black Cauldron"],
+    correct: 0,
+    points: 2
+  },
+  {
+    id: "emoji-09",
+    cat: "Emoji Quiz",
+    type: "emoji",
+    title: "Raad de Emojis",
+    text: "🎪🐘🎈🦅",
+    answers: ["Dumbo", "Tarzan", "The Jungle Book", "The Lion King"],
+    correct: 0,
+    points: 2
+  },
+  {
+    id: "emoji-10",
+    cat: "Emoji Quiz",
+    type: "emoji",
+    title: "Raad de Emojis",
+    text: "🚂🐘🪵🤥",
+    answers: ["Pinocchio", "Dumbo", "Peter Pan", "Alice in Wonderland"],
+    correct: 0,
+    points: 2
+  },
 
   // --- CATEGORY: WIE BEN IK? (type: 'whoami') ---
   {
@@ -292,6 +432,66 @@ export const DEFAULT_TASKS = [
     hint3: "Ik word verliefd op de Engelse kolonist John Smith.",
     answers: ["Mulan", "Tiana", "Pocahontas", "Moana"],
     correct: 2,
+    points: 3
+  },
+  {
+    id: "whoami-04",
+    cat: "Wie ben ik?",
+    type: "whoami",
+    title: "Hint Quest",
+    hint1: "Mijn naam is simpelweg de achterstevoren gespelde achternaam van mijn legendarische schepper.",
+    hint2: "Ik spreek nooit een woord in mijn debuutfilm, maar mijn strenge blik en magische boek boezemen ontzag in.",
+    hint3: "Ik ben de machtige tovenaar uit het segment 'The Sorcerer's Apprentice' in Fantasia.",
+    answers: ["Merlin", "Yen Sid", "Mim", "Jafar"],
+    correct: 1,
+    points: 3
+  },
+  {
+    id: "whoami-05",
+    cat: "Wie ben ik?",
+    type: "whoami",
+    title: "Hint Quest",
+    hint1: "Ik ben de enige vrouwelijke Disney-hoofdrolspeler wiens ziel fysiek werd opgeëist door de onderwereld.",
+    hint2: "Ik zong het cynische liefdeslied 'I Won't Say I'm in Love' met de Muzen als achtergrondkoor.",
+    hint3: "Ik verkocht mijn ziel aan Hades om het leven van mijn ex-vriend te redden, en werd later gered door Hercules.",
+    answers: ["Jane Porter", "Megara", "Esmeralda", "Giselle"],
+    correct: 1,
+    points: 3
+  },
+  {
+    id: "whoami-06",
+    cat: "Wie ben ik?",
+    type: "whoami",
+    title: "Hint Quest",
+    hint1: "Mijn uiterlijk werd gecreëerd door illustrator Albert Hurter en gemodelleerd naar acteur Bela Lugosi.",
+    hint2: "Ik ben een Slavische god van het kwaad die heerst op de Kale Berg tijdens de nacht van de heksen.",
+    hint3: "Ik ben de gigantische zwarte demon die de zielen van de doden oproept in het sluitstuk van Fantasia uit 1940.",
+    answers: ["Hades", "Chernabog", "Horned King", "Maleficent"],
+    correct: 1,
+    points: 3
+  },
+  {
+    id: "whoami-07",
+    cat: "Wie ben ik?",
+    type: "whoami",
+    title: "Hint Quest",
+    hint1: "Ik spreek de taal van eekhoorns vloeiend en kan heerlijke spinazie-puffs bakken.",
+    hint2: "Mijn schouders dragen zowel een mini-engel als een mini-duivel die mij advies geven bij morele dillema's.",
+    hint3: "Ik ben de gespierde maar uiterst naïeve assistent van de kwaadaardige Yzma in Keizer Kuzco.",
+    answers: ["Pacha", "Kronk", "Gaston", "Hercules"],
+    correct: 1,
+    points: 3
+  },
+  {
+    id: "whoami-08",
+    cat: "Wie ben ik?",
+    type: "whoami",
+    title: "Hint Quest",
+    hint1: "Ik rijd in een moeras-buggy en ben geobsedeerd door de grootste diamant ter wereld, de Duivelsogen.",
+    hint2: "Ik heb twee tamme alligators genaamd Nero en Brutus die ik vertroetel in mijn schuilplaats in het Duivelsmoeras.",
+    hint3: "Ik ontvoerde het weesmeisje Penny in de film 'De Reddertjes' (The Rescuers).",
+    answers: ["Cruella de Vil", "Madame Medusa", "Yzma", "Ursula"],
+    correct: 1,
     points: 3
   },
 
@@ -346,6 +546,46 @@ export const DEFAULT_TASKS = [
     explanation: "Feit! Dit was een bewuste keuze van Imagineer Tony Baxter.",
     points: 2
   },
+  {
+    id: "fact-05",
+    cat: "Feit of Fabel",
+    type: "fact",
+    title: "Echt of nep?",
+    text: "De animatiefilm 'Bambi' was zo realistisch dat Walt Disney twee levende herten in de studio liet rondlopen zodat de animators hun anatomie konden bestuderen.",
+    correct: true,
+    explanation: "Feit! Twee herten genaamd Bambi en Faline leefden een tijd in de studio.",
+    points: 2
+  },
+  {
+    id: "fact-06",
+    cat: "Feit of Fabel",
+    type: "fact",
+    title: "Echt of nep?",
+    text: "In de attractie Pirates of the Caribbean in Disneyland Paris is de volgorde van de scènes bewust omgedraaid vergeleken met de Amerikaanse parken, waardoor je eerst de plunderingen ziet en daarna pas de skeletten.",
+    correct: false,
+    explanation: "Fabel! In Parijs begin je juist bij het fort en de skeletten, en ga je pas aan het einde terug in de tijd naar de plunderingen.",
+    points: 2
+  },
+  {
+    id: "fact-07",
+    cat: "Feit of Fabel",
+    type: "fact",
+    title: "Echt of nep?",
+    text: "De iconische stem van Stitch wordt in de originele Engelse versie ingesproken door Chris Sanders, de regisseur van de film zelf.",
+    correct: true,
+    explanation: "Feit! Chris Sanders schreef en regisseerde de film en sprak zelf de stem in.",
+    points: 2
+  },
+  {
+    id: "fact-08",
+    cat: "Feit of Fabel",
+    type: "fact",
+    title: "Echt of nep?",
+    text: "De film 'Sleeping Beauty' (Doornroosje) uit 1959 was zo duur om te maken dat het bijna leidde tot het faillissement van de Walt Disney Studios.",
+    correct: true,
+    explanation: "Feit! De film had een destijds astronomisch budget van 6 miljoen dollar en stelde teleur aan de kassa.",
+    points: 2
+  },
 
   // --- CATEGORY: QUIZ (type: 'quiz') ---
   {
@@ -370,6 +610,72 @@ export const DEFAULT_TASKS = [
     correct: 0,
     points: 3
   },
+  {
+    id: "quiz-03",
+    cat: "Quiz",
+    type: "quiz",
+    difficulty: "hard",
+    title: "Moeilijke vraag",
+    text: "Welke Disney-animator creëerde het uiterlijk van Maleficent en baseerde haar kleding op een middeleeuws schilderij?",
+    answers: ["Marc Davis", "Eyvind Earle", "Milt Kahl", "Ollie Johnston"],
+    correct: 0,
+    points: 3
+  },
+  {
+    id: "quiz-04",
+    cat: "Quiz",
+    type: "quiz",
+    difficulty: "hard",
+    title: "Moeilijke vraag",
+    text: "Wat is de naam van de fictieve spoorwegmaatschappij die rijdt in Big Thunder Mountain in Disneyland Paris?",
+    answers: ["Thunder Mesa Mining Co.", "Western Pacific Railroad", "Parisian Steam Transport", "Santa Fe Railway"],
+    correct: 0,
+    points: 3
+  },
+  {
+    id: "quiz-05",
+    cat: "Quiz",
+    type: "quiz",
+    difficulty: "hard",
+    title: "Moeilijke vraag",
+    text: "Welke Pixar-film was de allereerste die een PG-rating kreeg in de Verenigde Staten?",
+    answers: ["The Incredibles", "Toy Story", "Monsters Inc.", "Finding Nemo"],
+    correct: 0,
+    points: 3
+  },
+  {
+    id: "quiz-06",
+    cat: "Quiz",
+    type: "quiz",
+    difficulty: "hard",
+    title: "Moeilijke vraag",
+    text: "Hoe heet het schip van Kapitein Haak in Peter Pan?",
+    answers: ["The Jolly Roger", "The Black Pearl", "The Sea Witch", "The Chimera"],
+    correct: 0,
+    points: 3
+  },
+  {
+    id: "quiz-07",
+    cat: "Quiz",
+    type: "quiz",
+    difficulty: "hard",
+    title: "Moeilijke vraag",
+    text: "In welke bekende klassieke Disney-film horen we het nummer 'Love is a Song'?",
+    answers: ["Bambi", "Cinderella", "Dumbo", "Pinocchio"],
+    correct: 0,
+    points: 3
+  },
+  {
+    id: "quiz-08",
+    cat: "Quiz",
+    type: "quiz",
+    difficulty: "hard",
+    title: "Moeilijke vraag",
+    text: "Welk Disney-karakter heeft het minst aantal spreekregels in een hoofdrol?",
+    answers: ["Dumbo", "Aurora", "Gideon", "Wall-E"],
+    correct: 1,
+    points: 3
+  },
 
   // --- CATEGORY: SAMEN (type: 'group') ---
   {
@@ -388,6 +694,24 @@ export const DEFAULT_TASKS = [
     title: "Groepsmissie",
     text: "Noem om de beurt een Disneypersonage. Wie langer dan drie seconden stilvalt, ligt eruit. Halen jullie samen twintig namen?",
     seconds: 60,
+    points: 1
+  },
+  {
+    id: "group-03",
+    cat: "Samen",
+    type: "group",
+    title: "Groepsmissie",
+    text: "Noem samen binnen 45 seconden tien verschillende Disney-liedjes die niet uit The Lion King of Frozen komen.",
+    seconds: 45,
+    points: 1
+  },
+  {
+    id: "group-04",
+    cat: "Samen",
+    type: "group",
+    title: "Groepsmissie",
+    text: "Noem binnen 30 seconden vijf verschillende attracties in Disneyland Paris die een fastpass- of premier access-ingang hebben.",
+    seconds: 30,
     points: 1
   }
 ];
