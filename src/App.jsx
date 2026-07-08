@@ -1628,6 +1628,21 @@ export default function App() {
           from { box-shadow: 0 0 10px #ff7b8b55; }
           to { box-shadow: 0 0 25px #ff7b8bda; }
         }
+        @keyframes glow-defense {
+          from { 
+            box-shadow: 0 4px 12px rgba(0,0,0,0.3), 0 0 5px rgba(255, 212, 92, 0.4); 
+            border-color: #31517e; 
+          }
+          to { 
+            box-shadow: 0 4px 12px rgba(0,0,0,0.3), 0 0 22px #ffd45c, inset 0 0 10px #ffd45c; 
+            border-color: #ffd45c; 
+            transform: translateY(-4px) scale(1.03);
+          }
+        }
+        .glow-defense {
+          animation: glow-defense 0.8s infinite alternate ease-in-out !important;
+          border-color: #ffd45c !important;
+        }
       `}</style>
 
       {/* Render Night theme animated stars overlays */}
@@ -1659,36 +1674,23 @@ export default function App() {
           const cardInfo = POWER_CARDS[attack.card];
 
           if (isMeTarget) {
-            const myHand = room.current_task_state.player_hands?.[localPlayer.id] || [];
-            const hasShield = myHand.includes('shield');
-            const hasSpiegel = myHand.includes('spiegel');
-
             return (
-              <div className="card-modal-overlay">
-                <div className="attack-notification" style={{ position: 'relative', top: 'auto', left: 'auto', width: '310px', textAlign: 'center' }}>
-                  <span style={{ fontSize: '42px', display: 'block', marginBottom: '8px' }}>⚠️</span>
-                  <h3>GEVAAR!</h3>
-                  <p><strong>{attacker?.name}</strong> speelt <strong>{cardInfo?.name}</strong> op jou!</p>
-                  <div className="timer" style={{ borderColor: 'var(--danger)', width: '64px', height: '64px', fontSize: '20px', margin: '10px auto' }}>
+              <div className="attack-notification">
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '10px' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                    <span style={{ fontSize: '24px' }}>⚠️</span>
+                    <div style={{ textAlign: 'left' }}>
+                      <strong style={{ display: 'block', color: '#ff7b8b', fontSize: '14px' }}>GEVAAR!</strong>
+                      <span style={{ fontSize: '13px' }}><strong>{attacker?.name}</strong> speelt <strong>{cardInfo?.name}</strong> op jou!</span>
+                    </div>
+                  </div>
+                  <div className="timer" style={{ borderColor: 'var(--danger)', width: '42px', height: '42px', fontSize: '16px', margin: 0 }}>
                     {attack.timer}s
                   </div>
-                  
-                  <div className="answers" style={{ marginTop: '16px' }}>
-                    {hasShield && (
-                      <button className="btn ok" onClick={handleDefendShield}>
-                        🛡️ Speel Magische Bumper (Blokkeren)
-                      </button>
-                    )}
-                    {hasSpiegel && (
-                      <button className="btn primary" onClick={handleDefendSpiegel}>
-                        🎭 Speel Magische Spiegel (Kaats terug)
-                      </button>
-                    )}
-                    <p className="small" style={{ color: 'var(--muted)', marginTop: '8px' }}>
-                      Als de timer afloopt, onderga je de aanval...
-                    </p>
-                  </div>
                 </div>
+                <p className="small" style={{ margin: '8px 0 0 0', color: 'rgba(255,255,255,0.7)', textAlign: 'center' }}>
+                  Tik op een oplichtende verdedigingskaart in je hand om te blokkeren of te spiegelen!
+                </p>
               </div>
             );
           } else {
@@ -1761,31 +1763,57 @@ export default function App() {
                       </div>
                       
                       <div className="answers" style={{ width: '100%' }}>
-                        {card.type === 'attack' ? (
-                          <button 
-                            className="btn primary full"
-                            onClick={() => {
-                              if (card.selectTarget) {
-                                setStrafTargetMode(zoomedCardKey);
-                                setZoomedCardKey(null);
-                              } else {
-                                handlePlayCard(zoomedCardKey);
-                              }
-                            }}
-                          >
-                            Speel kaart 🎯
-                          </button>
-                        ) : (
-                          card.type !== 'defense' && (
-                            <button 
-                              className="btn primary full"
-                              disabled={room?.current_player_index !== players.findIndex(p => p.id === localPlayer.id)}
-                              onClick={() => handlePlayCard(zoomedCardKey)}
-                            >
-                              Speel kaart ➔
-                            </button>
-                          )
-                        )}
+                        {(() => {
+                          const activeAttack = room?.current_task_state?.activeAttack;
+                          const isMeTarget = activeAttack && activeAttack.targetId === localPlayer?.id;
+                          const isDefending = isMeTarget && (zoomedCardKey === 'shield' || zoomedCardKey === 'spiegel');
+
+                          if (isDefending) {
+                            return (
+                              <button 
+                                className="btn ok full"
+                                onClick={() => {
+                                  if (zoomedCardKey === 'shield') handleDefendShield();
+                                  if (zoomedCardKey === 'spiegel') handleDefendSpiegel();
+                                }}
+                              >
+                                {zoomedCardKey === 'shield' ? "Zet Magische Bumper in 🛡️" : "Zet Magische Spiegel in 🎭"}
+                              </button>
+                            );
+                          }
+
+                          if (card.type === 'attack') {
+                            return (
+                              <button 
+                                className="btn primary full"
+                                onClick={() => {
+                                  if (card.selectTarget) {
+                                    setStrafTargetMode(zoomedCardKey);
+                                    setZoomedCardKey(null);
+                                  } else {
+                                    handlePlayCard(zoomedCardKey);
+                                  }
+                                }}
+                              >
+                                Speel kaart 🎯
+                              </button>
+                            );
+                          }
+
+                          if (card.type !== 'defense') {
+                            return (
+                              <button 
+                                className="btn primary full"
+                                disabled={room?.current_player_index !== players.findIndex(p => p.id === localPlayer.id)}
+                                onClick={() => handlePlayCard(zoomedCardKey)}
+                              >
+                                Speel kaart ➔
+                              </button>
+                            );
+                          }
+
+                          return null;
+                        })()}
                         <button className="btn ghost full" onClick={() => {
                           setZoomedCardKey(null);
                           setCardFlipped(false);
@@ -2836,28 +2864,33 @@ export default function App() {
                     const myHand = room.current_task_state?.player_hands?.[localPlayer.id] || [];
                     if (!myHand.length) return null;
 
+                    const activeAttack = room?.current_task_state?.activeAttack;
+                    const isMeTarget = activeAttack && activeAttack.targetId === localPlayer?.id;
+
                     return (
                       <div className="card" style={{ marginTop: '16px', padding: '12px' }}>
                         <strong style={{ fontSize: '13px', display: 'block', marginBottom: '8px', color: 'var(--gold)' }}>Je actieve handkaarten:</strong>
                         <div className="cards-hud" style={{ padding: '4px', background: 'transparent', border: 'none', marginTop: 0 }}>
-                          {myHand.map((cardKey, idx) => {
-                            const card = POWER_CARDS[cardKey];
-                            return (
-                              <div 
-                                key={idx} 
-                                className="mini-card-btn"
-                                onClick={() => {
-                                  setZoomedCardKey(cardKey);
-                                  setCardFlipped(false);
-                                }}
-                              >
-                                <span style={{ fontSize: '28px' }}>{card?.icon}</span>
-                                <span style={{ fontSize: '9px', fontWeight: '900', color: 'var(--muted)', marginTop: '4px' }}>
-                                  {card?.name.split(" ")[0]}
-                                </span>
-                              </div>
-                            );
-                          })}
+                           {myHand.map((cardKey, idx) => {
+                             const card = POWER_CARDS[cardKey];
+                             const isDefenseGlow = isMeTarget && (cardKey === 'shield' || cardKey === 'spiegel');
+
+                             return (
+                               <div 
+                                 key={idx} 
+                                 className={`mini-card-btn ${isDefenseGlow ? 'glow-defense' : ''}`}
+                                 onClick={() => {
+                                   setZoomedCardKey(cardKey);
+                                   setCardFlipped(false);
+                                 }}
+                               >
+                                 <span style={{ fontSize: '28px' }}>{card?.icon}</span>
+                                 <span style={{ fontSize: '9px', fontWeight: '900', color: 'var(--muted)', marginTop: '4px' }}>
+                                   {card?.name.split(" ")[0]}
+                                 </span>
+                               </div>
+                             );
+                           })}
                         </div>
                       </div>
                     );
