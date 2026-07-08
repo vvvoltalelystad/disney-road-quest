@@ -22,7 +22,11 @@ const GAME_VERSIONS = [
   { id: 1, name: "Sterrenroute", icon: "✨" },
   { id: 2, name: "Avonturenroute", icon: "🧭" },
   { id: 3, name: "Fantasieroute", icon: "🏰" },
-  { id: 4, name: "Magische route", icon: "🎆" }
+  { id: 4, name: "Magische route", icon: "🎆" },
+  { id: 5, name: "Pioniersroute", icon: "🤠" },
+  { id: 6, name: "Toekomstroute", icon: "🚀" },
+  { id: 7, name: "Sprookjesroute", icon: "👑" },
+  { id: 8, name: "Hollywoodroute", icon: "🎬" }
 ];
 
 const STAGES = [
@@ -433,7 +437,7 @@ export default function App() {
     if (!task || String(task.id).startsWith("custom-")) return room?.game_version || 1;
     const match = String(task.id).match(/\d+/);
     const number = match ? Number(match[0]) : 1;
-    return ((number - 1) % 4) + 1;
+    return ((number - 1) % 8) + 1;
   };
 
   const selectNextTask = async (currentRoom, currentPlayers, forcePersonal = false) => {
