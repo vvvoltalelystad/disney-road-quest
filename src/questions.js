@@ -2,7 +2,7 @@
 // Focuses on mainstream/famous movies, but with challenging, poetic details.
 
 export const MAGIC_NEWS = [
-  "Magisch Nieuws: Wist je dat de draak onder het kasteel van Disneyland Paris de grootste audio-animatronic is die Disney ooit heeft gebouwd? Hij is 24 meter lang en weegt meer dan 2.000 kilo!",
+  "Magisch Nieuws: Wist je dat de draak onder het kasteel van Disneyland Paris de grootste audio-animatronic is die Disney ooit heeft gebouwd? Het is 24 meter lang en weegt meer dan 2.000 kilo!",
   "Magisch Nieuws: Wist je dat het kasteel van Doornroosje in Parijs roze is geverfd omdat de ontwerpers wisten dat de Noord-Europese lucht vaak grijs is? De roze kleur zorgt ervoor dat het kasteel er altijd zonnig en sprookjesachtig uitziet.",
   "Magisch Nieuws: Wist je dat Disneyland Paris bewust op het noorden is gericht? Hierdoor staat de zon nooit direct achter het kasteel, waardoor bezoekers op elk moment van de dag foto's kunnen maken zonder tegenlicht.",
   "Magisch Nieuws: Wist je dat er onder Disneyland Paris een enorm netwerk van gangen (utilidors) ligt? Hierdoor kunnen medewerkers en Disney-figuren zich onopgemerkt verplaatsen zonder de sfeer in de themalanden te verstoren.",
@@ -21,8 +21,10 @@ export const DEFAULT_TASKS = [
     part1: "De geur van verbrande soep en koud water hangt in de lucht. Ik zit verscholen onder een warme, witte stoffen koepel, omringd door het kletterende geluid van koper en schreeuwende stemmen. Mijn handen trillen, maar mijn zintuigen vertellen me precies welke kruiden er ontbreken in de pan onder mij.",
     part2: "Ik bestuur de armen van een onhandige jongen door aan zijn haren te trekken. Samen vormen we een vreemd duo dat de culinaire wereld van deze stad probeert te veroveren, al mag niemand weten wie het echte brein achter de gerechten is.",
     part3: "Hoewel ik een klein knaagdier ben dat niet thuishoort in het chique Parijse restaurant van de beroemde overleden chef-kok Gusteau, bewijs ik dat iedereen kan koken.",
-    character: "Remy",
-    movie: "Ratatouille",
+    character_nl: "Remy",
+    character_en: "Remy",
+    movie_nl: "Ratatouille",
+    movie_en: "Ratatouille",
     character_aliases: ["remy", "remi"],
     movie_aliases: ["ratatouille"]
   },
@@ -34,8 +36,10 @@ export const DEFAULT_TASKS = [
     part1: "Ik zweef boven een kolkende rivier van zielen, omringd door vlammen die van kleur veranderen naargelang mijn humeur. Die drie grijze zussen vertelden me dat de planeten gunstig zullen staan, maar dat die jonge sterke jongen roet in het eten kan gooien.",
     part2: "Ik stuurde mijn twee onhandige helpers, Pain en Panic, om hem als baby te ontdoen van zijn onsterfelijkheid. Ze faalden jammerlijk. Nu probeer ik hem te chanteren via een deal met een meisje genaamd Megara.",
     part3: "Mijn plan om de Titanen te bevrijden en de heerser van de Olympus omver te werpen mislukt volledig als hij zijn onsterfelijkheid terugverdient door Megara te redden uit de rivier van de dood.",
-    character: "Hades",
-    movie: "Hercules",
+    character_nl: "Hades",
+    character_en: "Hades",
+    movie_nl: "Hercules",
+    movie_en: "Hercules",
     character_aliases: ["hades"],
     movie_aliases: ["hercules", "herkules"]
   },
@@ -47,10 +51,12 @@ export const DEFAULT_TASKS = [
     part1: "Ik leefde ooit in het koninklijk paleis, maar werd verbannen naar de diepste, donkerste krochten van de oceaan. Mijn twee trouwe glibberige spionnen, Flotsam en Jetsam, houden me op de hoogte van alle roddels.",
     part2: "Een jonge prinses wilde dolgraag benen om een menselijke prins te ontmoeten. Ik liet haar een contract tekenen met haar eigen bloed, waarmee ze haar stem aan mij overdroeg.",
     part3: "Onder de naam Vanessa en met haar stem in een gouden schelp om mijn nek probeerde ik de prins te verleiden, totdat ik veranderde in een reusachtig zeemonster en werd doorboord door de boegspriet van een schip.",
-    character: "Ursula",
-    movie: "The Little Mermaid",
-    character_aliases: ["ursula"],
-    movie_aliases: ["the little mermaid", "de kleine zeemeermin"]
+    character_nl: "Ursula",
+    character_en: "Ursula",
+    movie_nl: "De Kleine Zeemeermin",
+    movie_en: "The Little Mermaid",
+    character_aliases: ["ursula", "zeeheks"],
+    movie_aliases: ["the little mermaid", "little mermaid", "de kleine zeemeermin", "kleine zeemeermin"]
   },
   {
     id: "diary-04",
@@ -60,10 +66,12 @@ export const DEFAULT_TASKS = [
     part1: "Ik was de eerste in de lijn van opvolging, totdat die pluizige kleine welp werd geboren. Mijn litteken herinnert me dagelijks aan mijn misplaatste recht op de troon.",
     part2: "Ik verzamelde een leger van hongerige hyena's op het olifantenkerkhof en beloofde hen dat ze nooit meer honger zouden lijden als ze mij hielpen om mijn broer en zijn zoon te elimineren.",
     part3: "Nadat ik mijn broer in de kloof liet vallen, nam ik de heerschappij over het trotse land over, totdat mijn neef terugkeerde en me van de Koningsrots wierp, waarna mijn eigen hyena's me verslonden.",
-    character: "Scar",
-    movie: "The Lion King",
+    character_nl: "Scar",
+    character_en: "Scar",
+    movie_nl: "De Leeuwenkoning",
+    movie_en: "The Lion King",
     character_aliases: ["scar"],
-    movie_aliases: ["the lion king", "de leeuwenkoning"]
+    movie_aliases: ["the lion king", "lion king", "de leeuwenkoning", "leeuwenkoning"]
   },
   {
     id: "diary-05",
@@ -73,9 +81,11 @@ export const DEFAULT_TASKS = [
     part1: "Het tikkende geluid bezorgt me de koude rillingen. Telkens als ik dat geluid hoor, weet ik dat die monsterlijke reptielachtige schaduw in het water dichterbij komt, wachtend op de rest van mijn maaltijd.",
     part2: "Die vliegende jongen sneed mijn hand af en voerde het aan het reptiel. Nu draag ik een metalen prothese aan mijn linkerarm en leid ik mijn bemanning, met meneer Smee aan mijn zijde, om wraak te nemen.",
     part3: "Ik ontvoerde Wendy en de Verloren Jongens naar mijn schip Jolly Roger in Neverland om hem in de val te lokken.",
-    character: "Kapitein Haak",
-    movie: "Peter Pan",
-    character_aliases: ["kapitein haak", "haak", "captain hook"],
+    character_nl: "Kapitein Haak",
+    character_en: "Captain Hook",
+    movie_nl: "Peter Pan",
+    movie_en: "Peter Pan",
+    character_aliases: ["kapitein haak", "haak", "captain hook", "hook"],
     movie_aliases: ["peter pan"]
   },
   {
@@ -86,8 +96,10 @@ export const DEFAULT_TASKS = [
     part1: "Al achttien jaar zit ik opgesloten in een verborgen toren in het woud, met een kameleon als enige metgezel. Mijn zogenaamde moeder vertelt me dat de buitenwereld te gevaarlijk is.",
     part2: "Een knappe dief genaamd Flynn Rider brak in via mijn raam om te schuilen. Ik sloeg hem bewusteloos met een zware koekenpan en verstopte zijn gestolen tiara.",
     part3: "Ik dwong hem om me mee te nemen om de zwevende lichtjes te zien die elk jaar op mijn verjaardag aan de hemel verschijnen, om er uiteindelijk achter te komen dat ik de verloren prinses ben.",
-    character: "Rapunzel",
-    movie: "Tangled",
+    character_nl: "Rapunzel",
+    character_en: "Rapunzel",
+    movie_nl: "Rapunzel",
+    movie_en: "Tangled",
     character_aliases: ["rapunzel"],
     movie_aliases: ["tangled", "rapunzel"]
   },
@@ -96,11 +108,13 @@ export const DEFAULT_TASKS = [
     cat: "Disney Dagboek",
     type: "diary",
     title: "Geheim Dagboek",
-    part1: "Ik ben al jaren de favoriet van de jongen, de onbetwiste leider van de groep die op zijn bed woont. Er zit een trekkoord in mijn rug en mijn laars draagt zijn naam.",
+    part1: "Ik ben al jaren de favoriet van de jongen, de onbetwiste leader van de groep die op zijn bed woont. Er zit een trekkoord in mijn rug en mijn laars draagt zijn naam.",
     part2: "Alles veranderde toen er voor zijn verjaardag een glanzende ruimte-actiefiguur arriveerde die echt geloofde dat hij kon vliegen. In een vlaag van jaloezie stootte ik hem per ongeluk uit het raam.",
     part3: "Samen moesten we ontsnappen uit het huis van de sadistische buurjongen Sid, om uiteindelijk met een vuurwerkraket terug te vliegen naar de verhuiswagen van Andy.",
-    character: "Woody",
-    movie: "Toy Story",
+    character_nl: "Woody",
+    character_en: "Woody",
+    movie_nl: "Toy Story",
+    movie_en: "Toy Story",
     character_aliases: ["woody", "sheriff woody"],
     movie_aliases: ["toy story"]
   },
@@ -112,10 +126,12 @@ export const DEFAULT_TASKS = [
     part1: "Ik ben de meest gevierde jager van dit kleine, provinciale Franse dorpje. Mijn muren hangen vol met geweien en de lokale bevolking zingt liederen over mijn dikke nek en brede schouders.",
     part2: "Ik kon het niet verdragen dat de meest belezen meid van het dorp mij afwees voor een harig monster in een kasteel. Ik smeedde een plan om haar vader op te sluiten in het gesticht om haar te dwingen met mij te trouwen.",
     part3: "Ik leidde een boze menigte met fakkels en hooivorken naar het kasteel om het beest te doden, maar gleed uiteindelijk uit en stortte in de afgrond vanaf het dak.",
-    character: "Gaston",
-    movie: "Beauty and the Beast",
+    character_nl: "Gaston",
+    character_en: "Gaston",
+    movie_nl: "Belle en het Beest",
+    movie_en: "Beauty and the Beast",
     character_aliases: ["gaston"],
-    movie_aliases: ["beauty and the beast", "belle en het beest"]
+    movie_aliases: ["beauty and the beast", "beauty & the beast", "belle en het beest", "belle & het beest"]
   },
 
   // --- CATEGORY: PICTIONARY (type: 'draw') ---

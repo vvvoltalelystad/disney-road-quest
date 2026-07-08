@@ -34,6 +34,23 @@ const STAGES = [
   "Welkom in het Park!"
 ];
 
+const POWER_CARDS = {
+  fastpass: { name: "FastPass 🎟️", desc: "Sla de huidige actieve opdracht over zonder beurtverlies.", icon: "🎟️", type: "self" },
+  hyperdrive: { name: "Hyperdrive 🚀", desc: "Verdubbel de score die je verdient bij je eerstvolgende speelbeurt.", icon: "🚀", type: "self" },
+  tink: { name: "Tinkelbel Stof 🪄", desc: "Streep 2 foute opties weg bij je volgende Quiz of Emoji Quiz-vraag.", icon: "🪄", type: "self" },
+  time: { name: "Tijdverdrijver 🕰️", desc: "Geeft 30 seconden extra tijd voor de actieve timer.", icon: "🕰️", type: "self" },
+  wish: { name: "Wens van Genie 🧞‍♂️", desc: "Ruil deze kaart in om direct 2 nieuwe willekeurige actiekaarten te trekken.", icon: "🧞‍♂️", type: "self" },
+  autopech: { name: "Autopech 🪓", desc: "Bevries een medespeler. Hij/zij moet zijn eerstvolgende speelbeurt overslaan.", icon: "🪓", type: "attack", selectTarget: true },
+  apple: { name: "Giftige Appel 🍎", desc: "Steel direct 1 ster van een speler naar keuze en voeg deze toe aan jouw score.", icon: "🍎", type: "attack", selectTarget: true },
+  abu: { name: "Sluipen met Abu 👣", desc: "Steel een willekeurige actiekaart uit de hand van een medespeler naar keuze.", icon: "👣", type: "attack", selectTarget: true },
+  kuzco: { name: "Kroon van Kuzco 👑", desc: "Wissel al jouw actiekaarten om met de kaarten van een medespeler naar keuze.", icon: "👑", type: "attack", selectTarget: true },
+  kaahypnose: { name: "Kaa's Hypnose 🌀", desc: "Halveer de beschikbare tijd op de timer van de speler die nu aan de beurt is.", icon: "🌀", type: "attack" },
+  shield: { name: "Magische Bumper 🛡️", desc: "Blokkeer een aanval (zoals Autopech of Giftige Appel) die een speler op jou speelt.", icon: "🛡️", type: "defense" },
+  spiegel: { name: "Magische Spiegel 🎭", desc: "Kaats een aanval van een medespeler direct terug naar de speler die hem op jou speelde.", icon: "🎭", type: "defense" },
+  shortcut: { name: "Sluiproute 🗺️", desc: "Wissel de huidige opdracht met een willekeurige opdracht uit een categorie naar keuze.", icon: "🗺️", type: "self" },
+  elsa: { name: "Elsa's Bevriezing ❄️", desc: "Zet de actieve timer gedurende 15 seconden volledig stil om rustig na te denken.", icon: "❄️", type: "self" }
+};
+
 const assetPath = (path) => {
   if (location.hostname.includes('github.io')) {
     return '/disney-road-quest/' + path;
@@ -215,6 +232,12 @@ export default function App() {
   const [factLocked, setFactLocked] = useState(false);
   const [factSelected, setFactSelected] = useState(null);
 
+  // Upgrade 1: Day/Night Theme and Power Cards Zoom/Flip HUD states
+  const [themeMode, setThemeMode] = useState('day'); // 'day' or 'night'
+  const [zoomedCardKey, setZoomedCardKey] = useState(null); // card key like 'fastpass' or null
+  const [cardFlipped, setCardFlipped] = useState(false); // boolean flip
+  const [strafTargetMode, setStrafTargetMode] = useState(null); // card key if selecting target player
+
   // Session recovery
   useEffect(() => {
     async function recoverSession() {
@@ -295,6 +318,35 @@ export default function App() {
     const unsubscribe = subscribeToRoom(room.id, handleUpdate);
     return () => unsubscribe();
   }, [room?.id, screen]);
+
+  // Realtime attack countdown (only executed by the room host to avoid conflicts)
+  useEffect(() => {
+    const attack = room?.current_task_state?.activeAttack;
+    if (!attack || attack.timer <= 0) return;
+
+    const isHost = players[0]?.id === localPlayer?.id;
+    if (!isHost) return;
+
+    const interval = setInterval(async () => {
+      const currentTimer = room.current_task_state.activeAttack.timer;
+      if (currentTimer <= 1) {
+        clearInterval(interval);
+        await executeActiveAttack();
+      } else {
+        await updateRoomState(room.id, {
+          current_task_state: {
+            ...room.current_task_state,
+            activeAttack: {
+              ...room.current_task_state.activeAttack,
+              timer: currentTimer - 1
+            }
+          }
+        });
+      }
+    }, 1000);
+
+    return () => clearInterval(interval);
+  }, [room?.current_task_state?.activeAttack?.timer, room?.current_task_state?.activeAttack?.targetId]);
 
   // Local timer
   useEffect(() => {
@@ -448,7 +500,9 @@ export default function App() {
         answers: selected.type === 'diary' ? {} : undefined,
         lines: selected.type === 'draw' ? [] : undefined,
         estimate: undefined,
-        votes: (selected.type === 'dilemma' || selected.type === 'estimate') ? {} : undefined
+        votes: (selected.type === 'dilemma' || selected.type === 'estimate') ? {} : undefined,
+        tinkActive: false,
+        hyperdriveActive: false
       }
     });
   };
@@ -525,11 +579,27 @@ export default function App() {
       const startingIndex = Math.floor(Math.random() * players.length);
       const totalRounds = isGroupOnly() ? room.rounds_per_player : room.rounds_per_player * players.length;
 
+      // Initialize card hands for all players
+      const startHands = {};
+      players.forEach(p => {
+        const cardKeys = Object.keys(POWER_CARDS);
+        const hand = [];
+        for (let i = 0; i < 3; i++) {
+          const rKey = cardKeys[Math.floor(Math.random() * cardKeys.length)];
+          hand.push(rKey);
+        }
+        startHands[p.id] = hand;
+      });
+
       await updateRoomState(room.id, {
         status: 'playing',
         current_player_index: startingIndex,
         round: 0,
-        total_rounds: totalRounds
+        total_rounds: totalRounds,
+        current_task_state: {
+          ...room.current_task_state,
+          player_hands: startHands
+        }
       });
 
       const { room: updatedRoom } = await fetchRoomData(room.id);
@@ -578,11 +648,14 @@ export default function App() {
 
     const isCorrect = answerIndex === correctAnswerIndex;
     if (isCorrect) {
+      // Check for active Hyperdrive card
+      const ptsToAward = room.current_task_state?.hyperdriveActive ? points * 2 : points;
       const activePlayer = players[room.current_player_index];
+
       await addPlayerScore(
         room.id, 
         activePlayer, 
-        points, 
+        ptsToAward, 
         `Quiz ${room.current_task_state.quizDifficulty === 'easy' ? 'makkelijk' : room.current_task_state.quizDifficulty === 'medium' ? 'medium' : 'moeilijk'}: ${getCurrentTask()?.text}`,
         'knowledge',
         getCurrentTask()
@@ -611,26 +684,33 @@ export default function App() {
 
     let nextPlayerIndex = room.current_player_index;
     if (!wasGroup) {
-      nextPlayerIndex = (room.current_player_index + 1) % players.length;
-    }
+      // Check if next player is frozen (Autopech)
+      let candidateNextIdx = (room.current_player_index + 1) % players.length;
+      const candidatePlayer = players[candidateNextIdx];
+      const frozenPlayers = room.current_task_state?.frozenPlayers || {};
 
-    if (triggerPause) {
-      await updateRoomState(room.id, {
-        round: nextRound,
-        current_player_index: nextPlayerIndex,
-        current_task_state: {
-          ...room.current_task_state,
-          stagePause: true
-        }
-      });
-      setStagePause(true);
-      return;
+      if (frozenPlayers[candidatePlayer.id]) {
+        // Remove frozen status and skip his turn
+        frozenPlayers[candidatePlayer.id] = false;
+        candidateNextIdx = (candidateNextIdx + 1) % players.length;
+      }
+      nextPlayerIndex = candidateNextIdx;
     }
 
     await updateRoomState(room.id, {
       round: nextRound,
-      current_player_index: nextPlayerIndex
+      current_player_index: nextPlayerIndex,
+      current_task_state: {
+        ...room.current_task_state,
+        frozenPlayers: room.current_task_state?.frozenPlayers || {},
+        stagePause: triggerPause
+      }
     });
+
+    if (triggerPause) {
+      setStagePause(true);
+      return;
+    }
 
     const { room: r, players: p } = await fetchRoomData(room.id);
     setRoom(r);
@@ -657,11 +737,13 @@ export default function App() {
 
   const handleScoreAward = async (playerIndex, points, type) => {
     const targetPlayer = players[playerIndex];
+    const ptsToAward = (room.current_player_index === playerIndex && room.current_task_state?.hyperdriveActive) ? points * 2 : points;
+
     await addPlayerScore(
       room.id,
       targetPlayer,
-      points,
-      `${getCurrentTask()?.cat}: ${getCurrentTask()?.text || getCurrentTask()?.title}`,
+      ptsToAward,
+      `${getCurrentTask()?.cat}: ${getCurrentTask()?.title || getCurrentTask()?.text}`,
       type === 'creative' ? 'creative' : 'general',
       getCurrentTask()
     );
@@ -842,8 +924,9 @@ export default function App() {
 
     // Check active player (within 20%)
     const diff = Math.abs(estimate - correct) / correct;
+    const pts = room.current_task_state?.hyperdriveActive ? 4 : 2;
     if (diff <= 0.20) {
-      await addPlayerScore(room.id, activePlayer, 2, `Inschatting: dichtbij het juiste antwoord (${correct})`, 'knowledge');
+      await addPlayerScore(room.id, activePlayer, pts, `Inschatting: dichtbij het juiste antwoord (${correct})`, 'knowledge');
     }
 
     // Check other players
@@ -900,8 +983,8 @@ export default function App() {
       ['part1', 'part2', 'part3'].forEach(pk => {
         const entry = pAns[pk];
         if (entry) {
-          const charCorrect = match(entry.char, [t.character, ...(t.character_aliases || [])]);
-          const movieCorrect = match(entry.movie, [t.movie, ...(t.movie_aliases || [])]);
+          const charCorrect = match(entry.char, [t.character_nl, t.character_en, ...(t.character_aliases || [])]);
+          const movieCorrect = match(entry.movie, [t.movie_nl, t.movie_en, ...(t.movie_aliases || [])]);
           if (charCorrect && movieCorrect) score++;
         }
       });
@@ -949,10 +1032,11 @@ export default function App() {
     const updatedGuesses = [...mmGuesses, { guess: [...mmCurrentGuess], ...feedback }];
     setMmGuesses(updatedGuesses);
     
-    if (feedback.black === 4) {
+    if (feedback.black === 5) {
       setMmSolved(true);
       const turns = updatedGuesses.length;
-      const pts = turns <= 3 ? 3 : turns <= 5 ? 2 : 1;
+      const basePts = turns <= 3 ? 3 : turns <= 5 ? 2 : 1;
+      const pts = room.current_task_state?.hyperdriveActive ? basePts * 2 : basePts;
       setMmPointsEarned(pts);
     } else if (updatedGuesses.length >= 6) {
       setMmFailed(true);
@@ -973,7 +1057,8 @@ export default function App() {
     setWhoamiSelected(idx);
     const correct = idx === t.correct;
     if (correct) {
-      const pts = whoamiRevealed === 1 ? 3 : whoamiRevealed === 2 ? 2 : 1;
+      const basePts = whoamiRevealed === 1 ? 3 : whoamiRevealed === 2 ? 2 : 1;
+      const pts = room.current_task_state?.hyperdriveActive ? basePts * 2 : basePts;
       await addPlayerScore(room.id, localPlayer, pts, `Hint Quest: correct geraden met ${whoamiRevealed} hint(s)`, 'knowledge');
     }
   };
@@ -985,7 +1070,8 @@ export default function App() {
     setFactSelected(isTrue);
     const correct = isTrue === t.correct;
     if (correct) {
-      await addPlayerScore(room.id, localPlayer, 2, `Feit of Fabel: stelling correct beoordeeld`, 'knowledge');
+      const pts = room.current_task_state?.hyperdriveActive ? 4 : 2;
+      await addPlayerScore(room.id, localPlayer, pts, `Feit of Fabel: stelling correct beoordeeld`, 'knowledge');
     }
   };
 
@@ -996,7 +1082,252 @@ export default function App() {
     setQuizSelectedAnswer(idx);
     const correct = idx === t.correct;
     if (correct) {
-      await addPlayerScore(room.id, localPlayer, 2, `Emoji Quiz: correct geraden`, 'knowledge');
+      const pts = room.current_task_state?.hyperdriveActive ? 4 : 2;
+      await addPlayerScore(room.id, localPlayer, pts, `Emoji Quiz: correct geraden`, 'knowledge');
+    }
+  };
+
+  // --- POWER CARDS PLAY LOGIC ---
+  const handlePlayCard = async (cardKey, targetPlayerId = null) => {
+    const hands = room.current_task_state.player_hands || {};
+    let myHand = hands[localPlayer.id] || [];
+
+    const idx = myHand.indexOf(cardKey);
+    if (idx !== -1) {
+      myHand.splice(idx, 1);
+    }
+    hands[localPlayer.id] = myHand;
+
+    const newHistory = [
+      ...(room.current_task_state.cardHistory || []),
+      {
+        card: cardKey,
+        playedBy: localPlayer.name,
+        target: targetPlayerId ? players.find(p => p.id === targetPlayerId)?.name : null,
+        time: new Date().toISOString()
+      }
+    ];
+
+    if (cardKey === 'fastpass') {
+      await updateRoomState(room.id, {
+        current_task_state: { ...room.current_task_state, player_hands: hands, cardHistory: newHistory }
+      });
+      await selectNextTask(room, players);
+    } else if (cardKey === 'hyperdrive') {
+      await updateRoomState(room.id, {
+        current_task_state: { ...room.current_task_state, player_hands: hands, cardHistory: newHistory, hyperdriveActive: true }
+      });
+    } else if (cardKey === 'tink') {
+      await updateRoomState(room.id, {
+        current_task_state: { ...room.current_task_state, player_hands: hands, cardHistory: newHistory, tinkActive: true }
+      });
+    } else if (cardKey === 'time') {
+      setSecondsLeft(prev => prev + 30);
+      await updateRoomState(room.id, {
+        current_task_state: { ...room.current_task_state, player_hands: hands, cardHistory: newHistory }
+      });
+    } else if (cardKey === 'wish') {
+      const cardKeys = Object.keys(POWER_CARDS);
+      for (let i = 0; i < 2; i++) {
+        myHand.push(cardKeys[Math.floor(Math.random() * cardKeys.length)]);
+      }
+      hands[localPlayer.id] = myHand;
+      await updateRoomState(room.id, {
+        current_task_state: { ...room.current_task_state, player_hands: hands, cardHistory: newHistory }
+      });
+    } else if (cardKey === 'shortcut') {
+      await updateRoomState(room.id, {
+        current_task_state: { ...room.current_task_state, player_hands: hands, cardHistory: newHistory }
+      });
+      await selectNextTask(room, players);
+    } else if (cardKey === 'elsa') {
+      setTimerRunning(false);
+      await updateRoomState(room.id, {
+        current_task_state: { ...room.current_task_state, player_hands: hands, cardHistory: newHistory }
+      });
+    } else if (cardKey === 'kaahypnose') {
+      if (timerRunning) {
+        setSecondsLeft(prev => Math.max(5, Math.round(prev / 2)));
+      }
+      await updateRoomState(room.id, {
+        current_task_state: { ...room.current_task_state, player_hands: hands, cardHistory: newHistory }
+      });
+    }
+
+    setZoomedCardKey(null);
+    setCardFlipped(false);
+  };
+
+  const handlePlayAttackCard = async (cardKey, targetPlayerId) => {
+    const hands = room.current_task_state.player_hands || {};
+    let myHand = hands[localPlayer.id] || [];
+
+    const idx = myHand.indexOf(cardKey);
+    if (idx !== -1) {
+      myHand.splice(idx, 1);
+    }
+    hands[localPlayer.id] = myHand;
+
+    const newHistory = [
+      ...(room.current_task_state.cardHistory || []),
+      {
+        card: cardKey,
+        playedBy: localPlayer.name,
+        target: players.find(p => p.id === targetPlayerId)?.name,
+        time: new Date().toISOString()
+      }
+    ];
+
+    await updateRoomState(room.id, {
+      current_task_state: {
+        ...room.current_task_state,
+        player_hands: hands,
+        cardHistory: newHistory,
+        activeAttack: {
+          card: cardKey,
+          attackerId: localPlayer.id,
+          targetId: targetPlayerId,
+          timer: 6
+        }
+      }
+    });
+
+    setZoomedCardKey(null);
+    setCardFlipped(false);
+    setStrafTargetMode(null);
+  };
+
+  const handleDefendShield = async () => {
+    const hands = room.current_task_state.player_hands || {};
+    let myHand = hands[localPlayer.id] || [];
+
+    const idx = myHand.indexOf('shield');
+    if (idx !== -1) {
+      myHand.splice(idx, 1);
+    }
+    hands[localPlayer.id] = myHand;
+
+    const newHistory = [
+      ...(room.current_task_state.cardHistory || []),
+      {
+        card: 'shield',
+        playedBy: localPlayer.name,
+        target: 'aanval geblokkeerd',
+        time: new Date().toISOString()
+      }
+    ];
+
+    await updateRoomState(room.id, {
+      current_task_state: {
+        ...room.current_task_state,
+        player_hands: hands,
+        activeAttack: null,
+        cardHistory: newHistory
+      }
+    });
+  };
+
+  const handleDefendSpiegel = async () => {
+    const hands = room.current_task_state.player_hands || {};
+    let myHand = hands[localPlayer.id] || [];
+
+    const idx = myHand.indexOf('spiegel');
+    if (idx !== -1) {
+      myHand.splice(idx, 1);
+    }
+    hands[localPlayer.id] = myHand;
+
+    const newHistory = [
+      ...(room.current_task_state.cardHistory || []),
+      {
+        card: 'spiegel',
+        playedBy: localPlayer.name,
+        target: 'aanval teruggekaatst',
+        time: new Date().toISOString()
+      }
+    ];
+
+    const currentAttack = room.current_task_state.activeAttack;
+    await updateRoomState(room.id, {
+      current_task_state: {
+        ...room.current_task_state,
+        player_hands: hands,
+        activeAttack: {
+          ...currentAttack,
+          attackerId: localPlayer.id,
+          targetId: currentAttack.attackerId,
+          timer: 6
+        },
+        cardHistory: newHistory
+      }
+    });
+  };
+
+  const executeActiveAttack = async () => {
+    const attack = room.current_task_state.activeAttack;
+    const hands = room.current_task_state.player_hands || {};
+
+    if (attack.card === 'autopech') {
+      const frozen = room.current_task_state.frozenPlayers || {};
+      frozen[attack.targetId] = true;
+      await updateRoomState(room.id, {
+        current_task_state: {
+          ...room.current_task_state,
+          frozenPlayers: frozen,
+          activeAttack: null
+        }
+      });
+    } else if (attack.card === 'apple') {
+      const target = players.find(p => p.id === attack.targetId);
+      const attacker = players.find(p => p.id === attack.attackerId);
+      if (target && target.score > 0) {
+        await addPlayerScore(room.id, target, -1, `Giftige Appel gespeeld door ${attacker?.name}`, 'general');
+        if (attacker) {
+          await addPlayerScore(room.id, attacker, 1, `Giftige Appel gestolen van ${target?.name}`, 'general');
+        }
+      }
+      await updateRoomState(room.id, {
+        current_task_state: {
+          ...room.current_task_state,
+          activeAttack: null
+        }
+      });
+    } else if (attack.card === 'abu') {
+      const targetHand = hands[attack.targetId] || [];
+      const attackerHand = hands[attack.attackerId] || [];
+      if (targetHand.length > 0) {
+        const rIdx = Math.floor(Math.random() * targetHand.length);
+        const stolen = targetHand.splice(rIdx, 1)[0];
+        attackerHand.push(stolen);
+        hands[attack.targetId] = targetHand;
+        hands[attack.attackerId] = attackerHand;
+      }
+      await updateRoomState(room.id, {
+        current_task_state: {
+          ...room.current_task_state,
+          player_hands: hands,
+          activeAttack: null
+        }
+      });
+    } else if (attack.card === 'kuzco') {
+      const targetHand = hands[attack.targetId] || [];
+      const attackerHand = hands[attack.attackerId] || [];
+      hands[attack.targetId] = [...attackerHand];
+      hands[attack.attackerId] = [...targetHand];
+      await updateRoomState(room.id, {
+        current_task_state: {
+          ...room.current_task_state,
+          player_hands: hands,
+          activeAttack: null
+        }
+      });
+    } else {
+      await updateRoomState(room.id, {
+        current_task_state: {
+          ...room.current_task_state,
+          activeAttack: null
+        }
+      });
     }
   };
 
@@ -1009,7 +1340,12 @@ export default function App() {
           <span className="castle">🏰</span>
           <span>{title}</span>
         </div>
-        <div>
+        <div style={{ display: 'flex', gap: '8px' }}>
+          {screen === 'game' && (
+            <button className="iconbtn" onClick={() => setThemeMode(prev => prev === 'day' ? 'night' : 'day')} aria-label="Sfeer">
+              {themeMode === 'day' ? "🌙" : "☀️"}
+            </button>
+          )}
           {backAction && (
             <button className="iconbtn" onClick={backAction} aria-label="Terug">
               ←
@@ -1023,18 +1359,449 @@ export default function App() {
   const renderScoreBar = () => {
     return (
       <div className="scorebar">
-        {players.map(p => (
-          <div key={p.id} className="scorepill">
-            <b>{p.name}</b>
-            <span>{p.score} ★</span>
+        {players.map(p => {
+          const isFrozen = room?.current_task_state?.frozenPlayers?.[p.id];
+          return (
+            <div key={p.id} className="scorepill" style={{ border: isFrozen ? '1.5px solid var(--danger)' : undefined }}>
+              <b>{p.name} {isFrozen ? "❄️" : ""}</b>
+              <span>{p.score} ★</span>
+            </div>
+          );
+        })}
+      </div>
+    );
+  };
+
+  const renderRouteProgressRoad = () => {
+    const pct = Math.min(100, Math.round((room.round / room.total_rounds) * 100));
+    
+    // Etappe checkpoints markers
+    const stations = [
+      { pct: 0, label: "Start", icon: "🔑" },
+      { pct: 25, label: "Grens", icon: "🛂" },
+      { pct: 50, label: "Parijs", icon: "🗼" },
+      { pct: 75, label: "Sfeer", icon: "✨" },
+      { pct: 100, label: "Park", icon: "🏰" }
+    ];
+
+    return (
+      <div className="road-progress-container">
+        <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '11px', color: 'var(--muted)' }}>
+          <span>Etappe Routekaart</span>
+          <strong>{pct}% voltooid ({room.round}/{room.total_rounds} beurten)</strong>
+        </div>
+        
+        <div className="road-strip">
+          <div className="road-dashed"></div>
+          {stations.map((s, idx) => (
+            <div 
+              key={idx}
+              className={`road-station ${pct >= s.pct ? 'passed' : ''}`}
+              style={{ left: `${s.pct}%` }}
+              title={s.label}
+            >
+              {s.icon}
+            </div>
+          ))}
+          <div className="road-car" style={{ left: `${pct}%` }}>
+            🚗💨
           </div>
-        ))}
+        </div>
       </div>
     );
   };
 
   return (
     <div className="app">
+      {/* 3D Styles Injection */}
+      <style>{`
+        .star-bg {
+          position: fixed;
+          top: 0;
+          left: 0;
+          width: 100vw;
+          height: 100vh;
+          z-index: -1;
+          pointer-events: none;
+          background: radial-gradient(circle at 50% -20%, #0d1a33 0%, #050a1a 60%, #02040d 100%);
+          overflow: hidden;
+        }
+        .star {
+          position: absolute;
+          width: 2px;
+          height: 2px;
+          background: white;
+          border-radius: 50%;
+          opacity: 0.8;
+          animation: twinkle 2s infinite ease-in-out;
+        }
+        @keyframes twinkle {
+          0%, 100% { opacity: 0.3; }
+          50% { opacity: 1; transform: scale(1.3); }
+        }
+        .shooting-star {
+          position: absolute;
+          width: 80px;
+          height: 1.5px;
+          background: linear-gradient(90deg, white, transparent);
+          animation: shoot 5s infinite linear;
+          opacity: 0;
+        }
+        @keyframes shoot {
+          0% { transform: translate(-100px, -100px) rotate(35deg); opacity: 1; }
+          15%, 100% { transform: translate(500px, 500px) rotate(35deg); opacity: 0; }
+        }
+        .road-progress-container {
+          background: rgba(21, 49, 95, 0.45);
+          border: 1px solid #31517e;
+          border-radius: 20px;
+          padding: 12px 16px;
+          margin-bottom: 16px;
+          position: relative;
+          overflow: hidden;
+          backdrop-filter: blur(12px);
+          box-shadow: 0 10px 30px rgba(0, 0, 0, 0.2);
+        }
+        .road-strip {
+          height: 4px;
+          background: #2b4974;
+          border-radius: 99px;
+          position: relative;
+          margin: 18px 0 10px;
+        }
+        .road-dashed {
+          position: absolute;
+          top: 1px;
+          left: 0;
+          width: 100%;
+          height: 2px;
+          border-top: 1.5px dashed rgba(255,255,255,0.4);
+        }
+        .road-station {
+          position: absolute;
+          top: -12px;
+          width: 28px;
+          height: 28px;
+          border-radius: 50%;
+          background: #0a1c3c;
+          border: 2px solid #2b4974;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          font-size: 13px;
+          cursor: pointer;
+          transform: translateX(-50%);
+          transition: all 0.3s;
+          z-index: 10;
+        }
+        .road-station.passed {
+          border-color: var(--gold);
+          background: #173664;
+          box-shadow: 0 0 10px rgba(255, 212, 92, 0.4);
+        }
+        .road-car {
+          position: absolute;
+          top: -16px;
+          font-size: 20px;
+          transform: translateX(-50%);
+          transition: left 0.5s cubic-bezier(0.25, 0.46, 0.45, 0.94);
+          z-index: 20;
+          animation: car-wobble 0.6s infinite alternate ease-in-out;
+        }
+        @keyframes car-wobble {
+          from { transform: translateX(-50%) translateY(0) rotate(-1deg); }
+          to { transform: translateX(-50%) translateY(-2px) rotate(1deg); }
+        }
+        .cards-hud {
+          display: flex;
+          justify-content: center;
+          gap: 12px;
+          margin-top: 18px;
+          padding: 12px;
+          background: rgba(21, 49, 95, 0.3);
+          border: 1.5px dashed #2b4974;
+          border-radius: 20px;
+        }
+        .mini-card-btn {
+          width: 62px;
+          height: 86px;
+          border-radius: 12px;
+          background: linear-gradient(135deg, #173564, #08162f);
+          border: 1.5px solid #31517e;
+          display: flex;
+          flex-direction: column;
+          align-items: center;
+          justify-content: center;
+          cursor: pointer;
+          transition: all 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+          box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+        }
+        .mini-card-btn:hover {
+          transform: translateY(-6px) scale(1.05);
+          border-color: var(--gold);
+          box-shadow: 0 8px 16px rgba(255, 212, 92, 0.25);
+        }
+        .card-modal-overlay {
+          position: fixed;
+          top: 0;
+          left: 0;
+          width: 100vw;
+          height: 100vh;
+          background: rgba(0,0,0,0.85);
+          backdrop-filter: blur(12px);
+          -webkit-backdrop-filter: blur(12px);
+          z-index: 999;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+        }
+        .card-3d-wrapper {
+          width: 280px;
+          height: 400px;
+          perspective: 1000px;
+        }
+        .card-3d {
+          width: 100%;
+          height: 100%;
+          position: relative;
+          transform-style: preserve-3d;
+          transition: transform 0.6s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+        .card-3d.flipped {
+          transform: rotateY(180deg);
+        }
+        .card-front, .card-back {
+          position: absolute;
+          top: 0;
+          left: 0;
+          width: 100%;
+          height: 100%;
+          backface-visibility: hidden;
+          -webkit-backface-visibility: hidden;
+          border-radius: 24px;
+          padding: 24px;
+          display: flex;
+          flex-direction: column;
+          align-items: center;
+          justify-content: space-between;
+          box-shadow: 0 15px 35px rgba(0,0,0,0.5);
+          border: 2px solid rgba(255,255,255,0.1);
+        }
+        .card-front {
+          background: linear-gradient(135deg, #173664, #08162f);
+          color: white;
+        }
+        .card-back {
+          background: linear-gradient(135deg, #0e2447, #061126);
+          transform: rotateY(180deg);
+          border-color: var(--gold);
+          color: #f8fbff;
+        }
+        .confetti-piece {
+          position: fixed;
+          width: 10px;
+          height: 10px;
+          animation: fall 3s infinite linear;
+          z-index: 9999;
+          top: -10px;
+          border-radius: 20%;
+        }
+        @keyframes fall {
+          0% { top: -10px; transform: translateX(0) rotate(0deg); }
+          100% { top: 100vh; transform: translateX(100px) rotate(360deg); opacity: 0; }
+        }
+        .attack-notification {
+          position: fixed;
+          top: 20px;
+          left: 5%;
+          width: 90%;
+          background: #4a101d;
+          border: 2px solid var(--danger);
+          border-radius: 16px;
+          padding: 14px;
+          color: white;
+          z-index: 1000;
+          box-shadow: 0 10px 30px rgba(0,0,0,0.5);
+          animation: pulse-red 1.5s infinite alternate;
+        }
+        @keyframes pulse-red {
+          from { box-shadow: 0 0 10px #ff7b8b55; }
+          to { box-shadow: 0 0 25px #ff7b8bda; }
+        }
+      `}</style>
+
+      {/* Render Night theme animated stars overlays */}
+      {screen === 'game' && themeMode === 'night' && (
+        <div className="star-bg">
+          {Array.from({ length: 15 }).map((_, i) => (
+            <div 
+              key={i} 
+              className="star" 
+              style={{
+                top: `${Math.random() * 100}%`,
+                left: `${Math.random() * 100}%`,
+                animationDelay: `${Math.random() * 2}s`,
+                animationDuration: `${1.5 + Math.random() * 2.5}s`
+              }}
+            ></div>
+          ))}
+          <div className="shooting-star" style={{ top: '20%', left: '10%' }}></div>
+          <div className="shooting-star" style={{ top: '60%', left: '40%', animationDelay: '3s' }}></div>
+        </div>
+      )}
+
+      {/* RENDER ACTIVE MULTIPLAYER ATTACK OVERLAY */}
+      {room?.current_task_state?.activeAttack && (
+        (() => {
+          const attack = room.current_task_state.activeAttack;
+          const attacker = players.find(p => p.id === attack.attackerId);
+          const isMeTarget = attack.targetId === localPlayer?.id;
+          const cardInfo = POWER_CARDS[attack.card];
+
+          if (isMeTarget) {
+            const myHand = room.current_task_state.player_hands?.[localPlayer.id] || [];
+            const hasShield = myHand.includes('shield');
+            const hasSpiegel = myHand.includes('spiegel');
+
+            return (
+              <div className="card-modal-overlay">
+                <div className="attack-notification" style={{ position: 'relative', top: 'auto', left: 'auto', width: '310px', textAlign: 'center' }}>
+                  <span style={{ fontSize: '42px', display: 'block', marginBottom: '8px' }}>⚠️</span>
+                  <h3>GEVAAR!</h3>
+                  <p><strong>{attacker?.name}</strong> speelt <strong>{cardInfo?.name}</strong> op jou!</p>
+                  <div className="timer" style={{ borderColor: 'var(--danger)', width: '64px', height: '64px', fontSize: '20px', margin: '10px auto' }}>
+                    {attack.timer}s
+                  </div>
+                  
+                  <div className="answers" style={{ marginTop: '16px' }}>
+                    {hasShield && (
+                      <button className="btn ok" onClick={handleDefendShield}>
+                        🛡️ Speel Magische Bumper (Blokkeren)
+                      </button>
+                    )}
+                    {hasSpiegel && (
+                      <button className="btn primary" onClick={handleDefendSpiegel}>
+                        🎭 Speel Magische Spiegel (Kaats terug)
+                      </button>
+                    )}
+                    <p className="small" style={{ color: 'var(--muted)', marginTop: '8px' }}>
+                      Als de timer afloopt, onderga je de aanval...
+                    </p>
+                  </div>
+                </div>
+              </div>
+            );
+          } else {
+            const targetPlayerName = players.find(p => p.id === attack.targetId)?.name || "iemand";
+            return (
+              <div className="card-modal-overlay">
+                <div className="card" style={{ width: '310px', textAlign: 'center', borderColor: 'var(--line)' }}>
+                  <span style={{ fontSize: '38px' }}>🪄</span>
+                  <h3>Magisch Duel</h3>
+                  <p><strong>{attacker?.name}</strong> valt <strong>{targetPlayerName}</strong> aan met <strong>{cardInfo?.name}</strong>!</p>
+                  <p className="small">Wachten op reactie... ({attack.timer}s)</p>
+                </div>
+              </div>
+            );
+          }
+        })()
+      )}
+
+      {/* RENDER TARGET SELECT MODAL FOR ATTACK CARDS */}
+      {strafTargetMode && (
+        <div className="card-modal-overlay">
+          <div className="card" style={{ width: '300px' }}>
+            <h3>Kies een speler</h3>
+            <p>Op wie wil je {POWER_CARDS[strafTargetMode]?.name} spelen?</p>
+            <div className="answers" style={{ marginTop: '14px' }}>
+              {players
+                .filter(p => p.id !== localPlayer.id)
+                .map(p => (
+                  <button 
+                    key={p.id} 
+                    className="answer"
+                    onClick={() => handlePlayAttackCard(strafTargetMode, p.id)}
+                  >
+                    🎯 {p.name}
+                  </button>
+                ))
+              }
+              <button className="btn ghost full" style={{ marginTop: '8px' }} onClick={() => setStrafTargetMode(null)}>
+                Annuleren
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* RENDER 3D FLIP ZOOM MODAL FOR ACTIVE HAND CARDS */}
+      {zoomedCardKey && (
+        (() => {
+          const card = POWER_CARDS[zoomedCardKey];
+          return (
+            <div className="card-modal-overlay">
+              <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '20px' }}>
+                <p className="small" style={{ color: 'var(--muted)' }}>Tik op de kaart om hem om te draaien!</p>
+                
+                <div className="card-3d-wrapper" onClick={() => setCardFlipped(prev => !prev)}>
+                  <div className={`card-3d ${cardFlipped ? 'flipped' : ''}`}>
+                    {/* Front: themed illustration */}
+                    <div className="card-front">
+                      <div style={{ fontSize: '72px', margin: '40px 0 20px 0', filter: 'drop-shadow(0 4px 12px rgba(0,0,0,0.3))' }}>{card.icon}</div>
+                      <h2 style={{ fontSize: '28px', color: 'var(--gold)', margin: 0 }}>Wilde Rit</h2>
+                      <span className="badge">Disney Power-up</span>
+                    </div>
+
+                    {/* Back: details & action */}
+                    <div className="card-back" onClick={(e) => e.stopPropagation() /* prevent flip back when clicking action buttons */}>
+                      <div>
+                        <h3 style={{ margin: '0 0 10px 0', color: 'var(--gold)', fontSize: '24px' }}>{card.name}</h3>
+                        <hr style={{ margin: '8px 0' }} />
+                        <p style={{ fontSize: '15px', lineHeight: '1.4', margin: '14px 0 0 0' }}>{card.desc}</p>
+                      </div>
+                      
+                      <div className="answers" style={{ width: '100%' }}>
+                        {card.type === 'attack' ? (
+                          <button 
+                            className="btn primary full"
+                            onClick={() => {
+                              if (card.selectTarget) {
+                                setStrafTargetMode(zoomedCardKey);
+                                setZoomedCardKey(null);
+                              } else {
+                                handlePlayCard(zoomedCardKey);
+                              }
+                            }}
+                          >
+                            Speel kaart 🎯
+                          </button>
+                        ) : (
+                          card.type !== 'defense' && (
+                            <button 
+                              className="btn primary full"
+                              disabled={room?.current_player_index !== players.findIndex(p => p.id === localPlayer.id)}
+                              onClick={() => handlePlayCard(zoomedCardKey)}
+                            >
+                              Speel kaart ➔
+                            </button>
+                          )
+                        )}
+                        <button className="btn ghost full" onClick={() => {
+                          setZoomedCardKey(null);
+                          setCardFlipped(false);
+                        }}>
+                          Sluiten
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          );
+        })()
+      )}
+
       {loading && (
         <div style={{ textAlign: 'center', padding: '40px' }}>
           <div className="timer" style={{ borderWidth: '4px', width: '60px', height: '60px', fontSize: '16px' }}>🧙‍♂️</div>
@@ -1085,7 +1852,7 @@ export default function App() {
                   </div>
                   <div className="portal-card-body">
                     <h3>Disney Music Quiz</h3>
-                    <p>Dé interactieve muziekquiz met 100 betoverende Disney en Pixar songs. Scan scancodes met Spotify, raad de film, het jaartal of de uitvoerder en verover de troon!</p>
+                    <p>Dé interactieve muziekquiz met 150 betoverende Disney en Pixar songs. Scan scancodes met Spotify, raad de film, het jaartal of de uitvoerder en verover de troon!</p>
                   </div>
                   <div className="portal-card-footer">
                     <span className="btn-play music">Speel Quiz ➔</span>
@@ -1300,12 +2067,8 @@ export default function App() {
                     Kamer: {room.code} · Mode: {GAME_MODES.find(m => m.id === room.game_mode)?.name}
                   </div>
 
-                  <div className="progresswrap">
-                    <div className="progress">
-                      <i style={{ width: `${Math.min(100, Math.round((room.round / room.total_rounds) * 100))}%` }}></i>
-                    </div>
-                    <span className="small">{room.round}/{room.total_rounds} {isGroupOnly() ? "missies" : "beurten"}</span>
-                  </div>
+                  {/* Render new animated road progress */}
+                  {renderRouteProgressRoad()}
 
                   {getCurrentTask() ? (
                     (() => {
@@ -1359,6 +2122,13 @@ export default function App() {
                               <div>
                                 <div className="answers">
                                   {t.answers.map((ans, idx) => {
+                                    // Check if card tink is active (strike through 2 foute opties)
+                                    const isTinkActive = room.current_task_state?.tinkActive;
+                                    const isIncorrectOption = idx !== t.correct;
+                                    const shouldHide = isTinkActive && isIncorrectOption && (idx === (t.correct + 1) % 4 || idx === (t.correct + 2) % 4);
+
+                                    if (shouldHide) return null;
+
                                     let btnClass = "answer";
                                     if (quizLocked) {
                                       if (idx === t.correct) btnClass += " correct";
@@ -1425,7 +2195,12 @@ export default function App() {
                                       })}
                                     </div>
 
-                                    <div className="btnrow stack">
+                                    {/* Display Correct Answers for the Reader */}
+                                    <div className="notice" style={{ background: '#091c38', borderColor: 'var(--line)', fontSize: '13px' }}>
+                                      <strong>Oplossing:</strong> {t.character_nl} / {t.character_en} ({t.movie_nl} / {t.movie_en})
+                                    </div>
+
+                                    <div className="btnrow stack" style={{ marginTop: '10px' }}>
                                       {activePart < 3 ? (
                                         <button className="btn primary" disabled={!allSubmitted} onClick={() => handleNextDiaryPart(activePart + 1)}>
                                           Volgend deel voorlezen ➔
@@ -1467,11 +2242,11 @@ export default function App() {
                                       <div>
                                         <div className="field">
                                           <label>Welk Karakter?</label>
-                                          <input placeholder="Bijv. Aladdin" value={diaryChar} onChange={e => setDiaryChar(e.target.value)} />
+                                          <input placeholder="Bijv. Aladdin of Captain Hook" value={diaryChar} onChange={e => setDiaryChar(e.target.value)} />
                                         </div>
                                         <div className="field">
                                           <label>Welke Film?</label>
-                                          <input placeholder="Bijv. Aladdin" value={diaryMovie} onChange={e => setDiaryMovie(e.target.value)} />
+                                          <input placeholder="Bijv. Aladdin of Tangled" value={diaryMovie} onChange={e => setDiaryMovie(e.target.value)} />
                                         </div>
                                         <button className="btn primary full" disabled={!diaryChar.trim() || !diaryMovie.trim()} onClick={() => handleSubmitDiaryPart(activePart)}>
                                           Bevestig antwoord voor deel {activePart}
@@ -1762,6 +2537,13 @@ export default function App() {
                                 </div>
                                 <div className="answers">
                                   {t.answers.map((ans, idx) => {
+                                    // Check if tink is active
+                                    const isTinkActive = room.current_task_state?.tinkActive;
+                                    const isIncorrectOption = idx !== t.correct;
+                                    const shouldHide = isTinkActive && isIncorrectOption && (idx === (t.correct + 1) % 4 || idx === (t.correct + 2) % 4);
+
+                                    if (shouldHide) return null;
+
                                     let btnClass = "answer";
                                     if (quizLocked) {
                                       if (idx === t.correct) btnClass += " correct";
@@ -1814,10 +2596,10 @@ export default function App() {
 
                                   {!whoamiLocked && isMyTurn && (
                                     <div className="btnrow" style={{ marginBottom: '14px' }}>
-                                      <button className="btn secondary mini" disabled={whoamiRevealed >= 2} onClick={handleWhoamiRevealHint}>
+                                      <button className="btn secondary mini" disabled={whoamiRevealed >= 2} onClick={() => setWhoamiRevealed(2)}>
                                         Onthul Hint 2
                                       </button>
-                                      <button className="btn secondary mini" disabled={whoamiRevealed < 2 || whoamiRevealed >= 3} onClick={handleWhoamiRevealHint}>
+                                      <button className="btn secondary mini" disabled={whoamiRevealed < 2 || whoamiRevealed >= 3} onClick={() => setWhoamiRevealed(3)}>
                                         Onthul Hint 3
                                       </button>
                                     </div>
@@ -2048,6 +2830,38 @@ export default function App() {
                       )}
                     </section>
                   )}
+
+                  {/* Wilde Ritten: Player's card hand tray */}
+                  {(() => {
+                    const myHand = room.current_task_state?.player_hands?.[localPlayer.id] || [];
+                    if (!myHand.length) return null;
+
+                    return (
+                      <div className="card" style={{ marginTop: '16px', padding: '12px' }}>
+                        <strong style={{ fontSize: '13px', display: 'block', marginBottom: '8px', color: 'var(--gold)' }}>Je actieve handkaarten:</strong>
+                        <div className="cards-hud" style={{ padding: '4px', background: 'transparent', border: 'none', marginTop: 0 }}>
+                          {myHand.map((cardKey, idx) => {
+                            const card = POWER_CARDS[cardKey];
+                            return (
+                              <div 
+                                key={idx} 
+                                className="mini-card-btn"
+                                onClick={() => {
+                                  setZoomedCardKey(cardKey);
+                                  setCardFlipped(false);
+                                }}
+                              >
+                                <span style={{ fontSize: '28px' }}>{card?.icon}</span>
+                                <span style={{ fontSize: '9px', fontWeight: '900', color: 'var(--muted)', marginTop: '4px' }}>
+                                  {card?.name.split(" ")[0]}
+                                </span>
+                              </div>
+                            );
+                          })}
+                        </div>
+                      </div>
+                    );
+                  })()}
                 </div>
               )}
             </div>
@@ -2184,6 +2998,21 @@ export default function App() {
           {screen === 'end' && room && (
             <div>
               {renderAppHeader("Podium")}
+
+              {/* Render confetti overlay */}
+              {Array.from({ length: 20 }).map((_, i) => (
+                <div 
+                  key={i} 
+                  className="confetti-piece"
+                  style={{
+                    left: `${Math.random() * 100}%`,
+                    background: ['#ff7b8b', '#ffd45c', '#74d7ff', '#65d9a3'][Math.floor(Math.random() * 4)],
+                    animationDelay: `${Math.random() * 3}s`,
+                    animationDuration: `${2 + Math.random() * 2}s`
+                  }}
+                ></div>
+              ))}
+
               <section className="card hero">
                 <div className="bigicon">🎇🏰🎇</div>
                 <div className="badge">De magie is bereikt</div>
@@ -2232,7 +3061,7 @@ export default function App() {
             <div>
               {renderAppHeader("Versie-info", () => setScreen('home'))}
               <section className="card">
-                <div className="badge">Disney Road Quest · Multiplayer V2</div>
+                <div className="badge">Disney Road Quest · Premium Editie</div>
                 <h2 className="sectiontitle" style={{ marginTop: '14px' }}>Nieuw en aangepast</h2>
                 <div className="versionchanges">
                   <div className="versionchange">
@@ -2243,10 +3072,17 @@ export default function App() {
                     </div>
                   </div>
                   <div className="versionchange">
-                    <span>📰</span>
+                    <span>🎟️</span>
                     <div>
-                      <strong>Magisch Nieuws</strong>
-                      <p>Sfeervolle Disneyland Paris en Disney trivia op het tussenstand-scherm om de reis op te leuken.</p>
+                      <strong>Wilde Ritten Powerups (14 kaarten)</strong>
+                      <p>Gebruik fastpasses, steel sterren, of verdedig je met schilden en spiegels in 3D flip-kaarten!</p>
+                    </div>
+                  </div>
+                  <div className="versionchange">
+                    <span>🚗</span>
+                    <div>
+                      <strong>Geanimeerde Etappe Routekaart</strong>
+                      <p>Een live geanimeerd autootje rijdt langs de etappes van je trip naarmate je beurten vordert!</p>
                     </div>
                   </div>
                 </div>
@@ -2279,7 +3115,7 @@ export default function App() {
               </section>
 
               <section className="card">
-                <h2 className="sectiontitle">All opdrachten</h2>
+                <h2 className="sectiontitle">Alle opdrachten</h2>
                 <div className="field">
                   <input 
                     placeholder="Zoek opdracht..." 
@@ -2289,21 +3125,21 @@ export default function App() {
                 </div>
                 <div className="list">
                   {DEFAULT_TASKS
-                    .filter(t => (t.cat + " " + (t.text || t.title || "")).toLowerCase().includes(taskSearch.toLowerCase()))
+                    .filter(t => (t.cat + " " + (t.title || "")).toLowerCase().includes(taskSearch.toLowerCase()))
                     .slice(0, 10)
                     .map(t => (
                       <div key={t.id} className="taskitem">
                         <b>{t.cat}</b>
-                        <p>{t.text || t.title || ""}</p>
+                        <p>{t.title || ""}</p>
                       </div>
                     ))
                   }
                   {customTasks
-                    .filter(t => (t.cat + " " + (t.text || t.title || "")).toLowerCase().includes(taskSearch.toLowerCase()))
+                    .filter(t => (t.cat + " " + (t.title || "")).toLowerCase().includes(taskSearch.toLowerCase()))
                     .map(t => (
                       <div key={t.id} className="taskitem" style={{ borderColor: 'var(--gold)' }}>
                         <b>{t.cat} (Aangepast)</b>
-                        <p>{t.text || t.title || ""}</p>
+                        <p>{t.title || ""}</p>
                       </div>
                     ))
                   }
