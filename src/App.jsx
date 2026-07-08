@@ -1954,11 +1954,11 @@ export default function App() {
               
               <section className="card">
                 <h2 className="sectiontitle">1. Kies de spelonderdelen</h2>
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px', margin: '8px 0 12px 0' }}>
+                <div className="category-grid">
                   {["Disney Dagboek", "Pictionary", "Inschattingsvragen", "Dilemma", "Emoji Quiz", "Wie ben ik?", "Disney Mastermind", "Feit of Fabel", "Quiz", "Samen"].map(cat => {
                     const checked = selectedCats.includes(cat);
                     return (
-                      <label key={cat} style={{ display: 'flex', alignItems: 'center', gap: '8px', background: '#091b33', padding: '10px', borderRadius: '8px', fontSize: '13px', cursor: 'pointer', border: '1px solid var(--line)' }}>
+                      <label key={cat} className={`category-item ${checked ? 'checked' : ''}`}>
                         <input 
                           type="checkbox" 
                           checked={checked} 
