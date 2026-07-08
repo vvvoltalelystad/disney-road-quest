@@ -854,7 +854,7 @@ export default function App() {
                     <p>De ultieme roadtrip game voor onderweg naar Disneyland Parijs! Test je kennis met quizzen, maak moeilijke keuzes en werk samen aan magische opdrachten.</p>
                   </div>
                   <div className="portal-card-footer">
-                    <span className="btn-play">Start Spel ➔</span>
+                    <span className="btn-play">Start Quest ➔</span>
                   </div>
                 </div>
 
