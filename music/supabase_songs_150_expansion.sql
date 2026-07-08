@@ -1,6 +1,9 @@
 -- Disney Music Quest v2.8 Song Expansion (101-150)
 -- Voegt 50 extra iconische Disney-songs toe aan de database om de herspeelbaarheid te vergroten naar 150 nummers.
 
+alter table public.dmq_songs drop constraint if exists dmq_songs_song_number_check;
+alter table public.dmq_songs add constraint dmq_songs_song_number_check check (song_number between 1 and 150);
+
 insert into public.dmq_songs
 (song_number, label, title, film, year, artist, spotify_url, enabled)
 values
