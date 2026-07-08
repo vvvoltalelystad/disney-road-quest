@@ -201,7 +201,7 @@ export default function App() {
   // Mastermind states
   const [mmCode, setMmCode] = useState([]);
   const [mmGuesses, setMmGuesses] = useState([]);
-  const [mmCurrentGuess, setMmCurrentGuess] = useState([0, 0, 0, 0]);
+  const [mmCurrentGuess, setMmCurrentGuess] = useState([0, 0, 0, 0, 0]);
   const [mmSolved, setMmSolved] = useState(false);
   const [mmFailed, setMmFailed] = useState(false);
   const [mmPointsEarned, setMmPointsEarned] = useState(0);
@@ -327,12 +327,12 @@ export default function App() {
     setDiaryMovie('');
 
     setMmGuesses([]);
-    setMmCurrentGuess([0, 0, 0, 0]);
+    setMmCurrentGuess([0, 0, 0, 0, 0]);
     setMmSolved(false);
     setMmFailed(false);
     setMmPointsEarned(0);
     if (getCurrentTask()?.type === 'mastermind') {
-      const code = Array.from({ length: 4 }, () => Math.floor(Math.random() * 6));
+      const code = Array.from({ length: 5 }, () => Math.floor(Math.random() * 8));
       setMmCode(code);
     }
 
@@ -919,10 +919,10 @@ export default function App() {
   const checkGuess = (guess, code) => {
     let black = 0;
     let white = 0;
-    let codeUsed = Array(4).fill(false);
-    let guessUsed = Array(4).fill(false);
+    let codeUsed = Array(5).fill(false);
+    let guessUsed = Array(5).fill(false);
     
-    for (let i = 0; i < 4; i++) {
+    for (let i = 0; i < 5; i++) {
       if (guess[i] === code[i]) {
         black++;
         codeUsed[i] = true;
@@ -930,9 +930,9 @@ export default function App() {
       }
     }
     
-    for (let i = 0; i < 4; i++) {
+    for (let i = 0; i < 5; i++) {
       if (guessUsed[i]) continue;
-      for (let j = 0; j < 4; j++) {
+      for (let j = 0; j < 5; j++) {
         if (codeUsed[j]) continue;
         if (guess[i] === code[j]) {
           white++;
@@ -1861,14 +1861,16 @@ export default function App() {
                                 { label: '🔵 Stitch', color: '#74d7ff' },
                                 { label: '🟢 Buzz', color: '#65d9a3' },
                                 { label: '🟡 Winnie', color: '#ffe680' },
-                                { label: '🟣 Ursula', color: '#bd53ed' }
+                                { label: '🟣 Ursula', color: '#bd53ed' },
+                                { label: '🐚 Ariel', color: '#65d9c7' },
+                                { label: '❄️ Elsa', color: '#ffffff' }
                               ];
 
                               if (isMyTurn) {
                                 return (
                                   <div>
                                     <div className="notice" style={{ background: '#0a1c3c' }}>
-                                      Vul de stippen met kleuren en klik op check. Vind de 4 juiste figuren en hun positie!
+                                      Vul de stippen met kleuren en klik op check. Vind de 5 juiste figuren en hun positie!
                                     </div>
 
                                     {/* Guesses log */}
@@ -1949,7 +1951,7 @@ export default function App() {
                                   <div className="center">
                                     Wachten tot {activePlayer?.name} de Mastermind kleurcode kraakt... ⏳
                                     <div style={{ display: 'flex', gap: '6px', justifyContent: 'center', marginTop: '16px' }}>
-                                      {Array.from({ length: 4 }).map((_, i) => (
+                                      {Array.from({ length: 5 }).map((_, i) => (
                                         <div key={i} style={{ width: '20px', height: '20px', borderRadius: '50%', background: '#10264f', border: '1.5px solid var(--line)' }}></div>
                                       ))}
                                     </div>
