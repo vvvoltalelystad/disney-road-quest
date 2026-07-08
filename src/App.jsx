@@ -1899,7 +1899,7 @@ export default function App() {
               {renderAppHeader("Disney Road Quest", () => setScreen('portal'))}
               <section className="card hero">
                 <div className="badge">Multiplayer Edition · Real-time</div>
-                <div className="bigicon">✨🏰✨</div>
+                <img src={assetPath("header-logo.png")} style={{ maxWidth: '280px', margin: '15px auto 15px', display: 'block', filter: 'drop-shadow(0 8px 20px rgba(0, 0, 0, 0.4))' }} alt="Disney Road Quest Logo" />
                 <h1>Disney<br /><span className="gold">Road Quest</span></h1>
                 <p>Speel samen op je eigen telefoon tijdens de rit naar Disneyland Parijs!</p>
                 

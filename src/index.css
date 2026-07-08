@@ -12,12 +12,12 @@ button,input,select,textarea{font:inherit}
 button{cursor:pointer}
 .app{position:relative;z-index:10;min-height:100dvh;padding:calc(env(safe-area-inset-top) + 14px) 16px calc(env(safe-area-inset-bottom) + 18px);max-width:760px;margin:auto}
 .topbar{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-bottom:14px}
-.brand{display:flex;align-items:center;gap:10px;font-weight:900;letter-spacing:.3px}
+.brand{display:flex;align-items:center;gap:10px;font-family:'Waltograph',sans-serif;font-weight:normal;font-size:22px;letter-spacing:1px}
 .brand .castle{font-size:30px;filter:drop-shadow(0 2px 6px #0008)}
 .iconbtn{border:1px solid var(--line);background:#0d2144cc;color:white;border-radius:14px;min-width:46px;height:46px;font-size:21px}
 .card{background:linear-gradient(180deg,#15315fef,#0d2348ef);border:1px solid #31517e;border-radius:24px;padding:20px;box-shadow:0 20px 55px #0006;margin-bottom:14px;backdrop-filter:blur(12px)}
 .hero{text-align:center;padding:26px 20px}
-.hero h1{font-size:clamp(30px,8vw,50px);line-height:.98;margin:8px 0 12px}
+.hero h1{font-family:'Waltograph',sans-serif;font-weight:normal;font-size:clamp(38px,9vw,56px);line-height:1.05;margin:8px 0 12px;letter-spacing:1px}
 .hero p{color:var(--muted);font-size:17px;line-height:1.45;margin:0 auto 20px;max-width:520px}
 .gold{color:var(--gold)}
 .btn{border:0;border-radius:16px;padding:15px 17px;font-weight:850;min-height:52px}
