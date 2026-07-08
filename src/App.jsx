@@ -842,7 +842,7 @@ export default function App() {
 
               <div className="portal-grid">
                 {/* Game 1: Disney Road Quest */}
-                <button className="portal-card road-quest-card" onClick={() => setScreen('home')}>
+                <div className="portal-card road-quest-card" onClick={() => setScreen('home')} role="button" tabIndex={0}>
                   <div className="portal-card-header">
                     <div className="portal-card-media">
                       <img src={assetPath("portal/car.png")} onLoad={removeBg} className="portal-media-img" alt="Road Quest Car" />
@@ -856,7 +856,7 @@ export default function App() {
                   <div className="portal-card-footer">
                     <span className="btn-play">Start Spel ➔</span>
                   </div>
-                </button>
+                </div>
 
                 {/* Game 2: Disney Music Quiz */}
                 <a 
