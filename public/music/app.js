@@ -207,7 +207,7 @@ function organizerPanel(){
         <button class="btn secondary" onclick="regenerateRoomCode()">Nieuwe kamercode</button>
         <button class="btn danger" onclick="resetRoomToLobby()">Spel herstellen</button>
       </div>
-      <button class="btn ghost full" style="margin-top:9px" onclick="openSongAdminFromLobby()">⚙️ Songbeheer · 100 songs openen</button>
+      <button class="btn ghost full" style="margin-top:9px" onclick="openSongAdminFromLobby()">⚙️ Songbeheer · 150 songs openen</button>
       <hr><h3>Spelers beheren</h3>
       ${state.players.length?state.players.map(p=>`
         <div class="adminsong">
@@ -335,7 +335,7 @@ async function startGame(){
     const songs=shuffle(activeSongs()).slice(0,total);
     if(state.players.length<2)throw new Error('Er zijn minimaal twee spelers nodig.');
     if(!state.players.every(online))throw new Error('Niet alle spelers worden als online gezien. Laat iedereen de wachtruimte openhouden en druk op ↻.');
-    if(songs.length<total)throw new Error(`Er zijn ${songs.length} actieve songs, maar je hebt ${total} rondes gekozen. Activeer meer songs in Songbeheer · 100 songs.`);
+    if(songs.length<total)throw new Error(`Er zijn ${songs.length} actieve songs, maar je hebt ${total} rondes gekozen. Activeer meer songs in Songbeheer · 150 songs.`);
     const lm=state.lobbySettings.leaderMode||'rotating';
     const set={
       streaks:state.lobbySettings.streaks,
@@ -763,7 +763,7 @@ function renderFinal(){
     setTimeout(()=>playWinnerCelebration(s[0],s.slice(1)),150);
   }
 }
-function renderAdmin(){let s=state.songs.find(x=>+x.song_number===+state.adminSelectedSong)||{};app().innerHTML=`${topbar('Songbeheer · 100 songs',"state.view='home';render()")}
+function renderAdmin(){let s=state.songs.find(x=>+x.song_number===+state.adminSelectedSong)||{};app().innerHTML=`${topbar('Songbeheer · 150 songs',"state.view='home';render()")}
 <section class="card"><div class="field"><label>Beheer-PIN</label><input id="adminPin" type="password" value="${esc(state.adminPin)}"></div><div class="field"><label>Song</label><select id="songSelect" onchange="state.adminPin=adminPin.value;state.adminSelectedSong=+this.value;renderAdmin()">${state.songs.map(x=>`<option value="${x.song_number}" ${+x.song_number===+state.adminSelectedSong?'selected':''}>${esc(x.label)} · ${esc(x.title||'leeg')}</option>`).join('')}</select></div></section>
 <section class="card"><div class="field"><label>Titel</label><input id="songTitle" value="${esc(s.title||'')}"></div><div class="field"><label>Film</label><input id="songFilm" value="${esc(s.film||'')}"></div><div class="grid2"><div class="field"><label>Jaar</label><input id="songYear" type="number" value="${esc(s.year||'')}"></div><div class="field"><label>Uitvoerder</label><input id="songArtist" value="${esc(s.artist||'')}"></div></div><div class="field"><label>Spotify-link</label><input id="songSpotify" value="${esc(s.spotify_url||'')}"></div><div class="field"><label>Codeafbeelding-URL</label><input id="songCode" value="${esc(s.code_image_url||'')}"></div><div class="field"><label>Film-aliases</label><input id="filmAliases" value="${esc((s.film_aliases||[]).join(', '))}"></div><div class="field"><label>Titel-aliases</label><input id="titleAliases" value="${esc((s.title_aliases||[]).join(', '))}"></div><div class="field"><label>Uitvoerder-aliases</label><input id="artistAliases" value="${esc((s.artist_aliases||[]).join(', '))}"></div><label class="toggleline">Song actief<input id="songEnabled" type="checkbox" ${s.enabled?'checked':''}></label><button class="btn primary full" onclick="saveSong()">Opslaan</button></section>`}
 function list(v){return String(v||'').split(',').map(x=>x.trim()).filter(Boolean)}
