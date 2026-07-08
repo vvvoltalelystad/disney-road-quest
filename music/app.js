@@ -1,6 +1,6 @@
 // Build trigger: 2026-07-04 23:22
 "use strict";
-const DMQ_VERSION='65';
+const DMQ_VERSION='66';
 const cfg=window.DMQ_CONFIG||{};
 const COLORS=[['blue','Blauw','#00e5ff'],['green','Groen','#2eff7d'],['yellow','Geel','#ffd615'],['pink','Roze','#ff2a85'],['purple','Paars','#bd53ed'],['orange','Oranje','#ff6b00']];
 const AVATARS=[['linguini','Alfredo Linguini','avatars/linguini.webp'],['bruno','Bruno','avatars/bruno.png'],['buzz','Buzz Lightyear','avatars/buzz.png'],['heihei','Heihei','avatars/heihei.png'],['jack','Jack Sparrow','avatars/jack.png'],['kuzco','Kuzco','avatars/kuzco.png'],['medusa','Madame Medusa','avatars/medusa.png'],['maximus','Maximus','avatars/maximus.png'],['miguel','Miguel','avatars/miguel.png'],['mufasa','Mufasa','avatars/mufasa.png'],['mushu','Mushu','avatars/mushu.png'],['olaf','Olaf','avatars/olaf.png'],['pascal','Pascal','avatars/pascal.png'],['percy','Percy','avatars/percy.png'],['peter','Peter Pan','avatars/peter.png'],['redpanda','Red Panda','avatars/redpanda.png'],['remy','Remy','avatars/remy.png'],['stitch','Stitch','avatars/stitch.png']];
@@ -305,13 +305,28 @@ function renderLobby(){
 }
 function getSongPopularity(s){
   const n=Number(s.song_number);
-  const high=[1,2,3,4,5,6,9,10,11,12,15,16,17,20,21,22,25,26,30,31,40,43,47,48,96,97,100];
-  const low=[38,39,45,46,54,55,59,61,62,65,66,69,71,74,77,81,82,84,85,86,87,88,89,90,91,93,94,95,99];
+  const high=[1,2,3,4,5,6,9,10,11,12,15,16,17,20,21,22,25,26,30,31,40,43,47,48,96,97,100,
+               101,102,103,104,107,108,110,113,115,119,122,126,127,130,132,134,135,143,144,147,148,149,150];
+  const low=[38,39,45,46,54,55,59,61,62,65,66,69,71,74,77,81,82,84,85,86,87,88,89,90,91,93,94,95,99,
+              105,106,109,111,112,114,116,117,118,120,121,123,124,125,128,129,131,133,136,137,138,139,140,141,142,145,146];
   if(high.includes(n))return 'high';
   if(low.includes(n))return 'low';
   return 'medium';
 }
-function qtype(mode,s){if(mode!=='mix')return mode;const pop=getSongPopularity(s);if(pop==='low')return 'year';if(pop==='medium')return 'year_film';return 'year_film_artist';}
+function qtype(mode,s){
+  if(mode!=='mix')return mode;
+  const pop=getSongPopularity(s);
+  if(pop==='low'){
+    const opts=['year','title','film'];
+    return opts[Math.floor(Math.random()*opts.length)];
+  }
+  if(pop==='medium'){
+    const opts=['year_film','year_title','film_title'];
+    return opts[Math.floor(Math.random()*opts.length)];
+  }
+  const opts=['year_film_artist','year_title_artist','film_title_artist','full'];
+  return opts[Math.floor(Math.random()*opts.length)];
+}
 async function startGame(){
   state.startError='';
   try{
@@ -435,10 +450,84 @@ function showCode(s){let e=document.getElementById('qrArea');if(!e)return;e.inne
 async function claimSong(){let r=await state.sb.rpc('dmq_claim_song',{p_round_id:state.round.id});if(r.error)toast(r.error.message);else if(!r.data)toast('Iemand anders was sneller.');else schedule()}
 async function releaseSong(){let r=await state.sb.rpc('dmq_release_song',{p_round_id:state.round.id});if(r.error)toast(r.error.message);else schedule()}
 async function confirmPlaying(){let r=await state.sb.rpc('dmq_confirm_playing',{p_round_id:state.round.id});if(r.error)toast(r.error.message);else schedule()}
-function prompt(t){return{full:'Welke film, welke titel en welk filmjaar?',film:'Uit welke film komt dit lied?',title:'Hoe heet dit lied?',year:'In welk jaar verscheen de film?',artist:'Wie zingt of voert dit uit?',year_film:'Welke film en welk filmjaar?',year_film_artist:'Welke film, welk filmjaar en wie zingt of voert dit uit?'}[t]}
-function form(t,a={}){const fVal=state.currentAnswer.film!==undefined?state.currentAnswer.film:(a.film||'');const tVal=state.currentAnswer.title!==undefined?state.currentAnswer.title:(a.title||'');const yVal=state.currentAnswer.year!==undefined?state.currentAnswer.year:(a.year||'');const artVal=state.currentAnswer.artist!==undefined?state.currentAnswer.artist:(a.artist||'');const txVal=state.currentAnswer.text!==undefined?state.currentAnswer.text:(a[t]||'');if(t==='full')return `<div class="field"><label>Film</label><input id="ansFilm" value="${esc(fVal)}" oninput="state.currentAnswer.film=this.value"></div><div class="field"><label>Titel</label><input id="ansTitle" value="${esc(tVal)}" oninput="state.currentAnswer.title=this.value"></div><div class="field"><label>Jaar</label><input id="ansYear" type="number" value="${esc(yVal)}" oninput="state.currentAnswer.year=this.value"></div>`;if(t==='year_film')return `<div class="field"><label>Film</label><input id="ansFilm" value="${esc(fVal)}" oninput="state.currentAnswer.film=this.value"></div><div class="field"><label>Jaar</label><input id="ansYear" type="number" value="${esc(yVal)}" oninput="state.currentAnswer.year=this.value"></div>`;if(t==='year_film_artist')return `<div class="field"><label>Film</label><input id="ansFilm" value="${esc(fVal)}" oninput="state.currentAnswer.film=this.value"></div><div class="field"><label>Jaar</label><input id="ansYear" type="number" value="${esc(yVal)}" oninput="state.currentAnswer.year=this.value"></div><div class="field"><label>Uitvoerder</label><input id="ansArtist" value="${esc(artVal)}" oninput="state.currentAnswer.artist=this.value"></div>`;if(t==='year')return `<div class="field"><label>Jaar</label><input id="ansYear" type="number" value="${esc(yVal)}" oninput="state.currentAnswer.year=this.value"></div>`;return `<div class="field"><label>Antwoord</label><input id="ansText" value="${esc(txVal)}" oninput="state.currentAnswer.text=this.value"></div>`}
-function collect(t){let base={};if(t==='full')base={film:ansFilm.value.trim(),title:ansTitle.value.trim(),year:+ansYear.value||null};else if(t==='year_film')base={film:ansFilm.value.trim(),year:+ansYear.value||null};else if(t==='year_film_artist')base={film:ansFilm.value.trim(),year:+ansYear.value||null,artist:ansArtist.value.trim()};else if(t==='year')base={year:+ansYear.value||null};else base={[t]:ansText.value.trim()};if(state.currentAnswer.final_bet!==undefined)base.final_bet=state.currentAnswer.final_bet;return base}
-function filled(t,a){if(t==='full')return !!(a.film&&a.title&&a.year);if(t==='year_film')return !!(a.film&&a.year);if(t==='year_film_artist')return !!(a.film&&a.year&&a.artist);if(t==='year')return !!a.year;return !!a[t]}
+function prompt(t){
+  return {
+    full:'Welke film, welke titel en welk filmjaar?',
+    film:'Uit welke film komt dit lied?',
+    title:'Hoe heet dit lied?',
+    year:'In welk jaar verscheen de film?',
+    artist:'Wie zingt of voert dit uit?',
+    year_film:'Welke film en welk filmjaar?',
+    year_title:'Welke titel en welk filmjaar?',
+    film_title:'Welke film en welke titel?',
+    year_film_artist:'Welke film, welk filmjaar en wie zingt of voert dit uit?',
+    year_title_artist:'Welke titel, welk filmjaar en wie zingt of voert dit uit?',
+    film_title_artist:'Welke film, welke titel en wie zingt of voert dit uit?'
+  }[t] || 'Beantwoord de vragen:';
+}
+function form(t,a={}){
+  const fVal=state.currentAnswer.film!==undefined?state.currentAnswer.film:(a.film||'');
+  const tVal=state.currentAnswer.title!==undefined?state.currentAnswer.title:(a.title||'');
+  const yVal=state.currentAnswer.year!==undefined?state.currentAnswer.year:(a.year||'');
+  const artVal=state.currentAnswer.artist!==undefined?state.currentAnswer.artist:(a.artist||'');
+  const txVal=state.currentAnswer.text!==undefined?state.currentAnswer.text:(a[t]||'');
+  
+  let html = '';
+  const reqFilm = t === 'full' || t.includes('film') || t === 'film';
+  const reqTitle = t === 'full' || t.includes('title') || t === 'title';
+  const reqYear = t === 'full' || t.includes('year') || t === 'year';
+  const reqArtist = t.includes('artist') || t === 'artist';
+  const isSingle = !t.includes('_') && t !== 'full';
+  
+  if (isSingle) {
+    if (t === 'film') return `<div class="field"><label>Film</label><input id="ansFilm" value="${esc(fVal)}" oninput="state.currentAnswer.film=this.value"></div>`;
+    if (t === 'title') return `<div class="field"><label>Titel</label><input id="ansTitle" value="${esc(tVal)}" oninput="state.currentAnswer.title=this.value"></div>`;
+    if (t === 'year') return `<div class="field"><label>Jaar</label><input id="ansYear" type="number" value="${esc(yVal)}" oninput="state.currentAnswer.year=this.value"></div>`;
+    if (t === 'artist') return `<div class="field"><label>Uitvoerder</label><input id="ansArtist" value="${esc(artVal)}" oninput="state.currentAnswer.artist=this.value"></div>`;
+    return `<div class="field"><label>Antwoord</label><input id="ansText" value="${esc(txVal)}" oninput="state.currentAnswer.text=this.value"></div>`;
+  }
+  
+  if (reqFilm) html += `<div class="field"><label>Film</label><input id="ansFilm" value="${esc(fVal)}" oninput="state.currentAnswer.film=this.value"></div>`;
+  if (reqTitle) html += `<div class="field"><label>Titel</label><input id="ansTitle" value="${esc(tVal)}" oninput="state.currentAnswer.title=this.value"></div>`;
+  if (reqYear) html += `<div class="field"><label>Jaar</label><input id="ansYear" type="number" value="${esc(yVal)}" oninput="state.currentAnswer.year=this.value"></div>`;
+  if (reqArtist) html += `<div class="field"><label>Uitvoerder</label><input id="ansArtist" value="${esc(artVal)}" oninput="state.currentAnswer.artist=this.value"></div>`;
+  return html;
+}
+function collect(t){
+  const reqFilm = t === 'full' || t.includes('film') || t === 'film';
+  const reqTitle = t === 'full' || t.includes('title') || t === 'title';
+  const reqYear = t === 'full' || t.includes('year') || t === 'year';
+  const reqArtist = t.includes('artist') || t === 'artist';
+  
+  let res = {};
+  if (reqFilm) res.film = ansFilm.value.trim();
+  if (reqTitle) res.title = ansTitle.value.trim();
+  if (reqYear) res.year = +ansYear.value || null;
+  if (reqArtist) res.artist = ansArtist.value.trim();
+  
+  if (!reqFilm && !reqTitle && !reqYear && !reqArtist) {
+    res[t] = ansText.value.trim();
+  }
+  if (state.currentAnswer.final_bet !== undefined) {
+    res.final_bet = state.currentAnswer.final_bet;
+  }
+  return res;
+}
+function filled(t,a){
+  const reqFilm = t === 'full' || t.includes('film') || t === 'film';
+  const reqTitle = t === 'full' || t.includes('title') || t === 'title';
+  const reqYear = t === 'full' || t.includes('year') || t === 'year';
+  const reqArtist = t.includes('artist') || t === 'artist';
+  
+  if (reqFilm && !a.film) return false;
+  if (reqTitle && !a.title) return false;
+  if (reqYear && !a.year) return false;
+  if (reqArtist && !a.artist) return false;
+  if (!reqFilm && !reqTitle && !reqYear && !reqArtist) {
+    return !!a[t];
+  }
+  return true;
+}
 function renderAnswer(){
   if(!state.answerPhaseStartedAt)state.answerPhaseStartedAt=Date.now();
   let mine=own(),done=new Set(state.answers.map(a=>a.user_id)),all=state.answers.length===state.players.length;
@@ -460,17 +549,17 @@ function renderAnswer(){
     state.timerPhase = 'answer';
     startTimer(20, async () => {
       let a = collect(state.round.question_type);
-      if (state.round.question_type === 'full') {
-        a = { film: a.film || '-', title: a.title || '-', year: a.year || null };
-      } else if (state.round.question_type === 'year') {
-        a = { year: a.year || null };
-      } else if (state.round.question_type === 'year_film') {
-        a = { film: a.film || '-', year: a.year || null };
-      } else if (state.round.question_type === 'year_film_artist') {
-        a = { film: a.film || '-', year: a.year || null, artist: a.artist || '-' };
-      } else {
-        a = { [state.round.question_type]: a[state.round.question_type] || '-' };
-      }
+      const reqFilm = state.round.question_type === 'full' || state.round.question_type.includes('film') || state.round.question_type === 'film';
+      const reqTitle = state.round.question_type === 'full' || state.round.question_type.includes('title') || state.round.question_type === 'title';
+      const reqYear = state.round.question_type === 'full' || state.round.question_type.includes('year') || state.round.question_type === 'year';
+      const reqArtist = state.round.question_type.includes('artist') || state.round.question_type === 'artist';
+      
+      if (reqFilm && !a.film) a.film = '-';
+      if (reqTitle && !a.title) a.title = '-';
+      if (reqYear && !a.year) a.year = null;
+      if (reqArtist && !a.artist) a.artist = '-';
+      if (!reqFilm && !reqTitle && !reqYear && !reqArtist && !a[state.round.question_type]) a[state.round.question_type] = '-';
+      
       if (state.currentAnswer.final_bet !== undefined) {
         a.final_bet = state.currentAnswer.final_bet;
       }
@@ -506,33 +595,49 @@ function isMyPower(playerId){
 function points(a,s,t,activePower,playerId){
   let film=[s.film,...(s.film_aliases||[])],title=[s.title,...(s.title_aliases||[])],artist=[s.artist,...(s.artist_aliases||[])],q=0;
   const p=isMyPower(playerId)?activePower:null;
-  if(t==='full')q=(match(a.film,film)?1:0)+(match(a.title,title)?1:0)+(+a.year===+s.year?1:0);
-  if(t==='film')q=match(a.film,film)?2:0;
-  if(t==='title')q=match(a.title,title)?2:0;
-  if(t==='artist')q=match(a.artist,artist)?2:0;
-  if(t==='year'){
-    let d=Math.abs(+a.year-+s.year);
-    q=p==='wild_ride'?(d===0?3:d<=2?2:d<=4?1:0):(d===0?3:d===1?2:d===2?1:0)
+  
+  const reqFilm = t === 'full' || t.includes('film') || t === 'film';
+  const reqTitle = t === 'full' || t.includes('title') || t === 'title';
+  const reqYear = t === 'full' || t.includes('year') || t === 'year';
+  const reqArtist = t.includes('artist') || t === 'artist';
+  
+  if (reqFilm && match(a.film, film)) q++;
+  if (reqTitle && match(a.title, title)) q++;
+  if (reqArtist && match(a.artist, artist)) q++;
+  
+  if (reqYear && a.year) {
+    let diff = Math.abs(+a.year - +s.year);
+    let allowed = p === 'wild_ride' ? 4 : 0;
+    
+    if (t === 'year') {
+      if (diff === 0) q += 3;
+      else if (diff === 1) q += 2;
+      else if (diff === 2) q += 1;
+      else if (p === 'wild_ride' && diff <= allowed) q += 1;
+    } else if (t === 'year_film' || t === 'year_title') {
+      if (diff === 0) q += 2;
+      else if (diff === 1) q += 1;
+      else if (p === 'wild_ride' && diff <= allowed) q += 1;
+    } else {
+      if (diff === 0) q += 1;
+      else if (p === 'wild_ride' && diff <= allowed) q += 1;
+    }
   }
-  if(t==='year_film'){
-    const filmCorrect=match(a.film,film);
-    const d=Math.abs(+a.year-+s.year);
-    const yearPts=p==='wild_ride'?(d===0?2:d<=2?2:d<=4?1:0):(d===0?2:d===1?1:0);
-    q=(filmCorrect?1:0)+yearPts;
+  
+  if(p==='hidden_treasure'){
+    let correctParts = 0;
+    if (reqFilm && match(a.film, film)) correctParts++;
+    if (reqTitle && match(a.title, title)) correctParts++;
+    if (reqArtist && match(a.artist, artist)) correctParts++;
+    if (reqYear && +a.year === +s.year) correctParts++;
+    if (correctParts >= 1) q++;
   }
-  if(t==='year_film_artist'){
-    const filmCorrect=match(a.film,film);
-    const artistCorrect=match(a.artist,artist);
-    const d=Math.abs(+a.year-+s.year);
-    const yearCorrect=p==='wild_ride'?(d<=2):(d===0);
-    q=(filmCorrect?1:0)+(artistCorrect?1:0)+(yearCorrect?1:0);
-  }
-  if(p==='hidden_treasure'&&q>0)q++;
-  if(p==='hyperdrive')q*=2;
-  if(p==='lightspeed'&&a.speed_bonus&&q>0)q++;
+  if(p==='hyperdrive') q *= 2;
+  if(p==='lightspeed'&&a.speed_bonus&&q>0) q++;
   if(p==='temple_run'){
-    if(q>0)q*=3;
-    else q=-1;
+    const maxBase = maxPoints(t, null, playerId);
+    if(q===maxBase) q *= 3;
+    else q = -1;
   }
   if(p==='turbo_boost'&&q>0){
     const sortedAns=[...state.answers].sort((x,y)=>new Date(x.created_at)-new Date(y.created_at));
@@ -546,22 +651,104 @@ function points(a,s,t,activePower,playerId){
         if(otherScore>maxOther)maxOther=otherScore;
       }
     });
-    if(q<maxOther)q=maxOther;
+    if(q<maxOther) q=maxOther;
   }
   return q;
 }
 async function afterAnswers(){if(power()==='ghost_whisper'){let r=await state.sb.rpc('dmq_begin_power_phase',{p_round_id:state.round.id,p_phase:'power_phantom'});if(r.error)toast(r.error.message);return}if(power()==='second_drop'){await prepareTower();return}await reveal()}
-async function reveal(){let s=currentSong();let basePoints=[];for(const a of state.answers){let q=points(a.revised_answer||a.answer||{},s,state.round.question_type,power(),a.player_id);basePoints.push({ans:a,pts:q,streakBonusApplied:false,jackpotBonus:0,finalBetBonus:0,finalBetPenalty:0})}if(power()==='small_world'){const activatorPlayerId=state.round.power_used_by_player_id;const activatorEntry=basePoints.find(bp=>bp.ans.player_id===activatorPlayerId);if(activatorEntry&&activatorEntry.pts>0){let bonus=0;basePoints.forEach(bp=>{if(bp.ans.player_id!==activatorPlayerId&&bp.pts<activatorEntry.pts){bonus++}});activatorEntry.pts+=Math.min(bonus,2)}}if(state.room.settings?.streaks){try{const{data:pastAns}=await state.sb.from('dmq_answers').select('player_id,final_points,round_id').eq('room_id',state.room.id);const{data:pastRounds}=await state.sb.from('dmq_rounds').select('id,round_no').eq('room_id',state.room.id).order('round_no',{ascending:true});if(pastAns&&pastRounds){const roundOrder=pastRounds.map(r=>r.id);const currentRoundIdx=roundOrder.indexOf(state.round.id);if(currentRoundIdx>=2){const prevRound1Id=roundOrder[currentRoundIdx-1];const prevRound2Id=roundOrder[currentRoundIdx-2];basePoints.forEach(bp=>{const ans1=pastAns.find(a=>a.player_id===bp.ans.player_id&&a.round_id===prevRound1Id);const ans2=pastAns.find(a=>a.player_id===bp.ans.player_id&&a.round_id===prevRound2Id);if(bp.pts>0&&ans1&&ans1.final_points>0&&ans2&&ans2.final_points>0){bp.pts+=1;bp.streakBonusApplied=true}})}}}catch(err){console.error("Streak calculation failed:",err)}}const jackpotVal=getJackpotValue();if(state.room.settings?.jackpot&&jackpotVal>0){const maxBase=(state.round.question_type==='full'||state.round.question_type==='year'||state.round.question_type==='year_film'||state.round.question_type==='year_film_artist')?3:2;const winners=basePoints.filter(bp=>bp.pts>=maxBase);if(winners.length>0){const split=Math.floor(jackpotVal/winners.length);winners.forEach(bp=>{bp.pts+=split;bp.jackpotBonus=split})}}const isFinalRound=state.room.current_round_no===state.room.total_rounds;if(state.room.settings?.final_bet&&isFinalRound){basePoints.forEach(bp=>{const bet=bp.ans.answer?.final_bet;if(bet!==undefined&&bet>0){if(bp.pts>0){bp.pts+=bet;bp.finalBetBonus=bet}else{bp.pts=Math.max(0,bp.pts-bet);bp.finalBetPenalty=bet}}})}for(const bp of basePoints){let notes=[];if(bp.streakBonusApplied)notes.push('Muzikale Streak! 🔥 (+1 bonus)');if(bp.jackpotBonus>0)notes.push(`Soundtrack Jackpot! 💰 (+${bp.jackpotBonus})`);if(bp.finalBetBonus>0)notes.push(`Finale inzet gewonnen! 🏆 (+${bp.finalBetBonus})`);if(bp.finalBetPenalty>0)notes.push(`Finale inzet verloren... 💔 (-${bp.finalBetPenalty})`);let note=notes.join(' · ');let r=await state.sb.from('dmq_answers').update({proposed_points:bp.pts,final_points:bp.pts,note:note}).eq('id',bp.ans.id);if(r.error){fatal('Beoordelen mislukt.',r.error);return}}let r=await state.sb.rpc('dmq_set_phase',{p_round_id:state.round.id,p_phase:'review'});if(r.error)toast(r.error.message);else schedule()}
+async function reveal(){let s=currentSong();let basePoints=[];for(const a of state.answers){let q=points(a.revised_answer||a.answer||{},s,state.round.question_type,power(),a.player_id);basePoints.push({ans:a,pts:q,streakBonusApplied:false,jackpotBonus:0,finalBetBonus:0,finalBetPenalty:0})}if(power()==='small_world'){const activatorPlayerId=state.round.power_used_by_player_id;const activatorEntry=basePoints.find(bp=>bp.ans.player_id===activatorPlayerId);if(activatorEntry&&activatorEntry.pts>0){let bonus=0;basePoints.forEach(bp=>{if(bp.ans.player_id!==activatorPlayerId&&bp.pts<activatorEntry.pts){bonus++}});activatorEntry.pts+=Math.min(bonus,2)}}if(state.room.settings?.streaks){try{const{data:pastAns}=await state.sb.from('dmq_answers').select('player_id,final_points,round_id').eq('room_id',state.room.id);const{data:pastRounds}=await state.sb.from('dmq_rounds').select('id,round_no').eq('room_id',state.room.id).order('round_no',{ascending:true});if(pastAns&&pastRounds){const roundOrder=pastRounds.map(r=>r.id);const currentRoundIdx=roundOrder.indexOf(state.round.id);if(currentRoundIdx>=2){const prevRound1Id=roundOrder[currentRoundIdx-1];const prevRound2Id=roundOrder[currentRoundIdx-2];basePoints.forEach(bp=>{const ans1=pastAns.find(a=>a.player_id===bp.ans.player_id&&a.round_id===prevRound1Id);const ans2=pastAns.find(a=>a.player_id===bp.ans.player_id&&a.round_id===prevRound2Id);if(bp.pts>0&&ans1&&ans1.final_points>0&&ans2&&ans2.final_points>0){bp.pts+=1;bp.streakBonusApplied=true}})}}}catch(err){console.error("Streak calculation failed:",err)}}const jackpotVal=getJackpotValue();if(state.room.settings?.jackpot&&jackpotVal>0){const maxBase=maxPoints(state.round.question_type,null,null);const winners=basePoints.filter(bp=>bp.pts>=maxBase);if(winners.length>0){const split=Math.floor(jackpotVal/winners.length);winners.forEach(bp=>{bp.pts+=split;bp.jackpotBonus=split})}}const isFinalRound=state.room.current_round_no===state.room.total_rounds;if(state.room.settings?.final_bet&&isFinalRound){basePoints.forEach(bp=>{const bet=bp.ans.answer?.final_bet;if(bet!==undefined&&bet>0){if(bp.pts>0){bp.pts+=bet;bp.finalBetBonus=bet}else{bp.pts=Math.max(0,bp.pts-bet);bp.finalBetPenalty=bet}}})}for(const bp of basePoints){let notes=[];if(bp.streakBonusApplied)notes.push('Muzikale Streak! 🔥 (+1 bonus)');if(bp.jackpotBonus>0)notes.push(`Soundtrack Jackpot! 💰 (+${bp.jackpotBonus})`);if(bp.finalBetBonus>0)notes.push(`Finale inzet gewonnen! 🏆 (+${bp.finalBetBonus})`);if(bp.finalBetPenalty>0)notes.push(`Finale inzet verloren... 💔 (-${bp.finalBetPenalty})`);let note=notes.join(' · ');let r=await state.sb.from('dmq_answers').update({proposed_points:bp.pts,final_points:bp.pts,note:note}).eq('id',bp.ans.id);if(r.error){fatal('Beoordelen mislukt.',r.error);return}}let r=await state.sb.rpc('dmq_set_phase',{p_round_id:state.round.id,p_phase:'review'});if(r.error)toast(r.error.message);else schedule()}
 function startTimer(seconds,done){clearInterval(state.timer);state.timerSeconds=seconds;state.timerFinished=false;state.timer=setInterval(async()=>{state.timerSeconds--;let e=document.getElementById('countNum');if(e)e.textContent=state.timerSeconds;if(state.timerSeconds<=0){clearInterval(state.timer);state.timer=null;state.timerFinished=true;await done()}},1000)}
 function renderPhantom(){let mine=own(),counts={};state.answers.forEach(a=>{let y=+a.answer?.year;if(y)counts[y]=(counts[y]||0)+1});let ys=Object.keys(counts).map(Number).sort((a,b)=>a-b),selected=+(mine?.revised_answer?.year||mine?.answer?.year),same=ys.length===1;const duration=same?3:10;const secondsLeft=(state.timerRoundId===state.round.id&&state.timerPhase===state.round.phase&&state.timerFinished)?0:(state.timerRoundId===state.round.id&&state.timerPhase===state.round.phase&&state.timer)?state.timerSeconds:duration;app().innerHTML=`${topbar('Phantom Manor')}${scorebar()}${progress()}<section class="card phantom"><div class="powerbanner">👻 Geestenfluistering geldt voor iedereen</div>${rules('year','ghost_whisper')}<h2>De geesten fluisteren…</h2><p>Alle jaartallen zijn anoniem samengevoegd. ${host()?'Wacht tot de spelers kiezen.':'Jouw antwoord staat geselecteerd.'}</p><div class="yearchoices">${ys.map(y=>`<button class="yearbtn ${selected===y?'selected':''}" ${host()?'disabled':''} onclick="chooseYear(${y})">${y}${counts[y]>1?` × ${counts[y]}`:''}</button>`).join('')}</div><div class="countdown phantom"><div class="small">De klokken tikken…</div><div id="countNum" class="number">${secondsLeft}</div><div>🕯️ 👻 🕯️</div></div></section>`;if((state.timerRoundId!==state.round.id||state.timerPhase!==state.round.phase)&&!state.timerFinished){state.timerRoundId=state.round.id;state.timerPhase=state.round.phase;startTimer(duration,finishPhantom)}}
 async function chooseYear(y){let r=await state.sb.from('dmq_answers').update({revised_answer:{year:y}}).eq('id',own().id);if(r.error)toast(r.error.message);else schedule()}
 async function finishPhantom(){if(!leader()&&!host())return;let r=await state.sb.rpc('dmq_finalize_phantom',{p_round_id:state.round.id});if(r.error)toast(r.error.message);else{await refreshAll();await reveal()}}
-async function prepareTower(){let s=currentSong(),t=state.round.question_type;for(const a of state.answers){let x=a.answer||{},c={film:(t==='full'||t==='year_film'||t==='year_film_artist')?match(x.film,[s.film,...(s.film_aliases||[])]):null,title:t==='full'?match(x.title,[s.title,...(s.title_aliases||[])]):null,year:(t==='full'||t==='year'||t==='year_film'||t==='year_film_artist')?+x.year===+s.year:null,artist:(t==='artist'||t==='year_film_artist')?match(x.artist,[s.artist,...(s.artist_aliases||[])]):null};await state.sb.from('dmq_answers').update({correctness:c,revised_answer:x}).eq('id',a.id)}let r=await state.sb.rpc('dmq_begin_power_phase',{p_round_id:state.round.id,p_phase:'power_tower'});if(r.error)toast(r.error.message)}
-function renderTower(){let mine=own(),a=mine?.revised_answer||mine?.answer||{},c=mine?.correctness||{},t=state.round.question_type;const secondsLeft=(state.timerRoundId===state.round.id&&state.timerPhase===state.round.phase&&state.timerFinished)?0:(state.timerRoundId===state.round.id&&state.timerPhase===state.round.phase&&state.timer)?state.timerSeconds:30;const f=(k,l,tp='text')=>{const val=state.currentAnswer[k]!==undefined?state.currentAnswer[k]:(a[k]||'');return `<div class="field answerfield ${c[k]===true?'correct':c[k]===false?'wrong':''}"><label>${l} ${c[k]===true?'✓':c[k]===false?'✗':''}</label><input id="tower_${k}" type="${tp}" value="${esc(val)}" ${c[k]===true||host()||mine?.tower_completed?'disabled':''} oninput="state.currentAnswer['${k}']=this.value; this.closest('.answerfield').classList.remove('wrong');"></div>`};let fields=t==='full'?f('film','Film')+f('title','Titel')+f('year','Jaar','number'):t==='year_film'?f('film','Film')+f('year','Jaar','number'):t==='year_film_artist'?f('film','Film')+f('year','Jaar','number')+f('artist','Uitvoerder'):t==='year'?f('year','Jaar','number'):f(t,t==='film'?'Film':t==='title'?'Titel':'Uitvoerder');app().innerHTML=`${topbar('Tower of Terror')}${scorebar()}${progress()}<section class="card tower"><div class="powerbanner">🏨 Tweede val geldt voor iedereen</div>${rules(t,'second_drop')}<h2>De liftdeuren sluiten…</h2><p>${host()?'Jij bent de organisator. Wacht tot de spelers hun antwoorden herzien.':mine?.tower_completed?'Je antwoord staat vast. Wacht tot de timer afloopt.':'Groen is juist en staat vast. Pas rode velden aan en klik op Klaar.'}</p>${fields}${host()?'':mine?.tower_completed?'<div class="notice green">Je bent klaar.</div>':`<button class="btn primary full" onclick="completeTower()">✓ Ik ben klaar</button>`}<div class="countdown tower"><div class="small">Verdieping</div><div id="countNum" class="number">${secondsLeft}</div><div>⬇️ 🛗 ⬇️</div></div></section><section class="card"><h2>Wie is klaar?</h2>${playerList(pl=>{let x=state.answers.find(ans=>ans.player_id===pl.id);if(!x)return['Nadenken...','wait'];const correctness=x.correctness||{};const keys=t==='full'?['film','title','year']:t==='year_film'?['film','year']:t==='year_film_artist'?['film','year','artist']:[t];const allCorrect=keys.every(k=>correctness[k]===true);if(allCorrect)return['Volledig juist! ✓','ok'];return x.tower_completed?['Klaar ✓','ok']:['Aanpassen... ⏳','wait']})}</section>`;if((state.timerRoundId!==state.round.id||state.timerPhase!==state.round.phase)&&!state.timerFinished){state.timerRoundId=state.round.id;state.timerPhase=state.round.phase;startTimer(30,finishTower)}}
-async function completeTower(){let mine=own(),c=mine?.correctness||{},t=state.round.question_type,a={...(mine?.revised_answer||mine?.answer||{})},keys=t==='full'?['film','title','year']:t==='year_film'?['film','year']:t==='year_film_artist'?['film','year','artist']:[t];keys.forEach(k=>{if(c[k]!==true){let e=document.getElementById('tower_'+k);if(e)a[k]=k==='year'?+e.value||null:e.value.trim()}});let r=await state.sb.from('dmq_answers').update({revised_answer:a,tower_completed:true}).eq('id',mine.id);if(r.error)toast(r.error.message);else schedule()}
+async function prepareTower(){
+  let s=currentSong(),t=state.round.question_type;
+  for(const a of state.answers){
+    let x=a.answer||{};
+    let c={
+      film: (t==='full'||t.includes('film')||t==='film')?match(x.film,[s.film,...(s.film_aliases||[])]):null,
+      title: (t==='full'||t.includes('title')||t==='title')?match(x.title,[s.title,...(s.title_aliases||[])]):null,
+      year: (t==='full'||t.includes('year')||t==='year')?+x.year===+s.year:null,
+      artist: (t.includes('artist')||t==='artist')?match(x.artist,[s.artist,...(s.artist_aliases||[])]):null
+    };
+    await state.sb.from('dmq_answers').update({correctness:c,revised_answer:x}).eq('id',a.id);
+  }
+  let r=await state.sb.rpc('dmq_begin_power_phase',{p_round_id:state.round.id,p_phase:'power_tower'});
+  if(r.error)toast(r.error.message);
+}
+function renderTower(){
+  let mine=own(),a=mine?.revised_answer||mine?.answer||{},c=mine?.correctness||{},t=state.round.question_type;
+  const secondsLeft=(state.timerRoundId===state.round.id&&state.timerPhase===state.round.phase&&state.timerFinished)?0:(state.timerRoundId===state.round.id&&state.timerPhase===state.round.phase&&state.timer)?state.timerSeconds:30;
+  const f=(k,l,tp='text')=>{
+    const val=state.currentAnswer[k]!==undefined?state.currentAnswer[k]:(a[k]||'');
+    return `<div class="field answerfield ${c[k]===true?'correct':c[k]===false?'wrong':''}"><label>${l} ${c[k]===true?'✓':c[k]===false?'✗':''}</label><input id="tower_${k}" type="${tp}" value="${esc(val)}" ${c[k]===true||host()||mine?.tower_completed?'disabled':''} oninput="state.currentAnswer['${k}']=this.value; this.closest('.answerfield').classList.remove('wrong');"></div>`
+  };
+  
+  const keys=[];
+  if(t==='full'||t.includes('film')||t==='film')keys.push('film');
+  if(t==='full'||t.includes('title')||t==='title')keys.push('title');
+  if(t==='full'||t.includes('year')||t==='year')keys.push('year');
+  if(t.includes('artist')||t==='artist')keys.push('artist');
+  if(keys.length===0)keys.push(t);
+  
+  let fields='';
+  keys.forEach(k=>{
+    fields+=f(k,k==='film'?'Film':k==='title'?'Titel':k==='year'?'Jaar':k==='artist'?'Uitvoerder':'Antwoord',k==='year'?'number':'text');
+  });
+  
+  app().innerHTML=`${topbar('Tower of Terror')}${scorebar()}${progress()}<section class="card tower"><div class="powerbanner">🏨 Tweede val geldt voor iedereen</div>${rules(t,'second_drop')}<h2>De liftdeuren sluiten…</h2><p>${host()?'Jij bent de organisator. Wacht tot de spelers hun antwoorden herzien.':mine?.tower_completed?'Je antwoord staat vast. Wacht tot de timer afloopt.':'Groen is juist en staat vast. Pas rode velden aan en klik op Klaar.'}</p>${fields}${host()?'':mine?.tower_completed?'<div class="notice green">Je bent klaar.</div>':`<button class="btn primary full" onclick="completeTower()">✓ Ik ben klaar</button>`}<div class="countdown tower"><div class="small">Verdieping</div><div id="countNum" class="number">${secondsLeft}</div><div>⬇️ 🛗 ⬇️</div></div></section><section class="card"><h2>Wie is klaar?</h2>${playerList(pl=>{let x=state.answers.find(ans=>ans.player_id===pl.id);if(!x)return['Nadenken...','wait'];const correctness=x.correctness||{};const allCorrect=keys.every(k=>correctness[k]===true);if(allCorrect)return['Volledig juist! ✓','ok'];return x.tower_completed?['Klaar ✓','ok']:['Aanpassen... ⏳','wait']})}</section>`;
+  if((state.timerRoundId!==state.round.id||state.timerPhase!==state.round.phase)&&!state.timerFinished){state.timerRoundId=state.round.id;state.timerPhase=state.round.phase;startTimer(30,finishTower)}
+}
+async function completeTower(){
+  let mine=own(),c=mine?.correctness||{},t=state.round.question_type,a={...(mine?.revised_answer||mine?.answer||{})};
+  const keys=[];
+  if(t==='full'||t.includes('film')||t==='film')keys.push('film');
+  if(t==='full'||t.includes('title')||t==='title')keys.push('title');
+  if(t==='full'||t.includes('year')||t==='year')keys.push('year');
+  if(t.includes('artist')||t==='artist')keys.push('artist');
+  if(keys.length===0)keys.push(t);
+  
+  keys.forEach(k=>{
+    if(c[k]!==true){
+      let e=document.getElementById('tower_'+k);
+      if(e)a[k]=k==='year'?+e.value||null:e.value.trim();
+    }
+  });
+  let r=await state.sb.from('dmq_answers').update({revised_answer:a,tower_completed:true}).eq('id',mine.id);
+  if(r.error)toast(r.error.message);
+  else schedule();
+}
 async function finishTower(){if(!leader()&&!host())return;let r=await state.sb.rpc('dmq_finalize_tower',{p_round_id:state.round.id});if(r.error)toast(r.error.message);else{await refreshAll();await reveal()}}
-function answerText(a,t){if(t==='full')return `${a.film||'—'} · ${a.title||'—'} · ${a.year||'—'}`;if(t==='year_film')return `${a.film||'—'} · ${a.year||'—'}`;if(t==='year_film_artist')return `${a.film||'—'} · ${a.year||'—'} · ${a.artist||'—'}`;return String(a[t]||'—')}
-function maxPoints(t,p,playerId){let m=(t==='full'||t==='year'||t==='year_film'||t==='year_film_artist')?3:2;const activeP=isMyPower(playerId)?p:null;if(activeP==='hidden_treasure'||activeP==='lightspeed')m++;if(activeP==='small_world')m+=2;if(activeP==='hyperdrive')m*=2;if(activeP==='temple_run')m*=3;if(activeP==='spider_bot')m=(t==='full'||t==='year'||t==='year_film'||t==='year_film_artist')?6:4;return m;}
+function answerText(a,t){
+  const parts=[];
+  if((t==='full'||t.includes('film')||t==='film')&&a.film)parts.push(`Film: ${a.film}`);
+  if((t==='full'||t.includes('title')||t==='title')&&a.title)parts.push(`Titel: ${a.title}`);
+  if((t==='full'||t.includes('year')||t==='year')&&a.year)parts.push(`Jaar: ${a.year}`);
+  if((t.includes('artist')||t==='artist')&&a.artist)parts.push(`Uitvoerder: ${a.artist}`);
+  if(parts.length===0&&!t.includes('_')&&t!=='full')return String(a[t]||'—');
+  return parts.length>0?parts.join(' · '):'—';
+}
+function maxPoints(t,p,playerId){
+  let m=2;
+  if(t==='full'||t==='year'||t==='year_film'||t==='year_film_artist'||t==='year_title'||t==='year_title_artist'||t==='film_title_artist'){
+    m=3;
+  }else{
+    m=2;
+  }
+  const activeP=isMyPower(playerId)?p:null;
+  if(activeP==='hidden_treasure'||activeP==='lightspeed')m++;
+  if(activeP==='small_world')m+=2;
+  if(activeP==='hyperdrive')m*=2;
+  if(activeP==='temple_run')m*=3;
+  if(activeP==='spider_bot'){
+    if(t==='full'||t==='year'||t==='year_film'||t==='year_film_artist'||t==='year_title'||t==='year_title_artist'||t==='film_title_artist'){
+      m=6;
+    }else{
+      m=4;
+    }
+  }
+  return m;
+}
 function renderReview(){let s=currentSong(),mine=own();if(!s||(!mine&&!host())){loading('Laden…');return}let a=mine?.revised_answer||mine?.answer||{},p=power();if(mine){if(state.reviewFinalPoints===null)state.reviewFinalPoints=mine.final_points;if(state.reviewCorrectionNote===null)state.reviewCorrectionNote=mine.note||''}const fpVal=(mine&&state.reviewFinalPoints!==null)?state.reviewFinalPoints:(mine?.final_points||0);const noteVal=(mine&&state.reviewCorrectionNote!==null)?state.reviewCorrectionNote:(mine?.note||'');const minP=p==='temple_run'&&isMyPower(state.me?.id)?-1:0;app().innerHTML=`${topbar('Punten controleren')}${scorebar()}${progress()}<section class="card question" style="--accent:${myAccentColor()}"><div class="correctbox"><strong>Het juiste antwoord</strong><p style="margin:7px 0 0">${esc(s.title)} · ${esc(s.film)} · ${esc(s.year)}${s.artist?` · ${esc(s.artist)}`:''}</p></div>${rules(state.round.question_type,p)}${host()?'':`<div class="answerline"><small>Jouw definitieve antwoord</small><strong>${esc(answerText(a,state.round.question_type))}</strong></div>`}${host()?'<div class="notice blue">Jij bent de organisator. Wacht tot de spelers hun punten bevestigen.</div>':!mine.points_confirmed?`<div class="field"><label>Mijn definitieve punten</label><select id="finalPoints" onchange="state.reviewFinalPoints=+this.value">${Array.from({length:maxPoints(state.round.question_type,p,state.me?.id)-minP+1},(_,i)=>{const val=minP+i;return`<option value="${val}" ${+fpVal===val?'selected':''}>${val}</option>`}).join('')}</select></div><div class="field"><label>Toelichting bij correctie</label><input id="correctionNote" value="${esc(noteVal)}" oninput="state.reviewCorrectionNote=this.value"></div><button class="btn primary full" onclick="confirmPoints()">Punten bevestigen</button>`:`<div class="notice green">Je hebt +${mine.final_points} bevestigd.</div>${!mine.round_completed?'<button class="btn primary full" onclick="completeRound()">Ik ben klaar met deze ronde</button>':'<button class="btn ghost full" disabled>Ronde afgerond ✓</button>'}`}</section><section class="card"><h2>Puntenstatus</h2>${playerList(pl=>{let x=state.answers.find(a=>a.player_id===pl.id);if(!x?.points_confirmed)return['Controleert nog','wait'];return x.round_completed?[`+${x.final_points} · klaar`,'ok']:[`+${x.final_points} · afronden`,'wait']})}</section>`}
 async function confirmPoints(){let r=await state.sb.rpc('dmq_confirm_points',{p_answer_id:own().id,p_final_points:state.reviewFinalPoints,p_note:state.reviewCorrectionNote||''});if(r.error)toast(r.error.message);else schedule()}
 async function completeRound(){let r=await state.sb.rpc('dmq_complete_round',{p_answer_id:own().id});if(r.error)toast(r.error.message);else schedule()}
@@ -822,23 +1009,16 @@ async function stealFromPlayer(targetPlayerId){
   }
   const a=ansRow.answer;
   const t=state.round.question_type;
-  if(t==='full'||t==='year_film'||t==='year_film_artist'){
+  if(t==='full'||t.includes('_')||t==='film'||t==='title'||t==='year'||t==='artist'){
     state.currentAnswer.film=a.film||'';
     state.currentAnswer.year=a.year||'';
-    if(t==='full') state.currentAnswer.title=a.title||'';
-    if(t==='year_film_artist') state.currentAnswer.artist=a.artist||'';
+    state.currentAnswer.title=a.title||'';
+    state.currentAnswer.artist=a.artist||'';
     
     let f=document.getElementById('ansFilm');if(f)f.value=state.currentAnswer.film;
     let y=document.getElementById('ansYear');if(y)y.value=state.currentAnswer.year;
-    if(t==='full'){
-      let ti=document.getElementById('ansTitle');if(ti)ti.value=state.currentAnswer.title;
-    }
-    if(t==='year_film_artist'){
-      let art=document.getElementById('ansArtist');if(art)art.value=state.currentAnswer.artist;
-    }
-  } else if(t==='year'){
-    state.currentAnswer.year=a.year||'';
-    let y=document.getElementById('ansYear');if(y)y.value=state.currentAnswer.year;
+    let ti=document.getElementById('ansTitle');if(ti)ti.value=state.currentAnswer.title;
+    let art=document.getElementById('ansArtist');if(art)art.value=state.currentAnswer.artist;
   } else {
     state.currentAnswer.text=a[t]||'';
     let tx=document.getElementById('ansText');if(tx)tx.value=state.currentAnswer.text;
