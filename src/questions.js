@@ -18,9 +18,9 @@ export const DEFAULT_TASKS = [
     cat: "Disney Dagboek",
     type: "diary",
     title: "Geheim Dagboek",
-    part1: "De geur van verbrande soep en koud water hangt in de lucht. Ik zit verscholen onder een warme, witte stoffen koepel, omringd door het kletterende geluid van koper en schreeuwende stemmen. Mijn handen trillen, maar mijn zintuigen vertellen me precies welke kruiden er ontbreken in de pan onder mij.",
-    part2: "Ik bestuur de armen van een onhandige jongen door aan zijn haren te trekken. Samen vormen we een vreemd duo dat de culinaire wereld van deze stad probeert te veroveren, al mag niemand weten wie het echte brein achter de gerechten is.",
-    part3: "Hoewel ik een klein knaagdier ben dat niet thuishoort in het chique Parijse restaurant van de beroemde overleden chef-kok Gusteau, bewijs ik dat iedereen kan koken.",
+    part1: "Ik schuil onder een warme, witte stoffen koepel in een zinderende en lawaaierige omgeving van kokend water en rinkelend metaal. Hoewel ik klein en ongewenst ben, vertellen mijn zintuigen me precies welke kruiden er ontbreken in de pan onder mij.",
+    part2: "Ik bestuur de ledematen van een onbeholpen, lange jongen door aan plukken van zijn haar te trekken. Samen vormen we een vreemd duo dat de culinaire wereld van deze stad probeert te veroveren, al mag niemand weten wie het echte brein achter de gerechten is.",
+    part3: "Als ongenode gast in de chique Franse keuken van een beroemde, overleden chef-kok bewijs ik aan de strengste culinaire recensent dat iedereen kan koken.",
     character_nl: "Remy",
     character_en: "Remy",
     movie_nl: "Ratatouille",
@@ -33,9 +33,9 @@ export const DEFAULT_TASKS = [
     cat: "Disney Dagboek",
     type: "diary",
     title: "Geheim Dagboek",
-    part1: "Ik zweef boven een kolkende rivier van zielen, omringd door vlammen die van kleur veranderen naargelang mijn humeur. Die drie grijze zussen vertelden me dat de planeten gunstig zullen staan, maar dat die jonge sterke jongen roet in het eten kan gooien.",
-    part2: "Ik stuurde mijn twee onhandige helpers, Pain en Panic, om hem als baby te ontdoen van zijn onsterfelijkheid. Ze faalden jammerlijk. Nu probeer ik hem te chanteren via een deal met een meisje genaamd Megara.",
-    part3: "Mijn plan om de Titanen te bevrijden en de heerser van de Olympus omver te werpen mislukt volledig als hij zijn onsterfelijkheid terugverdient door Megara te redden uit de rivier van de dood.",
+    part1: "Ik heers over een schimmige, kolkende rivier van rusteloze zielen, omringd door vlammen die van kleur veranderen naargelang mijn driftbuien. Drie grijze zusters voorspelden me dat de planeten gunstig zullen staan voor mijn machtsovername.",
+    part2: "Ze waarschuwden me echter voor een pasgeborene met goddelijke kracht. Ik stuurde mijn twee onhandige kruipende helpers om hem als baby te ontdoen van zijn onsterfelijkheid. Ze faalden jammerlijk. Nu probeer ik hem te dwarsbomen via een deal met een gevangengenomen meisje.",
+    part3: "Mijn plan om de Titanen te bevrijden en de heerser van de wolken omver te werpen valt in duigen wanneer de jongeling zijn status terugverdient door haar ziel uit mijn dodenrijk te redden.",
     character_nl: "Hades",
     character_en: "Hades",
     movie_nl: "Hercules",
@@ -48,9 +48,9 @@ export const DEFAULT_TASKS = [
     cat: "Disney Dagboek",
     type: "diary",
     title: "Geheim Dagboek",
-    part1: "Ik leefde ooit in het koninklijk paleis, maar werd verbannen naar de diepste, donkerste krochten van de oceaan. Mijn twee trouwe glibberige spionnen, Flotsam en Jetsam, houden me op de hoogte van alle roddels.",
-    part2: "Een jonge prinses wilde dolgraag benen om een menselijke prins te ontmoeten. Ik liet haar een contract tekenen met haar eigen bloed, waarmee ze haar stem aan mij overdroeg.",
-    part3: "Onder de naam Vanessa en met haar stem in een gouden schelp om mijn nek probeerde ik de prins te verleiden, totdat ik veranderde in een reusachtig zeemonster en werd doorboord door de boegspriet van een schip.",
+    part1: "Verbannen naar de diepste, donkerste spelonken van de oceaan, stuur ik mijn twee glibberige spionnen op pad om de koninklijke familie in de gaten te houden. Een naïeve prinses wilde dolgraag het land betreden om een mens te ontmoeten.",
+    part2: "Ik liet haar een contract tekenen met haar eigen bloed, waarmee ze haar kostbaarste bezit — haar stem — aan mij overdroeg. Met die gestolen stem nam ik een menselijke gedaante aan om haar prins te verleiden.",
+    part3: "Mijn plan om de heerschappij over de zee op te eisen mislukt als de betovering wordt verbroken en ik als reusachtig monster word doorboord door de boeg van een wrak.",
     character_nl: "Ursula",
     character_en: "Ursula",
     movie_nl: "De Kleine Zeemeermin",
@@ -63,9 +63,9 @@ export const DEFAULT_TASKS = [
     cat: "Disney Dagboek",
     type: "diary",
     title: "Geheim Dagboek",
-    part1: "Ik was de eerste in de lijn van opvolging, totdat die pluizige kleine welp werd geboren. Mijn litteken herinnert me dagelijks aan mijn misplaatste recht op de troon.",
-    part2: "Ik verzamelde een leger van hongerige hyena's op het olifantenkerkhof en beloofde hen dat ze nooit meer honger zouden lijden als ze mij hielpen om mijn broer en zijn zoon te elimineren.",
-    part3: "Nadat ik mijn broer in de kloof liet vallen, nam ik de heerschappij over het trotse land over, totdat mijn neef terugkeerde en me van de Koningsrots wierp, waarna mijn eigen hyena's me verslonden.",
+    part1: "Mijn fysieke litteken herinnert me dagelijks aan het feit dat ik ben gepasseerd voor de opvolging. Toen de nieuwe pluizige welp werd gepresenteerd, besloot ik om nooit naar de ceremonie te gaan.",
+    part2: "Ik smeedde een pact met hongerige aaseters en lokte mijn eigen broer in een hinderlaag in een diepe kloof. Nadat ik hem in de diepte liet storten, nam ik de heerschappij over het uitgedroogde land over.",
+    part3: "Mijn verleden haalde me echter in toen zijn verbannen zoon terugkeerde en me van de rots wierp, waarna mijn eigen hyena's zich tegen me keerden.",
     character_nl: "Scar",
     character_en: "Scar",
     movie_nl: "De Leeuwenkoning",
@@ -78,9 +78,9 @@ export const DEFAULT_TASKS = [
     cat: "Disney Dagboek",
     type: "diary",
     title: "Geheim Dagboek",
-    part1: "Het tikkende geluid bezorgt me de koude rillingen. Telkens als ik dat geluid hoor, weet ik dat die monsterlijke reptielachtige schaduw in het water dichterbij komt, wachtend op de rest van mijn maaltijd.",
-    part2: "Die vliegende jongen sneed mijn hand af en voerde het aan het reptiel. Nu draag ik een metalen prothese aan mijn linkerarm en leid ik mijn bemanning, met meneer Smee aan mijn zijde, om wraak te nemen.",
-    part3: "Ik ontvoerde Wendy en de Verloren Jongens naar mijn schip Jolly Roger in Neverland om hem in de val te lokken.",
+    part1: "Het tikkende geluid bezorgt me de koude rillingen; een reptielachtige schaduw wacht geduldig in het water op de rest van mijn maaltijd. Een vliegende kwajongen sneed mijn hand af en voerde die aan het beest.",
+    part2: "Nu draag ik een scherpe metalen prothese aan mijn arm en leid ik mijn bemanning, met een dikke, loyale bootsman aan mijn zijde, om wraak te nemen op de jongen en zijn bende van verloren kinderen.",
+    part3: "Ik ontvoerde een meisje uit Londen naar mijn schip om hem in de val te lokken, maar werd uiteindelijk zelf overboord gejaagd en achternagezeten door de krokodil.",
     character_nl: "Kapitein Haak",
     character_en: "Captain Hook",
     movie_nl: "Peter Pan",
@@ -93,9 +93,9 @@ export const DEFAULT_TASKS = [
     cat: "Disney Dagboek",
     type: "diary",
     title: "Geheim Dagboek",
-    part1: "Al achttien jaar zit ik opgesloten in een verborgen toren in het woud, met een kameleon als enige metgezel. Mijn zogenaamde moeder vertelt me dat de buitenwereld te gevaarlijk is.",
-    part2: "Een knappe dief genaamd Flynn Rider brak in via mijn raam om te schuilen. Ik sloeg hem bewusteloos met een zware koekenpan en verstopte zijn gestolen tiara.",
-    part3: "Ik dwong hem om me mee te nemen om de zwevende lichtjes te zien die elk jaar op mijn verjaardag aan de hemel verschijnen, om er uiteindelijk achter te komen dat ik de verloren prinses ben.",
+    part1: "Al achttien jaar zit ik opgesloten in een verborgen toren in het woud, met een klein groen reptiel als enige metgezel. Mijn zogenaamde moeder vertelt me dat de buitenwereld te gevaarlijk is vanwege mijn unieke gave.",
+    part2: "Een dief die een koninklijk sieraad had gestolen brak in om te schuilen. Ik sloeg hem bewusteloos met een zware koekenpan en dwong hem om me te gidsen naar de zwevende lichtjes die elk jaar op mijn geboortedag verschijnen.",
+    part3: "Tijdens onze tocht in de boot op het meer ontdekte ik aan de hand van de zonnesymbolen dat ik de verloren prinses van het koninkrijk ben.",
     character_nl: "Rapunzel",
     character_en: "Rapunzel",
     movie_nl: "Rapunzel",
@@ -108,9 +108,9 @@ export const DEFAULT_TASKS = [
     cat: "Disney Dagboek",
     type: "diary",
     title: "Geheim Dagboek",
-    part1: "Ik ben al jaren de favoriet van de jongen, de onbetwiste leader van de groep die op zijn bed woont. Er zit een trekkoord in mijn rug en mijn laars draagt zijn naam.",
-    part2: "Alles veranderde toen er voor zijn verjaardag een glanzende ruimte-actiefiguur arriveerde die echt geloofde dat hij kon vliegen. In een vlaag van jaloezie stootte ik hem per ongeluk uit het raam.",
-    part3: "Samen moesten we ontsnappen uit het huis van de sadistische buurjongen Sid, om uiteindelijk met een vuurwerkraket terug te vliegen naar de verhuiswagen van Andy.",
+    part1: "Ik was jarenlang de favoriet en de onbetwiste leider van de groep die op het bed woont. Er zit een trekkoord in mijn rug en de zool van mijn laars draagt de naam van onze jongen.",
+    part2: "Alles veranderde toen er een glanzende indringer met vleugels arriveerde die echt dacht dat hij een buitenaardse ranger was. In een vlaag van jaloezie stootte ik hem per ongeluk uit het raam.",
+    part3: "Samen moesten we ontsnappen aan de sadistische buurjongen die speelgoed muteert, om met een vuurwerkraket terug te vliegen naar de verhuiswagen.",
     character_nl: "Woody",
     character_en: "Woody",
     movie_nl: "Toy Story",
@@ -123,9 +123,9 @@ export const DEFAULT_TASKS = [
     cat: "Disney Dagboek",
     type: "diary",
     title: "Geheim Dagboek",
-    part1: "Ik ben de meest gevierde jager van dit kleine, provinciale Franse dorpje. Mijn muren hangen vol met geweien en de lokale bevolking zingt liederen over mijn dikke nek en brede schouders.",
-    part2: "Ik kon het niet verdragen dat de meest belezen meid van het dorp mij afwees voor een harig monster in een kasteel. Ik smeedde een plan om haar vader op te sluiten in het gesticht om haar te dwingen met mij te trouwen.",
-    part3: "Ik leidde een boze menigte met fakkels en hooivorken naar het kasteel om het beest te doden, maar gleed uiteindelijk uit en stortte in de afgrond vanaf het dak.",
+    part1: "Ik ben de meest gevierde jager van ons kleine Franse dorpje, omringd door trofeeën en bewonderaars die zingen over mijn brede nek en spierballen. Ik kon het niet verkroppen dat de meest belezen meid mij afwees.",
+    part2: "Zij koos voor een harig wezen dat opgesloten zit in een betoverd kasteel. Ik smeedde een plan om haar vader op te sluiten in een gesticht om haar te dwingen met mij te trouwen.",
+    part3: "Ik leidde een boze menigte met fakkels om het wezen te doden, maar gleed uit en stortte in de afgrond vanaf het dak tijdens ons duel.",
     character_nl: "Gaston",
     character_en: "Gaston",
     movie_nl: "Belle en het Beest",
@@ -319,8 +319,9 @@ export const DEFAULT_TASKS = [
     type: "emoji",
     title: "Raad de Emojis",
     text: "🥀👹🕯️⏰",
-    answers: ["Sleeping Beauty", "Beauty and the Beast", "Aladdin", "Snow White"],
-    correct: 1,
+    movie_nl: "Belle en het Beest",
+    movie_en: "Beauty and the Beast",
+    movie_aliases: ["beauty and the beast", "beauty & the beast", "belle en het beest", "belle & het beest"],
     points: 2
   },
   {
@@ -329,8 +330,9 @@ export const DEFAULT_TASKS = [
     type: "emoji",
     title: "Raad de Emojis",
     text: "🎈🏠👴👦",
-    answers: ["WALL-E", "Up", "Coco", "Toy Story"],
-    correct: 1,
+    movie_nl: "Up",
+    movie_en: "Up",
+    movie_aliases: ["up"],
     points: 2
   },
   {
@@ -339,8 +341,9 @@ export const DEFAULT_TASKS = [
     type: "emoji",
     title: "Raad de Emojis",
     text: "🐭🍜👨‍🍳🇫🇷",
-    answers: ["Ratatouille", "Monsters Inc.", "Luca", "Soul"],
-    correct: 0,
+    movie_nl: "Ratatouille",
+    movie_en: "Ratatouille",
+    movie_aliases: ["ratatouille"],
     points: 2
   },
   {
@@ -349,8 +352,9 @@ export const DEFAULT_TASKS = [
     type: "emoji",
     title: "Raad de Emojis",
     text: "🎸💀🕯️🇲🇽",
-    answers: ["Encanto", "Coco", "The Emperor's New Groove", "Brave"],
-    correct: 1,
+    movie_nl: "Coco",
+    movie_en: "Coco",
+    movie_aliases: ["coco"],
     points: 2
   },
   {
@@ -359,8 +363,9 @@ export const DEFAULT_TASKS = [
     type: "emoji",
     title: "Raad de Emojis",
     text: "🧚‍♂️🏴‍☠️🐊⏱️",
-    answers: ["Peter Pan", "Pirates of the Caribbean", "Treasure Planet", "Hercules"],
-    correct: 0,
+    movie_nl: "Peter Pan",
+    movie_en: "Peter Pan",
+    movie_aliases: ["peter pan"],
     points: 2
   },
   {
@@ -369,8 +374,9 @@ export const DEFAULT_TASKS = [
     type: "emoji",
     title: "Raad de Emojis",
     text: "👩‍🦰🏹🐻🏴󠁧󠁢󠁳󠁣󠁴󠁿",
-    answers: ["Brave", "Robin Hood", "Brother Bear", "The Fox and the Hound"],
-    correct: 0,
+    movie_nl: "Brave",
+    movie_en: "Brave",
+    movie_aliases: ["brave", "rebel"],
     points: 2
   },
   {
@@ -379,8 +385,9 @@ export const DEFAULT_TASKS = [
     type: "emoji",
     title: "Raad de Emojis",
     text: "👽🌺🏝️🎸",
-    answers: ["Lilo & Stitch", "Moana", "Finding Nemo", "Tarzan"],
-    correct: 0,
+    movie_nl: "Lilo en Stitch",
+    movie_en: "Lilo and Stitch",
+    movie_aliases: ["lilo and stitch", "lilo & stitch", "lilo en stitch", "lilo & stitch"],
     points: 2
   },
   {
@@ -389,8 +396,9 @@ export const DEFAULT_TASKS = [
     type: "emoji",
     title: "Raad de Emojis",
     text: "👑🐷🍎🧙‍♀️",
-    answers: ["Snow White", "Cinderella", "Tangled", "The Black Cauldron"],
-    correct: 0,
+    movie_nl: "Sneeuwwitje",
+    movie_en: "Snow White",
+    movie_aliases: ["snow white", "sneeuwwitje", "snow white and the seven dwarfs"],
     points: 2
   },
   {
@@ -399,8 +407,9 @@ export const DEFAULT_TASKS = [
     type: "emoji",
     title: "Raad de Emojis",
     text: "🎪🐘🎈🦅",
-    answers: ["Dumbo", "Tarzan", "The Jungle Book", "The Lion King"],
-    correct: 0,
+    movie_nl: "Dumbo",
+    movie_en: "Dumbo",
+    movie_aliases: ["dumbo"],
     points: 2
   },
   {
@@ -409,8 +418,9 @@ export const DEFAULT_TASKS = [
     type: "emoji",
     title: "Raad de Emojis",
     text: "🚂🐘🪵🤥",
-    answers: ["Pinocchio", "Dumbo", "Peter Pan", "Alice in Wonderland"],
-    correct: 0,
+    movie_nl: "Pinokkio",
+    movie_en: "Pinocchio",
+    movie_aliases: ["pinocchio", "pinokkio"],
     points: 2
   },
 
@@ -468,7 +478,7 @@ export const DEFAULT_TASKS = [
     cat: "Wie ben ik?",
     type: "whoami",
     title: "Hint Quest",
-    hint1: "Ik ben de enige in mijn Franse dorpje die blauwe kleding draagt, wat symbool staat voor hoe anders ik ben.",
+    hint1: "Mijn enige kledingstuk in het Franse dorpje is blauw, wat symbool staat voor hoe vreemd de dorpsbewoners mij vinden.",
     hint2: "Ik ruil mijn eigen vrijheid om het leven van mijn vader Maurice te redden uit de donkere kerker van een kasteel.",
     hint3: "Ik word verliefd op een harig, nors monster en verbreek daarmee de betovering.",
     answers: ["Aurora", "Cinderella", "Belle", "Sneeuwwitje"],
@@ -605,8 +615,101 @@ export const DEFAULT_TASKS = [
   },
 
   // --- CATEGORY: QUIZ (type: 'quiz') ---
+  // Easy (1 star)
   {
-    id: "quiz-01",
+    id: "quiz-easy-01",
+    cat: "Quiz",
+    type: "quiz",
+    difficulty: "easy",
+    title: "Makkelijke vraag",
+    text: "Wat is de naam van de vrolijke sneeuwpop in de film Frozen?",
+    answers: ["Sven", "Olaf", "Kristoff", "Hans"],
+    correct: 1,
+    points: 1
+  },
+  {
+    id: "quiz-easy-02",
+    cat: "Quiz",
+    type: "quiz",
+    difficulty: "easy",
+    title: "Makkelijke vraag",
+    text: "Welk diersoort is het karakter Simba uit De Leeuwenkoning?",
+    answers: ["Leeuw", "Tijger", "Panter", "Hyena"],
+    correct: 0,
+    points: 1
+  },
+  {
+    id: "quiz-easy-03",
+    cat: "Quiz",
+    type: "quiz",
+    difficulty: "easy",
+    title: "Makkelijke vraag",
+    text: "Welke kleur heeft de jurk van Assepoester (Cinderella) op het koninklijk bal?",
+    answers: ["Rood", "Geel", "Blauw", "Roze"],
+    correct: 2,
+    points: 1
+  },
+  {
+    id: "quiz-easy-04",
+    cat: "Quiz",
+    type: "quiz",
+    difficulty: "easy",
+    title: "Makkelijke vraag",
+    text: "Hoe heet het houten marionet-jongetje wiens neus groeit als hij liegt?",
+    answers: ["Pinokkio", "Peter Pan", "Mowgli", "Tarzan"],
+    correct: 0,
+    points: 1
+  },
+
+  // Medium (2 stars)
+  {
+    id: "quiz-medium-01",
+    cat: "Quiz",
+    type: "quiz",
+    difficulty: "medium",
+    title: "Gemiddelde vraag",
+    text: "Hoe heet de trouwe rode krab die als hofmaarschalk dient in De Kleine Zeemeermin?",
+    answers: ["Flounder", "Sebastian", "Scuttle", "Triton"],
+    correct: 1,
+    points: 2
+  },
+  {
+    id: "quiz-medium-02",
+    cat: "Quiz",
+    type: "quiz",
+    difficulty: "medium",
+    title: "Gemiddelde vraag",
+    text: "Hoe heet het babytijgertje dat de trouwe metgezel is van prinses Jasmine in Aladdin?",
+    answers: ["Rajah", "Abu", "Iago", "Shere Khan"],
+    correct: 0,
+    points: 2
+  },
+  {
+    id: "quiz-medium-03",
+    cat: "Quiz",
+    type: "quiz",
+    difficulty: "medium",
+    title: "Gemiddelde vraag",
+    text: "Welk fruit gebruikt de boze stiefmoeder om Sneeuwwitje te vergiftigen?",
+    answers: ["Peer", "Appel", "Perzik", "Kers"],
+    correct: 1,
+    points: 2
+  },
+  {
+    id: "quiz-medium-04",
+    cat: "Quiz",
+    type: "quiz",
+    difficulty: "medium",
+    title: "Gemiddelde vraag",
+    text: "Wie is de beste vriend van sheriff Woody in de Toy Story-films?",
+    answers: ["Buzz Lightyear", "Rex", "Slinky", "Hamm"],
+    correct: 0,
+    points: 2
+  },
+
+  // Hard (3 stars)
+  {
+    id: "quiz-hard-01",
     cat: "Quiz",
     type: "quiz",
     difficulty: "hard",
@@ -617,7 +720,7 @@ export const DEFAULT_TASKS = [
     points: 3
   },
   {
-    id: "quiz-02",
+    id: "quiz-hard-02",
     cat: "Quiz",
     type: "quiz",
     difficulty: "hard",
@@ -628,7 +731,7 @@ export const DEFAULT_TASKS = [
     points: 3
   },
   {
-    id: "quiz-03",
+    id: "quiz-hard-03",
     cat: "Quiz",
     type: "quiz",
     difficulty: "hard",
@@ -639,7 +742,7 @@ export const DEFAULT_TASKS = [
     points: 3
   },
   {
-    id: "quiz-04",
+    id: "quiz-hard-04",
     cat: "Quiz",
     type: "quiz",
     difficulty: "hard",
@@ -650,7 +753,7 @@ export const DEFAULT_TASKS = [
     points: 3
   },
   {
-    id: "quiz-05",
+    id: "quiz-hard-05",
     cat: "Quiz",
     type: "quiz",
     difficulty: "hard",
@@ -661,7 +764,7 @@ export const DEFAULT_TASKS = [
     points: 3
   },
   {
-    id: "quiz-06",
+    id: "quiz-hard-06",
     cat: "Quiz",
     type: "quiz",
     difficulty: "hard",
@@ -669,28 +772,6 @@ export const DEFAULT_TASKS = [
     text: "Hoe heet het schip van Kapitein Haak in Peter Pan?",
     answers: ["The Jolly Roger", "The Black Pearl", "The Sea Witch", "The Chimera"],
     correct: 0,
-    points: 3
-  },
-  {
-    id: "quiz-07",
-    cat: "Quiz",
-    type: "quiz",
-    difficulty: "hard",
-    title: "Moeilijke vraag",
-    text: "In welke bekende klassieke Disney-film horen we het nummer 'Love is a Song'?",
-    answers: ["Bambi", "Cinderella", "Dumbo", "Pinocchio"],
-    correct: 0,
-    points: 3
-  },
-  {
-    id: "quiz-08",
-    cat: "Quiz",
-    type: "quiz",
-    difficulty: "hard",
-    title: "Moeilijke vraag",
-    text: "Welk Disney-karakter heeft het minst aantal spreekregels in een hoofdrol?",
-    answers: ["Dumbo", "Aurora", "Gideon", "Wall-E"],
-    correct: 1,
     points: 3
   },
 

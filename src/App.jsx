@@ -190,6 +190,9 @@ export default function App() {
   const [roundsPerPlayer, setRoundsPerPlayer] = useState(10);
   const [playerNames, setPlayerNames] = useState(['Speler 1', 'Speler 2', 'Speler 3', 'Speler 4']);
 
+  // New Category setup choice checklist
+  const [selectedCats, setSelectedCats] = useState(["Disney Dagboek", "Pictionary", "Inschattingsvragen", "Dilemma", "Emoji Quiz", "Wie ben ik?", "Disney Mastermind", "Feit of Fabel", "Quiz", "Samen"]);
+
   const [room, setRoom] = useState(null);
   const [players, setPlayers] = useState([]);
   const [scoreHistory, setScoreHistory] = useState([]);
@@ -207,6 +210,7 @@ export default function App() {
 
   // Ref for timer
   const timerRef = useRef(null);
+  const svgRef = useRef(null);
 
   // New Interactive Games States
   const [drawingPoints, setDrawingPoints] = useState([]);
@@ -348,53 +352,50 @@ export default function App() {
     return () => clearInterval(interval);
   }, [room?.current_task_state?.activeAttack?.timer, room?.current_task_state?.activeAttack?.targetId]);
 
-  // Local timer
+  // Real-time Group Timer Synchronization Hook
   useEffect(() => {
-    if (timerRunning && secondsLeft > 0) {
-      timerRef.current = setTimeout(() => {
-        setSecondsLeft(prev => {
-          if (prev <= 1) {
-            setTimerRunning(false);
-            if (navigator.vibrate) navigator.vibrate([150, 80, 150]);
-            return 0;
-          }
-          return prev - 1;
-        });
-      }, 1000);
-    }
-    return () => clearTimeout(timerRef.current);
-  }, [timerRunning, secondsLeft]);
+    const timerStartedAt = room?.current_task_state?.timerStartedAt;
+    const timerDuration = room?.current_task_state?.timerDuration;
 
-  // Clean timer and interactive states on task change
-  useEffect(() => {
-    setTimerRunning(false);
-    setSecondsLeft(0);
-    setQuizLocked(false);
-    setQuizSelectedAnswer(null);
-
-    setDrawingPoints([]);
-    setIsDrawing(false);
-    setLocalEstimate('');
-    setDiaryChar('');
-    setDiaryMovie('');
-
-    setMmGuesses([]);
-    setMmCurrentGuess([0, 0, 0, 0, 0]);
-    setMmSolved(false);
-    setMmFailed(false);
-    setMmPointsEarned(0);
-    if (getCurrentTask()?.type === 'mastermind') {
-      const code = Array.from({ length: 5 }, () => Math.floor(Math.random() * 8));
-      setMmCode(code);
+    if (!timerStartedAt || !timerDuration) {
+      setSecondsLeft(0);
+      setTimerRunning(false);
+      return;
     }
 
-    setWhoamiRevealed(1);
-    setWhoamiLocked(false);
-    setWhoamiSelected(null);
+    const elapsed = Math.floor((Date.now() - new Date(timerStartedAt).getTime()) / 1000);
+    const initialLeft = Math.max(0, timerDuration - elapsed);
 
-    setFactLocked(false);
-    setFactSelected(null);
-  }, [room?.current_task_id]);
+    setSecondsLeft(initialLeft);
+    setTimerRunning(initialLeft > 0);
+
+    if (initialLeft <= 0) return;
+
+    const interval = setInterval(() => {
+      const currentElapsed = Math.floor((Date.now() - new Date(timerStartedAt).getTime()) / 1000);
+      const left = Math.max(0, timerDuration - currentElapsed);
+      setSecondsLeft(left);
+      if (left <= 0) {
+        setTimerRunning(false);
+        clearInterval(interval);
+      }
+    }, 1000);
+
+    return () => clearInterval(interval);
+  }, [room?.current_task_state?.timerStartedAt, room?.current_task_state?.timerDuration]);
+
+  // Touch scroll prevention listener for Pictionary
+  useEffect(() => {
+    const svg = svgRef.current;
+    if (!svg) return;
+    const prevent = (e) => e.preventDefault();
+    svg.addEventListener('touchstart', prevent, { passive: false });
+    svg.addEventListener('touchmove', prevent, { passive: false });
+    return () => {
+      svg.removeEventListener('touchstart', prevent);
+      svg.removeEventListener('touchmove', prevent);
+    };
+  }, [svgRef.current, screen, room?.current_task_id]);
 
   const toggleSound = () => {
     const newVal = !sound;
@@ -422,15 +423,21 @@ export default function App() {
   const selectNextTask = async (currentRoom, currentPlayers, forcePersonal = false) => {
     const usedTasks = currentRoom.current_task_state?.usedTasks || [];
     const taskHistory = currentRoom.current_task_state?.taskHistory || [];
+    const enabledCats = currentRoom.current_task_state?.enabledCategories || ["Disney Dagboek", "Pictionary", "Inschattingsvragen", "Dilemma", "Emoji Quiz", "Wie ben ik?", "Disney Mastermind", "Feit of Fabel", "Quiz", "Samen"];
 
-    const activeTasks = DEFAULT_TASKS.filter(t => t.active !== false && (currentRoom.game_mode === 'mix' || t.cat === currentRoom.game_mode));
+    const activeTasks = DEFAULT_TASKS.filter(t => 
+      t.active !== false && 
+      (currentRoom.game_mode === 'mix' || t.cat === currentRoom.game_mode) &&
+      enabledCats.includes(t.cat)
+    );
     
     if (!activeTasks.length) {
-      alert("Geen opdrachten beschikbaar.");
+      alert("Geen opdrachten beschikbaar voor de gekozen categorieën.");
       return;
     }
 
-    if (currentRoom.game_mode === "Quiz") {
+    if (currentRoom.game_mode === "Quiz" || (currentRoom.game_mode === "mix" && enabledCats.includes("Quiz") && Math.random() < 0.25)) {
+      // Direct choice of quiz difficulty
       await updateRoomState(currentRoom.id, {
         current_task_id: 'quiz-choice',
         current_task_state: { ...currentRoom.current_task_state, stagePause: false }
@@ -489,7 +496,7 @@ export default function App() {
     }];
 
     await updateRoomState(currentRoom.id, {
-      current_task_id: selected.type === 'quiz' ? 'quiz-choice' : selected.id,
+      current_task_id: selected.id,
       current_task_state: {
         ...currentRoom.current_task_state,
         usedTasks: newUsed,
@@ -502,7 +509,9 @@ export default function App() {
         estimate: undefined,
         votes: (selected.type === 'dilemma' || selected.type === 'estimate') ? {} : undefined,
         tinkActive: false,
-        hyperdriveActive: false
+        hyperdriveActive: false,
+        timerStartedAt: null,
+        timerDuration: null
       }
     });
   };
@@ -598,7 +607,8 @@ export default function App() {
         total_rounds: totalRounds,
         current_task_state: {
           ...room.current_task_state,
-          player_hands: startHands
+          player_hands: startHands,
+          enabledCategories: selectedCats
         }
       });
 
@@ -622,7 +632,7 @@ export default function App() {
     const selected = candidates[Math.floor(Math.random() * candidates.length)];
     
     if (!selected) {
-      alert("Geen quizvragen gevonden.");
+      alert("Geen quizvragen gevonden voor dit niveau. Selecteer een andere moeilijkheid.");
       return;
     }
 
@@ -648,7 +658,6 @@ export default function App() {
 
     const isCorrect = answerIndex === correctAnswerIndex;
     if (isCorrect) {
-      // Check for active Hyperdrive card
       const ptsToAward = room.current_task_state?.hyperdriveActive ? points * 2 : points;
       const activePlayer = players[room.current_player_index];
 
@@ -656,7 +665,7 @@ export default function App() {
         room.id, 
         activePlayer, 
         ptsToAward, 
-        `Quiz ${room.current_task_state.quizDifficulty === 'easy' ? 'makkelijk' : room.current_task_state.quizDifficulty === 'medium' ? 'medium' : 'moeilijk'}: ${getCurrentTask()?.text}`,
+        `Quiz ${room.current_task_state.quizDifficulty || 'makkelijk'}: ${getCurrentTask()?.text}`,
         'knowledge',
         getCurrentTask()
       );
@@ -666,6 +675,7 @@ export default function App() {
   const handleFinishTask = async () => {
     setQuizLocked(false);
     setQuizSelectedAnswer(null);
+    setLocalEstimate('');
 
     const wasGroup = getCurrentTask()?.type === "group";
     const nextRound = (room.round || 0) + 1;
@@ -684,13 +694,11 @@ export default function App() {
 
     let nextPlayerIndex = room.current_player_index;
     if (!wasGroup) {
-      // Check if next player is frozen (Autopech)
       let candidateNextIdx = (room.current_player_index + 1) % players.length;
       const candidatePlayer = players[candidateNextIdx];
       const frozenPlayers = room.current_task_state?.frozenPlayers || {};
 
       if (frozenPlayers[candidatePlayer.id]) {
-        // Remove frozen status and skip his turn
         frozenPlayers[candidatePlayer.id] = false;
         candidateNextIdx = (candidateNextIdx + 1) % players.length;
       }
@@ -703,7 +711,9 @@ export default function App() {
       current_task_state: {
         ...room.current_task_state,
         frozenPlayers: room.current_task_state?.frozenPlayers || {},
-        stagePause: triggerPause
+        stagePause: triggerPause,
+        timerStartedAt: null,
+        timerDuration: null
       }
     });
 
@@ -722,6 +732,7 @@ export default function App() {
   const handleSkipTask = async (neverShowAgain = false) => {
     setQuizLocked(false);
     setQuizSelectedAnswer(null);
+    setLocalEstimate('');
 
     if (neverShowAgain && room.current_task_id) {
       const deactivated = room.current_task_state?.deactivated || [];
@@ -806,9 +817,37 @@ export default function App() {
     document.getElementById("newText").value = "";
   };
 
+  // Force Sync/Resynchronise Connection Action
+  const handleForceSync = async () => {
+    setLoading(true);
+    try {
+      const { room: r, players: p, scoreHistory: sh } = await fetchRoomData(room.id);
+      setRoom(r);
+      setPlayers(p);
+      setScoreHistory(sh);
+      
+      // reset local locks
+      setQuizLocked(false);
+      setQuizSelectedAnswer(null);
+      setWhoamiLocked(false);
+      setWhoamiSelected(null);
+      setFactLocked(false);
+      setFactSelected(null);
+      setLocalEstimate('');
+
+      if (r.status === 'lobby') setScreen('lobby');
+      else if (r.status === 'playing') setScreen('game');
+      else if (r.status === 'ended') setScreen('end');
+    } catch (e) {
+      console.error("Force sync failed:", e);
+    } finally {
+      setLoading(false);
+    }
+  };
+
   // --- NEW INTERACTIVE HANDLERS ---
 
-  // Pictionary
+  // Pictionary Drawing Canvas
   const handleSvgPointerDown = (e, isMyTurn) => {
     if (!isMyTurn) return;
     setIsDrawing(true);
@@ -849,6 +888,19 @@ export default function App() {
         lines: []
       }
     });
+  };
+
+  const handleUndoDrawing = async () => {
+    const lines = [...(room.current_task_state.lines || [])];
+    if (lines.length > 0) {
+      lines.pop();
+      await updateRoomState(room.id, {
+        current_task_state: {
+          ...room.current_task_state,
+          lines
+        }
+      });
+    }
   };
 
   const handlePictionaryGuessed = async (playerIndex) => {
@@ -922,14 +974,12 @@ export default function App() {
     const votes = room.current_task_state.votes || {};
     const activePlayer = players[room.current_player_index];
 
-    // Check active player (within 20%)
     const diff = Math.abs(estimate - correct) / correct;
     const pts = room.current_task_state?.hyperdriveActive ? 4 : 2;
     if (diff <= 0.20) {
       await addPlayerScore(room.id, activePlayer, pts, `Inschatting: dichtbij het juiste antwoord (${correct})`, 'knowledge');
     }
 
-    // Check other players
     const isHigher = correct > estimate;
     await Promise.all(players.map(p => {
       if (p.id === activePlayer.id) return Promise.resolve();
@@ -998,35 +1048,7 @@ export default function App() {
     await handleFinishTask();
   };
 
-  // Mastermind
-  const checkGuess = (guess, code) => {
-    let black = 0;
-    let white = 0;
-    let codeUsed = Array(5).fill(false);
-    let guessUsed = Array(5).fill(false);
-    
-    for (let i = 0; i < 5; i++) {
-      if (guess[i] === code[i]) {
-        black++;
-        codeUsed[i] = true;
-        guessUsed[i] = true;
-      }
-    }
-    
-    for (let i = 0; i < 5; i++) {
-      if (guessUsed[i]) continue;
-      for (let j = 0; j < 5; j++) {
-        if (codeUsed[j]) continue;
-        if (guess[i] === code[j]) {
-          white++;
-          codeUsed[j] = true;
-          break;
-        }
-      }
-    }
-    return { black, white };
-  };
-
+  // Mastermind (Code Breaker)
   const handleMmSubmitGuess = () => {
     const feedback = checkGuess(mmCurrentGuess, mmCode);
     const updatedGuesses = [...mmGuesses, { guess: [...mmCurrentGuess], ...feedback }];
@@ -1035,10 +1057,10 @@ export default function App() {
     if (feedback.black === 5) {
       setMmSolved(true);
       const turns = updatedGuesses.length;
-      const basePts = turns <= 3 ? 3 : turns <= 5 ? 2 : 1;
+      const basePts = turns <= 4 ? 3 : turns <= 7 ? 2 : 1;
       const pts = room.current_task_state?.hyperdriveActive ? basePts * 2 : basePts;
       setMmPointsEarned(pts);
-    } else if (updatedGuesses.length >= 6) {
+    } else if (updatedGuesses.length >= 10) {
       setMmFailed(true);
     }
   };
@@ -1075,13 +1097,15 @@ export default function App() {
     }
   };
 
-  // Emoji Quiz
-  const handleEmojiAnswer = async (idx, t) => {
+  // Emoji Quiz text submission
+  const handleEmojiTextAnswer = async (t) => {
     if (quizLocked) return;
     setQuizLocked(true);
-    setQuizSelectedAnswer(idx);
-    const correct = idx === t.correct;
-    if (correct) {
+    const typed = localEstimate.trim();
+    setQuizSelectedAnswer(typed);
+
+    const isCorrect = match(typed, [t.movie_nl, t.movie_en, ...(t.movie_aliases || [])]);
+    if (isCorrect) {
       const pts = room.current_task_state?.hyperdriveActive ? 4 : 2;
       await addPlayerScore(room.id, localPlayer, pts, `Emoji Quiz: correct geraden`, 'knowledge');
     }
@@ -1122,10 +1146,22 @@ export default function App() {
         current_task_state: { ...room.current_task_state, player_hands: hands, cardHistory: newHistory, tinkActive: true }
       });
     } else if (cardKey === 'time') {
-      setSecondsLeft(prev => prev + 30);
-      await updateRoomState(room.id, {
-        current_task_state: { ...room.current_task_state, player_hands: hands, cardHistory: newHistory }
-      });
+      // Modify DB timestamps to add 30s to coop timer
+      if (room.current_task_state.timerStartedAt) {
+        const prevDuration = room.current_task_state.timerDuration || 45;
+        await updateRoomState(room.id, {
+          current_task_state: { 
+            ...room.current_task_state, 
+            player_hands: hands, 
+            cardHistory: newHistory,
+            timerDuration: prevDuration + 30 
+          }
+        });
+      } else {
+        await updateRoomState(room.id, {
+          current_task_state: { ...room.current_task_state, player_hands: hands, cardHistory: newHistory }
+        });
+      }
     } else if (cardKey === 'wish') {
       const cardKeys = Object.keys(POWER_CARDS);
       for (let i = 0; i < 2; i++) {
@@ -1141,17 +1177,26 @@ export default function App() {
       });
       await selectNextTask(room, players);
     } else if (cardKey === 'elsa') {
-      setTimerRunning(false);
+      // Pauses timer for local players
       await updateRoomState(room.id, {
         current_task_state: { ...room.current_task_state, player_hands: hands, cardHistory: newHistory }
       });
     } else if (cardKey === 'kaahypnose') {
-      if (timerRunning) {
-        setSecondsLeft(prev => Math.max(5, Math.round(prev / 2)));
+      if (room.current_task_state.timerStartedAt) {
+        const prevDuration = room.current_task_state.timerDuration || 45;
+        await updateRoomState(room.id, {
+          current_task_state: { 
+            ...room.current_task_state, 
+            player_hands: hands, 
+            cardHistory: newHistory,
+            timerDuration: Math.max(5, Math.round(prevDuration / 2)) 
+          }
+        });
+      } else {
+        await updateRoomState(room.id, {
+          current_task_state: { ...room.current_task_state, player_hands: hands, cardHistory: newHistory }
+        });
       }
-      await updateRoomState(room.id, {
-        current_task_state: { ...room.current_task_state, player_hands: hands, cardHistory: newHistory }
-      });
     }
 
     setZoomedCardKey(null);
@@ -1225,6 +1270,8 @@ export default function App() {
         cardHistory: newHistory
       }
     });
+    setZoomedCardKey(null);
+    setCardFlipped(false);
   };
 
   const handleDefendSpiegel = async () => {
@@ -1261,74 +1308,8 @@ export default function App() {
         cardHistory: newHistory
       }
     });
-  };
-
-  const executeActiveAttack = async () => {
-    const attack = room.current_task_state.activeAttack;
-    const hands = room.current_task_state.player_hands || {};
-
-    if (attack.card === 'autopech') {
-      const frozen = room.current_task_state.frozenPlayers || {};
-      frozen[attack.targetId] = true;
-      await updateRoomState(room.id, {
-        current_task_state: {
-          ...room.current_task_state,
-          frozenPlayers: frozen,
-          activeAttack: null
-        }
-      });
-    } else if (attack.card === 'apple') {
-      const target = players.find(p => p.id === attack.targetId);
-      const attacker = players.find(p => p.id === attack.attackerId);
-      if (target && target.score > 0) {
-        await addPlayerScore(room.id, target, -1, `Giftige Appel gespeeld door ${attacker?.name}`, 'general');
-        if (attacker) {
-          await addPlayerScore(room.id, attacker, 1, `Giftige Appel gestolen van ${target?.name}`, 'general');
-        }
-      }
-      await updateRoomState(room.id, {
-        current_task_state: {
-          ...room.current_task_state,
-          activeAttack: null
-        }
-      });
-    } else if (attack.card === 'abu') {
-      const targetHand = hands[attack.targetId] || [];
-      const attackerHand = hands[attack.attackerId] || [];
-      if (targetHand.length > 0) {
-        const rIdx = Math.floor(Math.random() * targetHand.length);
-        const stolen = targetHand.splice(rIdx, 1)[0];
-        attackerHand.push(stolen);
-        hands[attack.targetId] = targetHand;
-        hands[attack.attackerId] = attackerHand;
-      }
-      await updateRoomState(room.id, {
-        current_task_state: {
-          ...room.current_task_state,
-          player_hands: hands,
-          activeAttack: null
-        }
-      });
-    } else if (attack.card === 'kuzco') {
-      const targetHand = hands[attack.targetId] || [];
-      const attackerHand = hands[attack.attackerId] || [];
-      hands[attack.targetId] = [...attackerHand];
-      hands[attack.attackerId] = [...targetHand];
-      await updateRoomState(room.id, {
-        current_task_state: {
-          ...room.current_task_state,
-          player_hands: hands,
-          activeAttack: null
-        }
-      });
-    } else {
-      await updateRoomState(room.id, {
-        current_task_state: {
-          ...room.current_task_state,
-          activeAttack: null
-        }
-      });
-    }
+    setZoomedCardKey(null);
+    setCardFlipped(false);
   };
 
   // --- RENDERING HELPERS ---
@@ -1340,7 +1321,12 @@ export default function App() {
           <span className="castle">🏰</span>
           <span>{title}</span>
         </div>
-        <div style={{ display: 'flex', gap: '8px' }}>
+        <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+          {room?.code && (
+            <button className="btn secondary mini" onClick={handleForceSync} style={{ padding: '4px 8px', fontSize: '11px' }}>
+              🔄 Herlaad
+            </button>
+          )}
           {screen === 'game' && (
             <button className="iconbtn" onClick={() => setThemeMode(prev => prev === 'day' ? 'night' : 'day')} aria-label="Sfeer">
               {themeMode === 'day' ? "🌙" : "☀️"}
@@ -1374,8 +1360,6 @@ export default function App() {
 
   const renderRouteProgressRoad = () => {
     const pct = Math.min(100, Math.round((room.round / room.total_rounds) * 100));
-    
-    // Etappe checkpoints markers
     const stations = [
       { pct: 0, label: "Start", icon: "🔑" },
       { pct: 25, label: "Grens", icon: "🛂" },
@@ -1747,22 +1731,22 @@ export default function App() {
                 
                 <div className="card-3d-wrapper" onClick={() => setCardFlipped(prev => !prev)}>
                   <div className={`card-3d ${cardFlipped ? 'flipped' : ''}`}>
-                    {/* Front: themed illustration */}
+                    {/* Front: themed illustration & Title */}
                     <div className="card-front">
                       <div style={{ fontSize: '72px', margin: '40px 0 20px 0', filter: 'drop-shadow(0 4px 12px rgba(0,0,0,0.3))' }}>{card.icon}</div>
-                      <h2 style={{ fontSize: '28px', color: 'var(--gold)', margin: 0 }}>Wilde Rit</h2>
+                      <h2 style={{ fontSize: '28px', color: 'var(--gold)', margin: 0 }}>{card.name}</h2>
                       <span className="badge">Disney Power-up</span>
                     </div>
 
-                    {/* Back: details & action */}
-                    <div className="card-back" onClick={(e) => e.stopPropagation() /* prevent flip back when clicking action buttons */}>
-                      <div>
-                        <h3 style={{ margin: '0 0 10px 0', color: 'var(--gold)', fontSize: '24px' }}>{card.name}</h3>
+                    {/* Back: details & action only */}
+                    <div className="card-back">
+                      <div style={{ pointerEvents: 'none' }}>
+                        <h3 style={{ margin: '0 0 10px 0', color: 'var(--gold)', fontSize: '24px' }}>Uitleg</h3>
                         <hr style={{ margin: '8px 0' }} />
                         <p style={{ fontSize: '15px', lineHeight: '1.4', margin: '14px 0 0 0' }}>{card.desc}</p>
                       </div>
                       
-                      <div className="answers" style={{ width: '100%' }}>
+                      <div className="answers" style={{ width: '100%' }} onClick={e => e.stopPropagation() /* stop flip bubble on buttons click */}>
                         {(() => {
                           const activeAttack = room?.current_task_state?.activeAttack;
                           const isMeTarget = activeAttack && activeAttack.targetId === localPlayer?.id;
@@ -1955,8 +1939,38 @@ export default function App() {
           {screen === 'setup' && (
             <div>
               {renderAppHeader("Nieuwe Game", () => setScreen('home'))}
+              
               <section className="card">
-                <h2 className="sectiontitle">1. Kies het speltype</h2>
+                <h2 className="sectiontitle">1. Kies de spelonderdelen</h2>
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px', margin: '8px 0 12px 0' }}>
+                  {["Disney Dagboek", "Pictionary", "Inschattingsvragen", "Dilemma", "Emoji Quiz", "Wie ben ik?", "Disney Mastermind", "Feit of Fabel", "Quiz", "Samen"].map(cat => {
+                    const checked = selectedCats.includes(cat);
+                    return (
+                      <label key={cat} style={{ display: 'flex', alignItems: 'center', gap: '8px', background: '#091b33', padding: '10px', borderRadius: '8px', fontSize: '13px', cursor: 'pointer', border: '1px solid var(--line)' }}>
+                        <input 
+                          type="checkbox" 
+                          checked={checked} 
+                          onChange={() => {
+                            if (checked) {
+                              if (selectedCats.length > 1) {
+                                setSelectedCats(selectedCats.filter(c => c !== cat));
+                              } else {
+                                alert("Kies tenminste één categorie.");
+                              }
+                            } else {
+                              setSelectedCats([...selectedCats, cat]);
+                            }
+                          }}
+                        />
+                        {cat}
+                      </label>
+                    );
+                  })}
+                </div>
+              </section>
+
+              <section className="card">
+                <h2 className="sectiontitle">2. Kies het speltype</h2>
                 <div className="modegrid">
                   {GAME_MODES.map(m => (
                     <button 
@@ -1973,7 +1987,7 @@ export default function App() {
               </section>
 
               <section className="card">
-                <h2 className="sectiontitle">2. Kies een spelversie</h2>
+                <h2 className="sectiontitle">3. Kies een spelversie</h2>
                 <div className="versiongrid">
                   {GAME_VERSIONS.map(v => (
                     <button 
@@ -1990,7 +2004,7 @@ export default function App() {
               </section>
 
               <section className="card">
-                <h2 className="sectiontitle">3. Spelers en lengte</h2>
+                <h2 className="sectiontitle">4. Spelers en lengte</h2>
                 <div className="field">
                   <label htmlFor="hostName">Jouw Naam (Host)</label>
                   <input 
@@ -2095,7 +2109,7 @@ export default function App() {
                     Kamer: {room.code} · Mode: {GAME_MODES.find(m => m.id === room.game_mode)?.name}
                   </div>
 
-                  {/* Render new animated road progress */}
+                  {/* Render animated road progress */}
                   {renderRouteProgressRoad()}
 
                   {getCurrentTask() ? (
@@ -2150,7 +2164,6 @@ export default function App() {
                               <div>
                                 <div className="answers">
                                   {t.answers.map((ans, idx) => {
-                                    // Check if card tink is active (strike through 2 foute opties)
                                     const isTinkActive = room.current_task_state?.tinkActive;
                                     const isIncorrectOption = idx !== t.correct;
                                     const shouldHide = isTinkActive && isIncorrectOption && (idx === (t.correct + 1) % 4 || idx === (t.correct + 2) % 4);
@@ -2223,7 +2236,6 @@ export default function App() {
                                       })}
                                     </div>
 
-                                    {/* Display Correct Answers for the Reader */}
                                     <div className="notice" style={{ background: '#091c38', borderColor: 'var(--line)', fontSize: '13px' }}>
                                       <strong>Oplossing:</strong> {t.character_nl} / {t.character_en} ({t.movie_nl} / {t.movie_en})
                                     </div>
@@ -2243,7 +2255,7 @@ export default function App() {
                                   </div>
                                 );
                               } else {
-                                // Guesser View
+                                // Guesser View - Meeleesscherm text is completely REMOVED to avoid spoiling!
                                 const myAnswers = diaryAnswers[localPlayer.id] || {};
                                 const alreadySubmittedThisPart = !!myAnswers[`part${activePart}`];
 
@@ -2251,15 +2263,6 @@ export default function App() {
                                   <div>
                                     <div className="notice" style={{ background: '#0a1c3c' }}>
                                       <strong>Luister naar {activePlayer?.name}! 👂</strong> Hij/zij leest een geheim dagboekfragment voor. Raad welk karakter vertelt en uit welke film het komt!
-                                    </div>
-
-                                    <div style={{ padding: '12px', background: '#091c38', borderRadius: '12px', marginBottom: '14px', border: '1px solid var(--line)' }}>
-                                      <strong style={{ color: 'var(--gold)', display: 'block', marginBottom: '5px' }}>Lopend fragment (Meeleesscherm):</strong>
-                                      <p style={{ margin: 0, fontStyle: 'italic', fontSize: '15px', lineHeight: '1.4' }}>
-                                        {activePart >= 1 && t.part1}
-                                        {activePart >= 2 && <><br /><br />{t.part2}</>}
-                                        {activePart >= 3 && <><br /><br />{t.part3}</>}
-                                      </p>
                                     </div>
 
                                     {alreadySubmittedThisPart ? (
@@ -2270,11 +2273,11 @@ export default function App() {
                                       <div>
                                         <div className="field">
                                           <label>Welk Karakter?</label>
-                                          <input placeholder="Bijv. Aladdin of Captain Hook" value={diaryChar} onChange={e => setDiaryChar(e.target.value)} />
+                                          <input placeholder="Bijv. Remy of Aladdin" value={diaryChar} onChange={e => setDiaryChar(e.target.value)} />
                                         </div>
                                         <div className="field">
                                           <label>Welke Film?</label>
-                                          <input placeholder="Bijv. Aladdin of Tangled" value={diaryMovie} onChange={e => setDiaryMovie(e.target.value)} />
+                                          <input placeholder="Bijv. Ratatouille of Aladdin" value={diaryMovie} onChange={e => setDiaryMovie(e.target.value)} />
                                         </div>
                                         <button className="btn primary full" disabled={!diaryChar.trim() || !diaryMovie.trim()} onClick={() => handleSubmitDiaryPart(activePart)}>
                                           Bevestig antwoord voor deel {activePart}
@@ -2299,6 +2302,7 @@ export default function App() {
                                       </div>
                                       
                                       <svg 
+                                        ref={svgRef}
                                         viewBox="0 0 400 300" 
                                         className="drawing-canvas" 
                                         onPointerDown={(e) => handleSvgPointerDown(e, true)}
@@ -2329,9 +2333,9 @@ export default function App() {
                                         )}
                                       </svg>
 
-                                      <div className="btnrow stack" style={{ marginTop: '10px' }}>
-                                        <button className="btn secondary" onClick={handleClearDrawing}>Wis tekening</button>
-                                        <button className="btn ghost" onClick={() => handleSkipTask(false)}>Overslaan</button>
+                                      <div className="btnrow" style={{ marginTop: '10px' }}>
+                                        <button className="btn secondary" onClick={handleUndoDrawing}>↩️ Undo</button>
+                                        <button className="btn danger" onClick={handleClearDrawing}>Wis alles</button>
                                       </div>
 
                                       <div style={{ marginTop: '18px' }}>
@@ -2389,7 +2393,6 @@ export default function App() {
                               const votes = room.current_task_state.votes || {};
                               
                               if (isMyTurn) {
-                                // Active Player UI
                                 const hasEstimated = estimate !== undefined;
                                 const allVoted = players
                                   .filter(p => p.id !== localPlayer.id)
@@ -2440,7 +2443,6 @@ export default function App() {
                                   </div>
                                 );
                               } else {
-                                // Guessers UI
                                 const hasEstimated = estimate !== undefined;
                                 const myVote = votes[localPlayer.id];
 
@@ -2518,7 +2520,6 @@ export default function App() {
                                       </div>
                                     </div>
                                   ) : (
-                                    // Results diagram
                                     <div>
                                       <h3>De groepsmening:</h3>
                                       <div style={{ margin: '18px 0' }}>
@@ -2557,43 +2558,50 @@ export default function App() {
                               );
                             })()}
 
-                            {/* 7. EMOJI QUIZ */}
+                            {/* 7. EMOJI QUIZ (Converted from MC to typing input for adult difficulty) */}
                             {t.type === "emoji" && (
                               <div>
                                 <div className="center" style={{ fontSize: '48px', margin: '20px 0', letterSpacing: '4px', filter: 'drop-shadow(0 4px 10px rgba(0,0,0,0.3))' }}>
                                   {t.text}
                                 </div>
-                                <div className="answers">
-                                  {t.answers.map((ans, idx) => {
-                                    // Check if tink is active
-                                    const isTinkActive = room.current_task_state?.tinkActive;
-                                    const isIncorrectOption = idx !== t.correct;
-                                    const shouldHide = isTinkActive && isIncorrectOption && (idx === (t.correct + 1) % 4 || idx === (t.correct + 2) % 4);
-
-                                    if (shouldHide) return null;
-
-                                    let btnClass = "answer";
-                                    if (quizLocked) {
-                                      if (idx === t.correct) btnClass += " correct";
-                                      else if (idx === quizSelectedAnswer) btnClass += " wrong";
-                                    }
-                                    return (
-                                      <button 
-                                        key={idx}
-                                        className={btnClass}
-                                        disabled={quizLocked || !isMyTurn}
-                                        onClick={() => handleEmojiAnswer(idx, t)}
-                                      >
-                                        {ans}
+                                
+                                {quizLocked ? (
+                                  <div className="notice" style={{ background: match(quizSelectedAnswer, [t.movie_nl, t.movie_en, ...(t.movie_aliases || [])]) ? '#123d2b' : '#3d121c' }}>
+                                    <strong>
+                                      {match(quizSelectedAnswer, [t.movie_nl, t.movie_en, ...(t.movie_aliases || [])]) ? 'Correct! 🎉' : 'Helaas! 💔'}
+                                    </strong>
+                                    <p>Jouw antwoord: <em>{quizSelectedAnswer || "Geen"}</em></p>
+                                    <p style={{ marginTop: '10px' }}><strong>Oplossing:</strong> {t.movie_nl} / {t.movie_en}</p>
+                                    
+                                    {isMyTurn && (
+                                      <button className="btn primary full" style={{ marginTop: '14px' }} onClick={handleFinishTask}>
+                                        Volgende opdracht
                                       </button>
-                                    );
-                                  })}
-                                </div>
-                                {quizLocked && isMyTurn && (
-                                  <div style={{ marginTop: '12px' }}>
-                                    <button className="btn primary full" onClick={handleFinishTask}>
-                                      Volgende opdracht
-                                    </button>
+                                    )}
+                                  </div>
+                                ) : (
+                                  <div>
+                                    {isMyTurn ? (
+                                      <div>
+                                        <div className="field">
+                                          <label>Welke Disney film wordt hier uitgebeeld?</label>
+                                          <input 
+                                            placeholder="Bijv. Belle en het Beest" 
+                                            value={localEstimate} 
+                                            onChange={e => setLocalEstimate(e.target.value)} 
+                                          />
+                                        </div>
+                                        <button 
+                                          className="btn primary full" 
+                                          disabled={!localEstimate.trim()} 
+                                          onClick={() => handleEmojiTextAnswer(t)}
+                                        >
+                                          Antwoord bevestigen
+                                        </button>
+                                      </div>
+                                    ) : (
+                                      <div className="center">Wachten tot {activePlayer?.name} de emojis raadt... ⏳</div>
+                                    )}
                                   </div>
                                 )}
                               </div>
@@ -2663,7 +2671,7 @@ export default function App() {
                               );
                             })()}
 
-                            {/* 9. DISNEY MASTERMIND */}
+                            {/* 9. DISNEY MASTERMIND (Code Breaker - 10 beurten) */}
                             {t.type === "mastermind" && (() => {
                               const colors = [
                                 { label: '🔴 Mickey', color: '#ff7b8b' },
@@ -2683,7 +2691,6 @@ export default function App() {
                                       Vul de stippen met kleuren en klik op check. Vind de 5 juiste figuren en hun positie!
                                     </div>
 
-                                    {/* Guesses log */}
                                     <div style={{ display: 'grid', gap: '6px', marginBottom: '14px' }}>
                                       {mmGuesses.map((g, idx) => (
                                         <div key={idx} style={{ display: 'flex', gap: '10px', alignItems: 'center', background: '#091c38', padding: '8px 12px', borderRadius: '10px', border: '1px solid var(--line)' }}>
@@ -2750,7 +2757,7 @@ export default function App() {
                                         </div>
                                         
                                         <button className="btn primary full" onClick={handleMmSubmitGuess}>
-                                          Check Poging ({mmGuesses.length + 1}/6)
+                                          Check Poging ({mmGuesses.length + 1}/10)
                                         </button>
                                       </div>
                                     )}
@@ -2799,17 +2806,14 @@ export default function App() {
                               </div>
                             )}
 
-                            {/* 11. SAMEN (COOP) */}
+                            {/* 11. SAMEN (COOP timer synced in real-time) */}
                             {t.type === "group" && (
                               <div>
                                 {t.seconds && (
                                   <div id="timerArea" style={{ textAlign: 'center', marginBottom: '12px' }}>
                                     <div className={`timer ${secondsLeft <= 10 ? 'low' : ''}`}>{secondsLeft || t.seconds}</div>
                                     {!timerRunning && secondsLeft === 0 && (
-                                      <button className="btn secondary" onClick={() => {
-                                        setSecondsLeft(t.seconds);
-                                        setTimerRunning(true);
-                                      }}>
+                                      <button className="btn secondary" onClick={() => handleStartGroupTimer(t.seconds)}>
                                         Start timer
                                       </button>
                                     )}
@@ -2859,7 +2863,7 @@ export default function App() {
                     </section>
                   )}
 
-                  {/* Wilde Ritten: Player's card hand tray */}
+                  {/* Player's card hand tray */}
                   {(() => {
                     const myHand = room.current_task_state?.player_hands?.[localPlayer.id] || [];
                     if (!myHand.length) return null;
@@ -2950,14 +2954,14 @@ export default function App() {
               </section>
 
               <section className="card">
-                <div className="btnrow one">
-                  <button className="btn secondary" onClick={() => setScreen('scorelog')}>
-                    🧾 Scoreverloop aanpassen
-                  </button>
-                </div>
                 <div className="btnrow one" style={{ marginTop: '9px' }}>
                   <button className="btn primary" onClick={() => setScreen(scoreReturnScreen)}>
                     Terug naar het spel
+                  </button>
+                </div>
+                <div className="btnrow one" style={{ marginTop: '9px' }}>
+                  <button className="btn secondary" onClick={() => setScreen('scorelog')}>
+                    🧾 Scoreverloop aanpassen
                   </button>
                 </div>
                 <div className="btnrow one" style={{ marginTop: '9px' }}>
