@@ -180,6 +180,63 @@ const removeBg = (e) => {
   }
 };
 
+// Helper to check mastermind guess against code
+const checkGuess = (guess, code) => {
+  let black = 0;
+  let white = 0;
+  const guessUsed = Array(guess.length).fill(false);
+  const codeUsed = Array(code.length).fill(false);
+
+  // First pass: check for black pegs (correct color and position)
+  for (let i = 0; i < guess.length; i++) {
+    if (guess[i] === code[i]) {
+      black++;
+      guessUsed[i] = true;
+      codeUsed[i] = true;
+    }
+  }
+
+  // Second pass: check for white pegs (correct color, wrong position)
+  for (let i = 0; i < guess.length; i++) {
+    if (!guessUsed[i]) {
+      for (let j = 0; j < code.length; j++) {
+        if (!codeUsed[j] && guess[i] === code[j]) {
+          white++;
+          codeUsed[j] = true;
+          break;
+        }
+      }
+    }
+  }
+
+  return { black, white };
+};
+
+// Helper to calculate score rating
+const getMmRating = (turns, codeLength, maxTurns) => {
+  let goedMax = 5;
+  let gemMax = 8;
+  if (codeLength === 4) {
+    goedMax = 4;
+    gemMax = 6;
+  } else if (codeLength === 5) {
+    goedMax = 6;
+    gemMax = 9;
+  } else if (codeLength === 6) {
+    goedMax = 7;
+    gemMax = 10;
+  }
+
+  if (maxTurns < gemMax) {
+    gemMax = maxTurns - 1;
+    goedMax = Math.min(goedMax, Math.floor(gemMax / 2) + 1);
+  }
+
+  if (turns <= goedMax) return { label: "Goed", points: 3 };
+  if (turns <= gemMax) return { label: "Gemiddeld", points: 2 };
+  return { label: "Matig", points: 1 };
+};
+
 export default function App() {
   const [screen, setScreen] = useState('portal');
   const [loading, setLoading] = useState(false);
@@ -230,6 +287,10 @@ export default function App() {
   const [mmSolved, setMmSolved] = useState(false);
   const [mmFailed, setMmFailed] = useState(false);
   const [mmPointsEarned, setMmPointsEarned] = useState(0);
+  const [mmGameStarted, setMmGameStarted] = useState(false);
+  const [mmCodeLength, setMmCodeLength] = useState(5);
+  const [mmMaxTurns, setMmMaxTurns] = useState(10);
+  const [mmActiveSlot, setMmActiveSlot] = useState(0);
 
   // Wie ben ik states
   const [whoamiRevealed, setWhoamiRevealed] = useState(1);
@@ -467,8 +528,39 @@ export default function App() {
     if (room.current_task_id === 'quiz-choice') {
       return { id: "quiz-choice", cat: "Quiz", type: "quizChoice", title: "Kies je niveau", text: "Kies voor 1, 2 of 3 sterren.", points: 0 };
     }
-    return DEFAULT_TASKS.find(t => t.id === room.current_task_id) || null;
   };
+
+  // Reset task-specific states on task change
+  useEffect(() => {
+    setWhoamiRevealed(1);
+    setWhoamiSelected(null);
+    setWhoamiLocked(false);
+    setFactSelected(null);
+    setFactLocked(false);
+    setQuizSelectedAnswer(null);
+    setQuizLocked(false);
+    setDiaryChar('');
+    setDiaryMovie('');
+    setLocalEstimate('');
+    setDrawingPoints([]);
+    setIsDrawing(false);
+
+    // Reset Mastermind states
+    setMmGuesses([]);
+    setMmSolved(false);
+    setMmFailed(false);
+    setMmPointsEarned(0);
+    setMmGameStarted(false);
+    setMmActiveSlot(0);
+    
+    const task = getCurrentTask();
+    if (task && task.type === 'mastermind') {
+      const displayLength = room?.current_task_state?.codeLength || 5;
+      setMmCurrentGuess(Array(displayLength).fill(0));
+    } else {
+      setMmCurrentGuess([0, 0, 0, 0, 0]);
+    }
+  }, [room?.current_task_id]);
 
   const taskDeck = (task) => {
     if (!task || String(task.id).startsWith("custom-")) return room?.game_version || 1;
@@ -639,8 +731,8 @@ export default function App() {
   };
 
   const handleStartGame = async () => {
-    if (players.length < 2) {
-      alert("Er zijn minimaal 2 spelers nodig om te starten.");
+    if (players.length < 1) {
+      alert("Er is minimaal 1 speler nodig om te starten.");
       return;
     }
     setLoading(true);
@@ -1121,13 +1213,13 @@ export default function App() {
     const updatedGuesses = [...mmGuesses, { guess: [...mmCurrentGuess], ...feedback }];
     setMmGuesses(updatedGuesses);
     
-    if (feedback.black === 5) {
+    if (feedback.black === mmCode.length) {
       setMmSolved(true);
-      const turns = updatedGuesses.length;
-      const basePts = turns <= 4 ? 3 : turns <= 7 ? 2 : 1;
+      const rating = getMmRating(updatedGuesses.length, mmCode.length, mmMaxTurns);
+      const basePts = rating.points;
       const pts = room.current_task_state?.hyperdriveActive ? basePts * 2 : basePts;
       setMmPointsEarned(pts);
-    } else if (updatedGuesses.length >= 10) {
+    } else if (updatedGuesses.length >= mmMaxTurns) {
       setMmFailed(true);
     }
   };
@@ -1884,18 +1976,23 @@ export default function App() {
             <h3>Kies een speler</h3>
             <p>Op wie wil je {POWER_CARDS[strafTargetMode]?.name} spelen?</p>
             <div className="answers" style={{ marginTop: '14px' }}>
-              {players
-                .filter(p => p.id !== localPlayer.id)
-                .map(p => (
-                  <button 
-                    key={p.id} 
-                    className="answer"
-                    onClick={() => handlePlayAttackCard(strafTargetMode, p.id)}
-                  >
-                    🎯 {p.name}
-                  </button>
-                ))
-              }
+              {players.filter(p => p.id !== localPlayer.id).length === 0 ? (
+                <div className="notice danger" style={{ margin: '10px 0', textAlign: 'center' }}>
+                  Er zijn geen andere spelers om aan te vallen!
+                </div>
+              ) : (
+                players
+                  .filter(p => p.id !== localPlayer.id)
+                  .map(p => (
+                    <button 
+                      key={p.id} 
+                      className="answer"
+                      onClick={() => handlePlayAttackCard(strafTargetMode, p.id)}
+                    >
+                      🎯 {p.name}
+                    </button>
+                  ))
+              )}
               <button className="btn ghost full" style={{ marginTop: '8px' }} onClick={() => setStrafTargetMode(null)}>
                 Annuleren
               </button>
@@ -2073,8 +2170,27 @@ export default function App() {
               {renderAppHeader("Disney Road Quest", () => setScreen('portal'))}
               <section className="card hero">
                 <div className="badge">Multiplayer Edition · Real-time</div>
-                <img src={assetPath("header-logo.png")} style={{ maxWidth: '280px', margin: '15px auto 15px', display: 'block', filter: 'drop-shadow(0 8px 20px rgba(0, 0, 0, 0.4))' }} alt="Disney Road Quest Logo" />
-                <h1>Disney<br /><span className="gold">Road Quest</span></h1>
+                <div style={{ display: 'flex', justifyContent: 'center', width: '100%', overflow: 'visible', margin: '15px 0' }}>
+                  <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', width: 'max-content', maxWidth: '100%' }}>
+                    <img 
+                      src={assetPath("header-logo.png")} 
+                      style={{ 
+                        width: '120%', 
+                        height: 'auto', 
+                        aspectRatio: '16/9',
+                        maxWidth: '100%', 
+                        margin: '0 auto 10px', 
+                        display: 'block', 
+                        filter: 'drop-shadow(0 8px 20px rgba(0, 0, 0, 0.4))',
+                        borderRadius: '16px'
+                      }} 
+                      alt="Disney Road Quest Logo" 
+                    />
+                    <h1 style={{ margin: '8px 0 12px', whiteSpace: 'nowrap' }}>
+                      Disney <span className="gold">Road Quest</span>
+                    </h1>
+                  </div>
+                </div>
                 <p>Speel samen op je eigen telefoon tijdens de rit naar Disneyland Parijs!</p>
                 
                 <div className="field">
@@ -2840,110 +2956,277 @@ export default function App() {
                               );
                             })()}
 
-                            {/* 9. DISNEY MASTERMIND (Code Breaker - 10 beurten) */}
+                            {/* 9. DISNEY MASTERMIND (Code Breaker) */}
                             {t.type === "mastermind" && (() => {
                               const colors = [
-                                { label: '🔴 Mickey', color: '#ff7b8b' },
-                                { label: '🦁 Simba', color: '#ffd45c' },
-                                { label: '🔵 Stitch', color: '#74d7ff' },
-                                { label: '🟢 Buzz', color: '#65d9a3' },
-                                { label: '🟡 Winnie', color: '#ffe680' },
-                                { label: '🟣 Ursula', color: '#bd53ed' },
-                                { label: '🐚 Ariel', color: '#65d9c7' },
-                                { label: '❄️ Elsa', color: '#ffffff' }
+                                { label: 'Mickey', emoji: '🔴', color: '#ff7b8b' },
+                                { label: 'Simba', emoji: '🦁', color: '#ffd45c' },
+                                { label: 'Stitch', emoji: '🔵', color: '#74d7ff' },
+                                { label: 'Buzz', emoji: '🟢', color: '#65d9a3' },
+                                { label: 'Winnie', emoji: '🟡', color: '#ffe680' },
+                                { label: 'Ursula', emoji: '🟣', color: '#bd53ed' },
+                                { label: 'Ariel', emoji: '🐚', color: '#65d9c7' },
+                                { label: 'Elsa', emoji: '❄️', color: '#ffffff' }
                               ];
 
-                              if (isMyTurn) {
-                                return (
-                                  <div>
-                                    <div className="notice" style={{ background: '#0a1c3c' }}>
-                                      Vul de stippen met kleuren en klik op check. Vind de 5 juiste figuren en hun positie!
-                                    </div>
+                              const isMyTurn = room?.current_player_index === players.findIndex(p => p.id === localPlayer.id);
 
-                                    <div style={{ display: 'grid', gap: '6px', marginBottom: '14px' }}>
-                                      {mmGuesses.map((g, idx) => (
-                                        <div key={idx} style={{ display: 'flex', gap: '10px', alignItems: 'center', background: '#091c38', padding: '8px 12px', borderRadius: '10px', border: '1px solid var(--line)' }}>
-                                          <span style={{ fontSize: '12px', minWidth: '46px' }}>Beurt {idx+1}:</span>
-                                          <div style={{ display: 'flex', gap: '6px', flex: 1 }}>
-                                            {g.guess.map((cIdx, i) => (
-                                              <div key={i} style={{ width: '16px', height: '16px', borderRadius: '50%', background: colors[cIdx].color }}></div>
-                                            ))}
-                                          </div>
-                                          <div style={{ display: 'flex', gap: '4px', fontSize: '12px' }}>
-                                            {Array.from({ length: g.black }).map((_, i) => <span key={i}>⚫</span>)}
-                                            {Array.from({ length: g.white }).map((_, i) => <span key={i}>⚪</span>)}
-                                            {g.black === 0 && g.white === 0 && <span style={{ color: 'var(--muted)' }}>Geen</span>}
-                                          </div>
-                                        </div>
-                                      ))}
-                                    </div>
-
-                                    {mmSolved && (
-                                      <div className="notice green">
-                                        <strong>Gekracked! 🎉</strong> Je hebt de code gekraakt in {mmGuesses.length} beurten en scoort <strong>+{mmPointsEarned} ★</strong>!
-                                        <button className="btn primary full" style={{ marginTop: '10px' }} onClick={() => handleMmFinish(mmPointsEarned)}>
-                                          Beëindig & incasseer
-                                        </button>
-                                      </div>
-                                    )}
-
-                                    {mmFailed && (
-                                      <div className="notice danger">
-                                        <strong>Helaas! 💀</strong> De beurten zijn op. De geheime code was:
-                                        <div style={{ display: 'flex', gap: '8px', justifyContent: 'center', margin: '8px 0' }}>
-                                          {mmCode.map((cIdx, i) => (
-                                            <div key={i} style={{ width: '20px', height: '20px', borderRadius: '50%', background: colors[cIdx].color }} title={colors[cIdx].label}></div>
-                                          ))}
-                                        </div>
-                                        <button className="btn primary full" onClick={() => handleMmFinish(0)}>
-                                          Volgende opdracht
-                                        </button>
-                                      </div>
-                                    )}
-
-                                    {!mmSolved && !mmFailed && (
-                                      <div>
-                                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: '#091c38', padding: '14px', borderRadius: '14px', border: '1px solid var(--line)', marginBottom: '14px' }}>
-                                          <span>Huidige rij:</span>
-                                          <div style={{ display: 'flex', gap: '10px' }}>
-                                            {mmCurrentGuess.map((cIdx, idx) => (
-                                              <select 
-                                                key={idx} 
-                                                value={cIdx} 
-                                                onChange={e => {
-                                                  const newGuess = [...mmCurrentGuess];
-                                                  newGuess[idx] = Number(e.target.value);
-                                                  setMmCurrentGuess(newGuess);
-                                                }}
-                                                style={{ width: '46px', height: '36px', padding: '2px', background: colors[cIdx].color, color: 'transparent', border: 'none', borderRadius: '8px' }}
-                                              >
-                                                {colors.map((c, i) => (
-                                                  <option key={i} value={i} style={{ background: c.color, color: 'white' }}>{c.label}</option>
-                                                ))}
-                                              </select>
-                                            ))}
-                                          </div>
-                                        </div>
-                                        
-                                        <button className="btn primary full" onClick={handleMmSubmitGuess}>
-                                          Check Poging ({mmGuesses.length + 1}/10)
-                                        </button>
-                                      </div>
-                                    )}
-                                  </div>
-                                );
-                              } else {
+                              if (!isMyTurn) {
+                                const displayLength = room.current_task_state?.codeLength || 5;
                                 return (
                                   <div className="center">
                                     Wachten tot {activePlayer?.name} de Mastermind kleurcode kraakt... ⏳
                                     <div style={{ display: 'flex', gap: '6px', justifyContent: 'center', marginTop: '16px' }}>
-                                      {Array.from({ length: 5 }).map((_, i) => (
+                                      {Array.from({ length: displayLength }).map((_, i) => (
                                         <div key={i} style={{ width: '20px', height: '20px', borderRadius: '50%', background: '#10264f', border: '1.5px solid var(--line)' }}></div>
                                       ))}
                                     </div>
                                   </div>
                                 );
                               }
+
+                              if (!mmGameStarted) {
+                                return (
+                                  <div style={{ padding: '10px' }}>
+                                    <h3 style={{ textAlign: 'center', marginBottom: '20px', fontSize: '20px' }}>⚙️ Mastermind Instellingen</h3>
+                                    
+                                    <div style={{ marginBottom: '20px' }}>
+                                      <label style={{ display: 'block', marginBottom: '8px', fontSize: '15px', fontWeight: 'bold' }}>Aantal stippen (code lengte):</label>
+                                      <div style={{ display: 'flex', gap: '10px' }}>
+                                        {[4, 5, 6].map(len => (
+                                          <button 
+                                            key={len} 
+                                            className={`btn ${mmCodeLength === len ? 'primary' : 'secondary'}`} 
+                                            style={{ flex: 1, padding: '12px 10px', fontSize: '15px' }}
+                                            onClick={() => setMmCodeLength(len)}
+                                          >
+                                            {len} Stippen
+                                          </button>
+                                        ))}
+                                      </div>
+                                    </div>
+
+                                    <div style={{ marginBottom: '25px' }}>
+                                      <label style={{ display: 'block', marginBottom: '8px', fontSize: '15px', fontWeight: 'bold' }}>Aantal beurten:</label>
+                                      <div style={{ display: 'flex', gap: '10px' }}>
+                                        {[8, 10, 12].map(turns => (
+                                          <button 
+                                            key={turns} 
+                                            className={`btn ${mmMaxTurns === turns ? 'primary' : 'secondary'}`} 
+                                            style={{ flex: 1, padding: '12px 10px', fontSize: '15px' }}
+                                            onClick={() => setMmMaxTurns(turns)}
+                                          >
+                                            {turns} beurten
+                                          </button>
+                                        ))}
+                                      </div>
+                                    </div>
+
+                                    <button 
+                                      className="btn primary full" 
+                                      style={{ padding: '14px', fontSize: '16px' }}
+                                      onClick={async () => {
+                                        const code = [];
+                                        for (let i = 0; i < mmCodeLength; i++) {
+                                          code.push(Math.floor(Math.random() * colors.length));
+                                        }
+                                        setMmCode(code);
+                                        setMmCurrentGuess(Array(mmCodeLength).fill(-1));
+                                        setMmGuesses([]);
+                                        setMmActiveSlot(0);
+                                        setMmGameStarted(true);
+                                        setMmSolved(false);
+                                        setMmFailed(false);
+                                        
+                                        // Sync configuration to database so other players know code length
+                                        await updateRoomState(room.id, {
+                                          current_task_state: {
+                                            ...room.current_task_state,
+                                            codeLength: mmCodeLength
+                                          }
+                                        });
+                                      }}
+                                    >
+                                      Start Code Breaker 🎮
+                                    </button>
+                                  </div>
+                                );
+                              }
+
+                              const rating = getMmRating(mmGuesses.length, mmCode.length, mmMaxTurns);
+                              const isGuessComplete = mmCurrentGuess.every(val => val !== -1);
+
+                              return (
+                                <div>
+                                  <div className="notice" style={{ background: '#0a1c3c', fontSize: '13px', lineHeight: '1.4' }}>
+                                    💡 Tik op de Disney-figuren onderaan om de stippen van links naar rechts te vullen. Klik op een stip om die positie handmatig aan te passen.
+                                  </div>
+
+                                  {/* GUESS HISTORY */}
+                                  <div style={{ display: 'grid', gap: '8px', marginBottom: '16px' }}>
+                                    {mmGuesses.map((g, idx) => (
+                                      <div key={idx} style={{ display: 'flex', gap: '12px', alignItems: 'center', background: '#091c38', padding: '10px 14px', borderRadius: '12px', border: '1px solid var(--line)' }}>
+                                        <span style={{ fontSize: '13px', minWidth: '55px', color: 'var(--muted)', fontWeight: 'bold' }}>Rij {idx+1}:</span>
+                                        <div style={{ display: 'flex', gap: '6px', flex: 1 }}>
+                                          {g.guess.map((cIdx, i) => (
+                                            <div key={i} style={{ width: '22px', height: '22px', borderRadius: '50%', background: colors[cIdx].color, border: '1px solid rgba(255,255,255,0.3)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '12px' }}>
+                                              {colors[cIdx].emoji}
+                                            </div>
+                                          ))}
+                                        </div>
+                                        
+                                        {/* Large High Contrast Pegs & Text */}
+                                        <div style={{ display: 'flex', alignItems: 'center', gap: '10px', minWidth: '135px', justifyContent: 'flex-end' }}>
+                                          <div style={{ display: 'flex', gap: '4px' }}>
+                                            {Array.from({ length: g.black }).map((_, i) => (
+                                              <div key={i} style={{ width: '22px', height: '22px', borderRadius: '50%', background: '#000000', border: '2px solid #ffffff', boxShadow: '0 0 3px rgba(255,255,255,0.6)' }} title="Goed"></div>
+                                            ))}
+                                            {Array.from({ length: g.white }).map((_, i) => (
+                                              <div key={i} style={{ width: '22px', height: '22px', borderRadius: '50%', background: '#ffffff', border: '2px solid #000000', boxShadow: '0 0 3px rgba(0,0,0,0.6)' }} title="Bijna goed"></div>
+                                            ))}
+                                          </div>
+                                          <span style={{ fontSize: '13px', fontWeight: 'bold', color: 'var(--gold)', minWidth: '65px', textAlign: 'right' }}>
+                                            {g.black} Goed, {g.white} Kleur
+                                          </span>
+                                        </div>
+                                      </div>
+                                    ))}
+                                  </div>
+
+                                  {/* SOLVED STATE */}
+                                  {mmSolved && (
+                                    <div className="notice green" style={{ padding: '20px', textAlign: 'center' }}>
+                                      <div style={{ fontSize: '24px', marginBottom: '8px' }}>🎉 Gekruist!</div>
+                                      <p style={{ margin: '8px 0', fontSize: '15px' }}>
+                                        Je hebt de code gekraakt in <strong>{mmGuesses.length}</strong> beurten!
+                                      </p>
+                                      <div className="badge" style={{ background: 'var(--gold)', color: '#000', marginBottom: '15px', fontSize: '14px', fontWeight: 'bold', padding: '6px 12px' }}>
+                                        Beoordeling: {rating.label} (+{mmPointsEarned} ★)
+                                      </div>
+                                      <button className="btn primary full" onClick={() => handleMmFinish(mmPointsEarned)}>
+                                        Beëindig & incasseer
+                                      </button>
+                                    </div>
+                                  )}
+
+                                  {/* FAILED STATE */}
+                                  {mmFailed && (
+                                    <div className="notice danger" style={{ padding: '20px', textAlign: 'center' }}>
+                                      <div style={{ fontSize: '24px', marginBottom: '8px' }}>💀 Helaas!</div>
+                                      <p style={{ margin: '8px 0', fontSize: '15px' }}>De beurten zijn op. De geheime code was:</p>
+                                      <div style={{ display: 'flex', gap: '8px', justifyContent: 'center', margin: '14px 0' }}>
+                                        {mmCode.map((cIdx, i) => (
+                                          <div key={i} style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', width: '36px', height: '36px', borderRadius: '50%', background: colors[cIdx].color, fontSize: '20px', border: '1.5px solid rgba(255,255,255,0.4)' }} title={colors[cIdx].label}>
+                                            {colors[cIdx].emoji}
+                                          </div>
+                                        ))}
+                                      </div>
+                                      <button className="btn primary full" onClick={() => handleMmFinish(0)}>
+                                        Volgende opdracht
+                                      </button>
+                                    </div>
+                                  )}
+
+                                  {/* INTERACTIVE PLAY INTERFACE */}
+                                  {!mmSolved && !mmFailed && (
+                                    <div>
+                                      {/* CURRENT ROW SLOTS */}
+                                      <div style={{ background: '#091c38', padding: '16px', borderRadius: '16px', border: '1px solid var(--line)', marginBottom: '14px' }}>
+                                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' }}>
+                                          <span style={{ fontSize: '15px', fontWeight: 'bold' }}>Jouw poging:</span>
+                                          <span style={{ fontSize: '12px', color: 'var(--gold)', fontWeight: 'bold' }}>Positie {mmActiveSlot + 1} geselecteerd</span>
+                                        </div>
+                                        <div style={{ display: 'flex', gap: '10px', justifyContent: 'center' }}>
+                                          {mmCurrentGuess.map((cIdx, idx) => {
+                                            const isActive = mmActiveSlot === idx;
+                                            const hasValue = cIdx !== -1;
+                                            return (
+                                              <button
+                                                key={idx}
+                                                onClick={() => setMmActiveSlot(idx)}
+                                                style={{
+                                                  width: '46px',
+                                                  height: '46px',
+                                                  borderRadius: '50%',
+                                                  background: hasValue ? colors[cIdx].color : 'transparent',
+                                                  border: isActive ? '3px solid var(--gold)' : '2px dashed var(--line)',
+                                                  boxShadow: isActive ? '0 0 10px var(--gold)' : 'none',
+                                                  cursor: 'pointer',
+                                                  display: 'flex',
+                                                  alignItems: 'center',
+                                                  justifyContent: 'center',
+                                                  fontSize: '22px',
+                                                  transition: 'all 0.15s ease'
+                                                }}
+                                              >
+                                                {hasValue ? colors[cIdx].emoji : ''}
+                                              </button>
+                                            );
+                                          })}
+                                        </div>
+                                      </div>
+
+                                      {/* PUSH BUTTONS PALETTE */}
+                                      <div style={{ background: '#091c38', padding: '16px', borderRadius: '16px', border: '1px solid var(--line)', marginBottom: '14px' }}>
+                                        <div style={{ fontSize: '13px', fontWeight: 'bold', marginBottom: '12px', textAlign: 'center', color: 'var(--muted)' }}>
+                                          TIK EEN FIGUUR OM IN TE VULLEN
+                                        </div>
+                                        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '10px' }}>
+                                          {colors.map((c, i) => (
+                                            <button
+                                              key={i}
+                                              onClick={() => {
+                                                const newGuess = [...mmCurrentGuess];
+                                                newGuess[mmActiveSlot] = i;
+                                                setMmCurrentGuess(newGuess);
+                                                // Find next slot (looping)
+                                                setMmActiveSlot((mmActiveSlot + 1) % mmCodeLength);
+                                              }}
+                                              style={{
+                                                display: 'flex',
+                                                flexDirection: 'column',
+                                                alignItems: 'center',
+                                                justifyContent: 'center',
+                                                padding: '10px 4px',
+                                                borderRadius: '12px',
+                                                background: '#10274f',
+                                                border: '1px solid var(--line)',
+                                                cursor: 'pointer',
+                                                transition: 'all 0.15s ease'
+                                              }}
+                                              className="color-btn"
+                                            >
+                                              <span style={{ fontSize: '24px', marginBottom: '4px' }}>{c.emoji}</span>
+                                              <span style={{ fontSize: '11px', color: '#fff', fontWeight: 'bold', opacity: 0.9 }}>{c.label}</span>
+                                            </button>
+                                          ))}
+                                        </div>
+                                      </div>
+                                      
+                                      <div style={{ display: 'flex', gap: '10px' }}>
+                                        <button 
+                                          className="btn secondary" 
+                                          onClick={() => {
+                                            setMmCurrentGuess(Array(mmCodeLength).fill(-1));
+                                            setMmActiveSlot(0);
+                                          }}
+                                          style={{ flex: 1, padding: '14px', fontSize: '15px' }}
+                                        >
+                                          Wis rij 🔄
+                                        </button>
+                                        <button 
+                                          className="btn primary" 
+                                          disabled={!isGuessComplete}
+                                          onClick={handleMmSubmitGuess}
+                                          style={{ flex: 2, padding: '14px', fontSize: '15px' }}
+                                        >
+                                          Check ({mmGuesses.length + 1}/{mmMaxTurns})
+                                        </button>
+                                      </div>
+                                    </div>
+                                  )}
+                                </div>
+                              );
                             })()}
 
                             {/* 10. FEIT OF FABEL */}
@@ -3034,6 +3317,7 @@ export default function App() {
 
                   {/* Player's card hand tray */}
                   {(() => {
+                    if (players.length <= 1) return null;
                     const myHand = room.current_task_state?.player_hands?.[localPlayer.id] || [];
                     if (!myHand.length) return null;
 
