@@ -301,7 +301,8 @@ export function OthelloGame({ mode, room, localPlayer, players, updateRoomState,
 // ----------------------------------------------------
 export function DotsBoxesGame({ mode, room, localPlayer, players, updateRoomState, onFinish }) {
   const isSolo = mode === 'solo' || room.id === 'solo';
-  const playerColors = ['#0077ff', '#ff3b30', '#ffcc00', '#4cd964'];
+  const playerColors = ['#008cff', '#ff2f3f', '#ffcc00', '#4cd964'];
+  const playerBoxEmojis = ['👑', '🍎', '⭐', '🍀'];
   
   const myIndex = players.findIndex(p => p.id === localPlayer.id);
   const activeIndex = room.current_player_index || 0;
@@ -412,7 +413,7 @@ export function DotsBoxesGame({ mode, room, localPlayer, players, updateRoomStat
       }, 800);
       return () => clearTimeout(timer);
     }
-  }, [activeIndex, isSolo]);
+  }, [activeIndex, isSolo, hLines, vLines, boxes]);
 
   const handleLineClick = (index, isHorizontal) => {
     if (!myTurn || isSolo && activeIndex === 1) return;
@@ -502,16 +503,28 @@ export function DotsBoxesGame({ mode, room, localPlayer, players, updateRoomStat
           const r = Math.floor(idx / 3);
           const c = idx % 3;
           return (
-            <rect
-              key={idx}
-              x={30 + c * 60 + 5}
-              y={30 + r * 60 + 5}
-              width="50"
-              height="50"
-              fill={playerColors[owner]}
-              opacity="0.15"
-              rx="6"
-            />
+            <g key={idx}>
+              <rect
+                x={30 + c * 60 + 5}
+                y={30 + r * 60 + 5}
+                width="50"
+                height="50"
+                fill={playerColors[owner] || '#fff'}
+                opacity="0.88"
+                rx="6"
+                stroke={owner === 0 ? '#7ed1ff' : '#ff9aa3'}
+                strokeWidth="2"
+              />
+              <text
+                x={30 + c * 60 + 30}
+                y={30 + r * 60 + 38}
+                textAnchor="middle"
+                fontSize="25"
+                style={{ pointerEvents: 'none' }}
+              >
+                {playerBoxEmojis[owner] || '★'}
+              </text>
+            </g>
           );
         })}
 
