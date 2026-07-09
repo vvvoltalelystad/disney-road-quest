@@ -546,6 +546,7 @@ export default function App() {
       status: 'playing',
       game_mode: 'solo',
       current_task_id: taskId,
+      current_player_index: 0,
       current_task_state: {
         usedTasks: (taskId !== 'quiz-choice' && taskId !== 'solo-sudoku') ? [taskId] : [],
         taskHistory: [],
