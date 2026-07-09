@@ -39,20 +39,20 @@ const STAGES = [
 ];
 
 const POWER_CARDS = {
-  fastpass: { name: "FastPass 🎟️", desc: "Sla de huidige actieve opdracht over zonder beurtverlies.", icon: "🎟️", type: "self" },
-  hyperdrive: { name: "Hyperdrive 🚀", desc: "Verdubbel de score die je verdient bij je eerstvolgende speelbeurt.", icon: "🚀", type: "self" },
-  tink: { name: "Tinkelbel Stof 🪄", desc: "Streep 2 foute opties weg bij je volgende Quiz of Emoji Quiz-vraag.", icon: "🪄", type: "self" },
-  time: { name: "Tijdverdrijver 🕰️", desc: "Geeft 30 seconden extra tijd voor de actieve timer.", icon: "🕰️", type: "self" },
-  wish: { name: "Wens van Genie 🧞‍♂️", desc: "Ruil deze kaart in om direct 2 nieuwe willekeurige actiekaarten te trekken.", icon: "🧞‍♂️", type: "self" },
-  autopech: { name: "Autopech 🪓", desc: "Bevries een medespeler. Hij/zij moet zijn eerstvolgende speelbeurt overslaan.", icon: "🪓", type: "attack", selectTarget: true },
-  apple: { name: "Giftige Appel 🍎", desc: "Steel direct 1 ster van een speler naar keuze en voeg deze toe aan jouw score.", icon: "🍎", type: "attack", selectTarget: true },
-  abu: { name: "Sluipen met Abu 👣", desc: "Steel een willekeurige actiekaart uit de hand van een medespeler naar keuze.", icon: "👣", type: "attack", selectTarget: true },
-  kuzco: { name: "Kroon van Kuzco 👑", desc: "Wissel al jouw actiekaarten om met de kaarten van een medespeler naar keuze.", icon: "👑", type: "attack", selectTarget: true },
-  kaahypnose: { name: "Kaa's Hypnose 🌀", desc: "Halveer de beschikbare tijd op de timer van de speler die nu aan de beurt is.", icon: "🌀", type: "attack" },
-  shield: { name: "Magische Bumper 🛡️", desc: "Blokkeer een aanval (zoals Autopech of Giftige Appel) die een speler op jou speelt.", icon: "🛡️", type: "defense" },
-  spiegel: { name: "Magische Spiegel 🎭", desc: "Kaats een aanval van een medespeler direct terug naar de speler die hem op jou speelde.", icon: "🎭", type: "defense" },
-  shortcut: { name: "Sluiproute 🗺️", desc: "Wissel de huidige opdracht met een willekeurige opdracht uit een categorie naar keuze.", icon: "🗺️", type: "self" },
-  elsa: { name: "Elsa's Bevriezing ❄️", desc: "Zet de actieve timer gedurende 15 seconden volledig stil om rustig na te denken.", icon: "❄️", type: "self" }
+  fastpass: { name: "FastPass \u{1F3AB}", desc: "Sla de huidige actieve opdracht over.", icon: "\u{1F3AB}", type: "self" },
+  hyperdrive: { name: "Hyperdrive \u{1F680}", desc: "Verdubbel de score die je verdient bij je eerstvolgende speelbeurt.", icon: "\u{1F680}", type: "self" },
+  tink: { name: "Tinkelbel Stof \u{1FA84}", desc: "Streep 2 foute opties weg bij je volgende Quiz of Emoji Quiz-vraag.", icon: "\u{1FA84}", type: "self" },
+  time: { name: "Tijdverdrijver \u{1F570}\u{FE0F}", desc: "Geeft 30 seconden extra tijd voor de actieve timer.", icon: "\u{1F570}\u{FE0F}", type: "self" },
+  wish: { name: "Wens van Genie \u{1F9DE}\u{200D}\u{2642}\u{FE0F}", desc: "Ruil deze kaart in om direct 2 nieuwe willekeurige actiekaarten te trekken.", icon: "\u{1F9DE}\u{200D}\u{2642}\u{FE0F}", type: "self" },
+  autopech: { name: "Autopech \u{1FA93}", desc: "Bevries een medespeler. Hij/zij moet zijn eerstvolgende speelbeurt overslaan.", icon: "\u{1FA93}", type: "attack", selectTarget: true },
+  apple: { name: "Giftige Appel \u{1F34E}", desc: "Steel direct 1 ster van een speler naar keuze en voeg deze toe aan jouw score.", icon: "\u{1F34E}", type: "attack", selectTarget: true },
+  abu: { name: "Sluipen met Abu \u{1F463}", desc: "Steel een willekeurige actiekaart uit de hand van een medespeler naar keuze.", icon: "\u{1F463}", type: "attack", selectTarget: true },
+  kuzco: { name: "Kroon van Kuzco \u{1F451}", desc: "Wissel al jouw actiekaarten om met de kaarten van een medespeler naar keuze.", icon: "\u{1F451}", type: "attack", selectTarget: true },
+  kaahypnose: { name: "Kaa's Hypnose \u{1F300}", desc: "Halveer de beschikbare tijd op de timer van de speler die nu aan de beurt is.", icon: "\u{1F300}", type: "attack" },
+  shield: { name: "Magische Bumper \u{1F6E1}\u{FE0F}", desc: "Blokkeer een aanval (zoals Autopech of Giftige Appel) die een speler op jou speelt.", icon: "\u{1F6E1}\u{FE0F}", type: "defense" },
+  spiegel: { name: "Magische Spiegel \u{1F3AD}", desc: "Kaats een aanval van een medespeler direct terug naar de speler die hem op jou speelde.", icon: "\u{1F3AD}", type: "defense" },
+  shortcut: { name: "Sluiproute \u{1F5FA}\u{FE0F}", desc: "Wissel de huidige opdracht met een willekeurige opdracht uit een categorie naar keuze.", icon: "\u{1F5FA}\u{FE0F}", type: "self" },
+  elsa: { name: "Elsa's Bevriezing \u{2744}\u{FE0F}", desc: "Zet de actieve timer gedurende 15 seconden volledig stil om rustig na te denken.", icon: "\u{2744}\u{FE0F}", type: "self" }
 };
 
 const assetPath = (path) => {
@@ -1892,10 +1892,12 @@ export default function App() {
                           }
 
                           if (card.type !== 'defense') {
+                            const isTurnRestrictive = ['fastpass', 'hyperdrive', 'tink', 'shortcut'].includes(zoomedCardKey);
+                            const isMyTurn = room?.current_player_index === players.findIndex(p => p.id === localPlayer.id);
                             return (
                               <button 
                                 className="btn primary full"
-                                disabled={room?.current_player_index !== players.findIndex(p => p.id === localPlayer.id)}
+                                disabled={isTurnRestrictive && !isMyTurn}
                                 onClick={() => handlePlayCard(zoomedCardKey)}
                               >
                                 Speel kaart ➔
