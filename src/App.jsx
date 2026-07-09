@@ -1333,6 +1333,74 @@ export default function App() {
     setCardFlipped(false);
   };
 
+  const executeActiveAttack = async () => {
+    const attack = room.current_task_state.activeAttack;
+    const hands = room.current_task_state.player_hands || {};
+
+    if (attack.card === 'autopech') {
+      const frozen = room.current_task_state.frozenPlayers || {};
+      frozen[attack.targetId] = true;
+      await updateRoomState(room.id, {
+        current_task_state: {
+          ...room.current_task_state,
+          frozenPlayers: frozen,
+          activeAttack: null
+        }
+      });
+    } else if (attack.card === 'apple') {
+      const target = players.find(p => p.id === attack.targetId);
+      const attacker = players.find(p => p.id === attack.attackerId);
+      if (target && target.score > 0) {
+        await addPlayerScore(room.id, target, -1, `Giftige Appel gespeeld door ${attacker?.name}`, 'general');
+        if (attacker) {
+          await addPlayerScore(room.id, attacker, 1, `Giftige Appel gestolen van ${target?.name}`, 'general');
+        }
+      }
+      await updateRoomState(room.id, {
+        current_task_state: {
+          ...room.current_task_state,
+          activeAttack: null
+        }
+      });
+    } else if (attack.card === 'abu') {
+      const targetHand = hands[attack.targetId] || [];
+      const attackerHand = hands[attack.attackerId] || [];
+      if (targetHand.length > 0) {
+        const rIdx = Math.floor(Math.random() * targetHand.length);
+        const stolen = targetHand.splice(rIdx, 1)[0];
+        attackerHand.push(stolen);
+        hands[attack.targetId] = targetHand;
+        hands[attack.attackerId] = attackerHand;
+      }
+      await updateRoomState(room.id, {
+        current_task_state: {
+          ...room.current_task_state,
+          player_hands: hands,
+          activeAttack: null
+        }
+      });
+    } else if (attack.card === 'kuzco') {
+      const targetHand = hands[attack.targetId] || [];
+      const attackerHand = hands[attack.attackerId] || [];
+      hands[attack.targetId] = [...attackerHand];
+      hands[attack.attackerId] = [...targetHand];
+      await updateRoomState(room.id, {
+        current_task_state: {
+          ...room.current_task_state,
+          player_hands: hands,
+          activeAttack: null
+        }
+      });
+    } else {
+      await updateRoomState(room.id, {
+        current_task_state: {
+          ...room.current_task_state,
+          activeAttack: null
+        }
+      });
+    }
+  };
+
   // --- RENDERING HELPERS ---
 
   const renderAppHeader = (title = "Disney Road Quest", backAction = null) => {
