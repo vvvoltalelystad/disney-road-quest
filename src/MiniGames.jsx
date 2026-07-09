@@ -800,18 +800,33 @@ export function ColorLinesGame({ onFinish }) {
 }
 
 // ----------------------------------------------------
-// 4. RICOCHET SHOT COMPONENT (Fysica)
+// 4. RICOCHET SHOT COMPONENT (Fysica & Realtime Duel)
 // ----------------------------------------------------
-export function RicochetShotGame({ onFinish }) {
-  const [stars, setStars] = useState([
-    { x: 80, y: 70, collected: false },
-    { x: 220, y: 80, collected: false },
-    { x: 150, y: 150, collected: false },
-    { x: 60, y: 220, collected: false },
-    { x: 240, y: 220, collected: false }
-  ]);
+const createRicochetStars = () => [
+  { x: 80, y: 70, collected: false },
+  { x: 220, y: 80, collected: false },
+  { x: 150, y: 150, collected: false },
+  { x: 60, y: 220, collected: false },
+  { x: 240, y: 220, collected: false }
+];
+
+const createRicochetBall = () => ({ x: 150, y: 270, vx: 0, vy: 0, isMoving: false });
+
+export function RicochetShotGame({ mode, room, localPlayer, players, updateRoomState, onFinish }) {
+  const isSolo = mode === 'solo' || room.id === 'solo';
+  const myIndex = Math.max(0, players.findIndex(p => p.id === localPlayer.id));
+  const activeIndex = room.current_player_index || 0;
+  const taskState = room.current_task_state || {};
+
+  const syncedStars = taskState.ricochetStars || createRicochetStars();
+  const syncedBall = taskState.ricochetBall || createRicochetBall();
+  const syncedScores = taskState.ricochetScores || {};
+  const totalDuelPlayers = Math.min(2, players.length || 2);
+  const duelFinished = !isSolo && Object.keys(syncedScores).length >= totalDuelPlayers;
+
+  const [localStars, setLocalStars] = useState(createRicochetStars);
   const [shotsLeft, setShotsLeft] = useState(5);
-  const [ball, setBall] = useState({ x: 150, y: 270, vx: 0, vy: 0, isMoving: false });
+  const [localBall, setLocalBall] = useState(createRicochetBall);
   const [dragStart, setDragStart] = useState(null);
   const [dragCurrent, setDragCurrent] = useState(null);
 
@@ -828,12 +843,39 @@ export function RicochetShotGame({ onFinish }) {
     { x1: 100, y1: 190, x2: 200, y2: 190 }
   ];
 
+  const stars = isSolo ? localStars : syncedStars;
+  const ball = isSolo ? localBall : syncedBall;
+  const myTurn = isSolo || activeIndex === myIndex;
+  const hasPlayedDuelShot = !isSolo && syncedScores[myIndex] !== undefined;
+  const canShoot = myTurn && !ball.isMoving && !duelFinished && !hasPlayedDuelShot;
+  const physicsBallRef = useRef(ball);
+  const physicsStarsRef = useRef(stars);
+
+  useEffect(() => {
+    physicsBallRef.current = ball;
+    physicsStarsRef.current = stars;
+  }, [ball, stars]);
+
+  useEffect(() => {
+    if (isSolo || taskState.ricochetInitialized) return;
+
+    updateRoomState(room.id, {
+      current_player_index: 0,
+      current_task_state: {
+        ...taskState,
+        ricochetInitialized: true,
+        ricochetStars: createRicochetStars(),
+        ricochetBall: createRicochetBall(),
+        ricochetScores: {}
+      }
+    });
+  }, []);
+
   const handlePointerDown = (e) => {
-    if (ball.isMoving || shotsLeft === 0) return;
+    if (!canShoot || (isSolo && shotsLeft === 0)) return;
     const rect = e.currentTarget.getBoundingClientRect();
     const x = e.clientX - rect.left;
     const y = e.clientY - rect.top;
-    
     const dist = Math.hypot(x - ball.x, y - ball.y);
     if (dist < 30) {
       setDragStart({ x: ball.x, y: ball.y });
@@ -854,84 +896,171 @@ export function RicochetShotGame({ onFinish }) {
 
     const dx = dragStart.x - dragCurrent.x;
     const dy = dragStart.y - dragCurrent.y;
-    
-    setBall(prev => ({
-      ...prev,
+    const nextBall = {
+      ...ball,
       vx: dx * 0.15,
       vy: dy * 0.15,
       isMoving: true
-    }));
-    setShotsLeft(prev => prev - 1);
+    };
+
+    if (isSolo) {
+      setLocalBall(nextBall);
+      setShotsLeft(prev => prev - 1);
+    } else {
+      updateRoomState(room.id, {
+        current_task_state: {
+          ...taskState,
+          ricochetBall: nextBall
+        }
+      });
+    }
+
     setDragStart(null);
     setDragCurrent(null);
   };
 
   useEffect(() => {
     if (!ball.isMoving) return;
+    if (!isSolo && activeIndex !== myIndex) return;
 
-    const updatePhysics = () => {
-      setBall(prev => {
-        let nx = prev.x + prev.vx;
-        let ny = prev.y + prev.vy;
-        let nvx = prev.vx * 0.99;
-        let nvy = prev.vy * 0.99;
+    const stepBall = (currentBall, currentStars) => {
+      let nx = currentBall.x + currentBall.vx;
+      let ny = currentBall.y + currentBall.vy;
+      let nvx = currentBall.vx * 0.99;
+      let nvy = currentBall.vy * 0.99;
 
-        if (nx < 8) { nx = 8; nvx = -nvx; }
-        if (nx > 292) { nx = 292; nvx = -nvx; }
-        if (ny < 8) { ny = 8; nvy = -nvy; }
-        if (ny > 292) { ny = 292; nvy = -nvy; }
+      if (nx < 8) { nx = 8; nvx = -nvx; }
+      if (nx > 292) { nx = 292; nvx = -nvx; }
+      if (ny < 8) { ny = 8; nvy = -nvy; }
+      if (ny > 292) { ny = 292; nvy = -nvy; }
 
-        if (ny > 102 && ny < 118 && nx < 110) { nvy = -nvy; ny = prev.y; }
-        if (ny > 102 && ny < 118 && nx > 190) { nvy = -nvy; ny = prev.y; }
-        if (ny > 182 && ny < 198 && nx > 100 && nx < 200) { nvy = -nvy; ny = prev.y; }
+      if (ny > 102 && ny < 118 && nx < 110) { nvy = -nvy; ny = currentBall.y; }
+      if (ny > 102 && ny < 118 && nx > 190) { nvy = -nvy; ny = currentBall.y; }
+      if (ny > 182 && ny < 198 && nx > 100 && nx < 200) { nvy = -nvy; ny = currentBall.y; }
 
-        const speed = Math.hypot(nvx, nvy);
-        if (speed < 0.2) {
-          return { x: nx, y: 270, vx: 0, vy: 0, isMoving: false };
-        }
-
-        setStars(prevStars => prevStars.map(star => {
-          if (star.collected) return star;
-          const dist = Math.hypot(nx - star.x, ny - star.y);
-          if (dist < 15) return { ...star, collected: true };
-          return star;
-        }));
-
-        return { ...prev, x: nx, y: ny, vx: nvx, vy: nvy };
+      const nextStars = currentStars.map(star => {
+        if (star.collected) return star;
+        const dist = Math.hypot(nx - star.x, ny - star.y);
+        if (dist < 15) return { ...star, collected: true };
+        return star;
       });
 
+      const speed = Math.hypot(nvx, nvy);
+      if (speed < 0.2) {
+        return {
+          ball: { x: 150, y: 270, vx: 0, vy: 0, isMoving: false },
+          stars: nextStars,
+          stopped: true
+        };
+      }
+
+      return {
+        ball: { ...currentBall, x: nx, y: ny, vx: nvx, vy: nvy },
+        stars: nextStars,
+        stopped: false
+      };
+    };
+
+    const updatePhysics = () => {
+      const currentBall = physicsBallRef.current;
+      const currentStars = physicsStarsRef.current;
+
+      if (isSolo) {
+        const next = stepBall(currentBall, currentStars);
+        physicsBallRef.current = next.ball;
+        physicsStarsRef.current = next.stars;
+        setLocalBall(next.ball);
+        setLocalStars(next.stars);
+        if (next.stopped) return;
+
+        animationRef.current = requestAnimationFrame(updatePhysics);
+        return;
+      }
+
+      const next = stepBall(currentBall, currentStars);
+      physicsBallRef.current = next.ball;
+      physicsStarsRef.current = next.stars;
+      const nextState = {
+        ...taskState,
+        ricochetStars: next.stars,
+        ricochetBall: next.ball
+      };
+
+      if (next.stopped) {
+        const collected = next.stars.filter(s => s.collected).length;
+        const nextScores = { ...syncedScores, [activeIndex]: collected };
+        const nextActiveIndex = (activeIndex + 1) % totalDuelPlayers;
+        const allDone = Object.keys(nextScores).length >= totalDuelPlayers;
+
+        nextState.ricochetScores = nextScores;
+        if (!allDone) {
+          nextState.ricochetStars = createRicochetStars();
+          nextState.ricochetBall = createRicochetBall();
+        }
+
+        updateRoomState(room.id, {
+          current_player_index: allDone ? activeIndex : nextActiveIndex,
+          current_task_state: nextState
+        });
+        return;
+      }
+
+      updateRoomState(room.id, { current_task_state: nextState });
       animationRef.current = requestAnimationFrame(updatePhysics);
     };
 
     animationRef.current = requestAnimationFrame(updatePhysics);
     return () => cancelAnimationFrame(animationRef.current);
-  }, [ball.isMoving]);
+  }, [ball.isMoving, ball.x, ball.y, ball.vx, ball.vy, activeIndex, isSolo]);
 
   const collectedCount = stars.filter(s => s.collected).length;
-  const isGameOver = shotsLeft === 0 && !ball.isMoving || collectedCount === 5;
+  const isGameOver = isSolo
+    ? (shotsLeft === 0 && !ball.isMoving || collectedCount === 5)
+    : duelFinished;
 
   const handleFinishGame = () => {
-    let pts = 1;
-    let label = "Matig";
-    if (collectedCount === 5) { pts = 3; label = "Uitstekend"; }
-    else if (collectedCount >= 3) { pts = 2; label = "Gemiddeld"; }
-    onFinish(pts, `Ricochet Shot: ${collectedCount}/5 sterren verzameld (${label})`);
+    if (isSolo) {
+      let pts = 1;
+      let label = "Matig";
+      if (collectedCount === 5) { pts = 3; label = "Uitstekend"; }
+      else if (collectedCount >= 3) { pts = 2; label = "Gemiddeld"; }
+      onFinish(pts, `Ricochet Shot: ${collectedCount}/5 sterren verzameld (${label})`);
+      return;
+    }
+
+    const myScore = syncedScores[myIndex] || 0;
+    const bestScore = Math.max(...Object.values(syncedScores));
+    const winnerCount = Object.values(syncedScores).filter(score => score === bestScore).length;
+    const won = myScore === bestScore;
+    const pts = won ? (winnerCount > 1 ? 2 : 3) : 1;
+    const label = won ? (winnerCount > 1 ? "gelijkspel" : "gewonnen") : "verloren";
+    onFinish(pts, `Ricochet Shot ${label}: ${myScore}/5 sterren`);
   };
 
   return (
     <div style={{ textAlign: 'center' }}>
-      <div style={{ display: 'flex', justifyContent: 'space-between', margin: '10px 20px' }}>
-        <div style={{ color: 'var(--gold)', fontWeight: 'bold' }}>⭐ Sterren: {collectedCount}/5</div>
-        <div style={{ color: '#fff' }}>Schoten over: {shotsLeft}</div>
+      <div style={{ display: 'flex', justifyContent: 'space-between', gap: '8px', margin: '10px 20px', flexWrap: 'wrap' }}>
+        <div style={{ color: 'var(--gold)', fontWeight: 'bold' }}>Sterren: {collectedCount}/5</div>
+        {isSolo ? (
+          <div style={{ color: '#fff' }}>Schoten over: {shotsLeft}</div>
+        ) : (
+          <div style={{ color: '#fff' }}>
+            {players.slice(0, totalDuelPlayers).map((p, idx) => `${p.name}: ${syncedScores[idx] ?? '-'}`).join(' | ')}
+          </div>
+        )}
       </div>
 
       <div style={{ margin: '10px 0', fontSize: '13px' }}>
         {isGameOver ? (
           <button className="btn primary" onClick={handleFinishGame}>Voltooien & Score opslaan</button>
+        ) : !isSolo && hasPlayedDuelShot ? (
+          <span>Jouw schot zit erop. Wachten op de andere speler...</span>
+        ) : !myTurn ? (
+          <span>Wachten op tegenstander...</span>
         ) : !ball.isMoving ? (
           <span>Sleep de bal naar achteren om te richten en laat los!</span>
         ) : (
-          <span>Kaatsen... 💫</span>
+          <span>Kaatsen...</span>
         )}
       </div>
 
@@ -958,7 +1087,7 @@ export function RicochetShotGame({ onFinish }) {
 
         {stars.map((star, i) => (
           <g key={i} opacity={star.collected ? 0.2 : 1}>
-            <text x={star.x - 10} y={star.y + 8} fontSize="20">⭐</text>
+            <text x={star.x - 10} y={star.y + 8} fontSize="20">*</text>
           </g>
         ))}
 
@@ -974,12 +1103,11 @@ export function RicochetShotGame({ onFinish }) {
           />
         )}
 
-        <circle cx={ball.x} cy={ball.y} r="8" fill="linear-gradient(135deg, #00d2ff, #0066ff)" stroke="#fff" strokeWidth="1.5" />
+        <circle cx={ball.x} cy={ball.y} r="8" fill="#00a7ff" stroke="#fff" strokeWidth="1.5" />
       </svg>
     </div>
   );
 }
-
 // ----------------------------------------------------
 // 5. CURLING DUEL COMPONENT (Fysica & Realtime Duel)
 // ----------------------------------------------------
@@ -1324,12 +1452,15 @@ export function AbaloneGame({ mode, room, localPlayer, players, updateRoomState,
     const marbleIdx = marbles.findIndex(m => m.r === r && m.q === q);
     const hasMarble = marbleIdx !== -1;
 
-    if (hasMarble) {
+    if (hasMarble && (!selectedCell || marbles[marbleIdx].colorIdx === myIndex)) {
       const clickedMarble = marbles[marbleIdx];
       if (clickedMarble.colorIdx === myIndex) {
         setSelectedCell({ r, q });
       }
-    } else if (selectedCell !== null) {
+      return;
+    }
+
+    if (selectedCell !== null) {
       const dr = r - selectedCell.r;
       const dq = q - selectedCell.q;
 
@@ -1341,37 +1472,41 @@ export function AbaloneGame({ mode, room, localPlayer, players, updateRoomState,
 
       let nextMarbles = marbles.map(m => ({ ...m }));
       const myMarbleIdx = nextMarbles.findIndex(m => m.r === selectedCell.r && m.q === selectedCell.q);
+      if (myMarbleIdx === -1) {
+        setSelectedCell(null);
+        return;
+      }
 
-      nextMarbles[myMarbleIdx].r = r;
-      nextMarbles[myMarbleIdx].q = q;
-
-      const oppIdx = marbles.findIndex(m => m.r === r && m.q === q);
+      const targetMarble = hasMarble ? marbles[marbleIdx] : null;
       let pOutUpdate = 0;
 
-      if (oppIdx !== -1) {
-        const oppMarble = marbles[oppIdx];
-        if (oppMarble.colorIdx !== myIndex) {
-          const nr = r + dr;
-          const nq = q + dq;
-
-          if (Math.abs(nr) > 3 || Math.abs(nq) > 3 || Math.abs(nr + nq) > 3) {
-            nextMarbles = nextMarbles.filter(m => !(m.r === r && m.q === q));
-            pOutUpdate = 1;
-          } else {
-            const blocked = marbles.some(m => m.r === nr && m.q === nq);
-            if (blocked) {
-              setSelectedCell(null);
-              return;
-            }
-            const targetOppIdx = nextMarbles.findIndex(m => m.r === r && m.q === q && m.colorIdx !== myIndex);
-            nextMarbles[targetOppIdx].r = nr;
-            nextMarbles[targetOppIdx].q = nq;
-          }
-        } else {
+      if (targetMarble) {
+        if (targetMarble.colorIdx === myIndex) {
           setSelectedCell(null);
           return;
         }
+
+        const nr = r + dr;
+        const nq = q + dq;
+
+        if (Math.abs(nr) > 3 || Math.abs(nq) > 3 || Math.abs(nr + nq) > 3) {
+          nextMarbles = nextMarbles.filter(m => !(m.r === r && m.q === q));
+          pOutUpdate = 1;
+        } else {
+          const blocked = marbles.some(m => m.r === nr && m.q === nq);
+          if (blocked) {
+            setSelectedCell(null);
+            return;
+          }
+          const targetOppIdx = nextMarbles.findIndex(m => m.r === r && m.q === q && m.colorIdx !== myIndex);
+          nextMarbles[targetOppIdx].r = nr;
+          nextMarbles[targetOppIdx].q = nq;
+        }
       }
+
+      const movedMarbleIdx = nextMarbles.findIndex(m => m.r === selectedCell.r && m.q === selectedCell.q && m.colorIdx === myIndex);
+      nextMarbles[movedMarbleIdx].r = r;
+      nextMarbles[movedMarbleIdx].q = q;
 
       const totalPlayers = isSolo ? 2 : players.length;
       const nextActive = (activeIndex + 1) % totalPlayers;
@@ -1573,6 +1708,11 @@ export function MiniGameRenderer({ gameId, mode, room, localPlayer, players, upd
     case 'ricochet':
       return (
         <RicochetShotGame
+          mode={mode}
+          room={room}
+          localPlayer={localPlayer}
+          players={players}
+          updateRoomState={safeUpdateRoomState}
           onFinish={onFinish}
         />
       );

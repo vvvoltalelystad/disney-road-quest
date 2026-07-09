@@ -2694,7 +2694,7 @@ export default function App() {
                     }</strong>
                   </p>
 
-                  {(selectedArcadeGame === 'colorlines' || selectedArcadeGame === 'ricochet') ? (
+                  {selectedArcadeGame === 'colorlines' ? (
                     <button
                       className="btn primary full"
                       onClick={() => handleStartArcadeSolo(selectedArcadeGame)}
