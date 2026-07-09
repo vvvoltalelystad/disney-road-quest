@@ -368,6 +368,43 @@ export default function App() {
     return () => clearInterval(interval);
   }, [room?.current_task_state?.activeAttack?.timer, room?.current_task_state?.activeAttack?.targetId, players, localPlayer]);
 
+  // Synchronize local quiz/whoami/fact answer states with DB for all players to see selections
+  useEffect(() => {
+    const isLocked = room?.current_task_state?.quizLocked || false;
+    const selAns = room?.current_task_state?.selectedAnswer !== undefined ? room.current_task_state.selectedAnswer : null;
+    
+    // Sync Quiz
+    setQuizLocked(isLocked);
+    setQuizSelectedAnswer(selAns);
+
+    // Sync Who am I
+    setWhoamiLocked(isLocked);
+    setWhoamiSelected(selAns);
+
+    // Sync Fact or Fabel
+    setFactLocked(isLocked);
+    setFactSelected(selAns);
+  }, [room?.current_task_state?.quizLocked, room?.current_task_state?.selectedAnswer]);
+
+  // Auto-advance quiz after answer is selected (3-second delay)
+  useEffect(() => {
+    const isLocked = room?.current_task_state?.quizLocked;
+    const currentTask = getCurrentTask();
+    if (!isLocked || !currentTask) return;
+
+    const isAutoAdvanceType = ['quiz', 'whoami', 'fact', 'emoji'].includes(currentTask.type);
+    if (!isAutoAdvanceType) return;
+
+    const isHost = players[0]?.id === localPlayer?.id;
+    if (!isHost) return;
+
+    const timeout = setTimeout(async () => {
+      await handleFinishTask();
+    }, 3000);
+
+    return () => clearTimeout(timeout);
+  }, [room?.current_task_state?.quizLocked, room?.id, players[0]?.id]);
+
   // Real-time Group Timer Synchronization Hook
   useEffect(() => {
     const timerStartedAt = room?.current_task_state?.timerStartedAt;
@@ -531,7 +568,9 @@ export default function App() {
         tinkActive: false,
         hyperdriveActive: false,
         timerStartedAt: null,
-        timerDuration: null
+        timerDuration: null,
+        quizLocked: false,
+        selectedAnswer: undefined
       }
     });
   };
@@ -673,15 +712,14 @@ export default function App() {
   };
 
   const handleAnswerQuiz = async (answerIndex, correctAnswerIndex, points) => {
-    if (quizLocked) return;
-    setQuizLocked(true);
-    setQuizSelectedAnswer(answerIndex);
+    if (room.current_task_state?.quizLocked) return;
 
+    const isMyTurn = players[room.current_player_index]?.id === localPlayer?.id;
     const isCorrect = answerIndex === correctAnswerIndex;
-    if (isCorrect) {
-      const ptsToAward = room.current_task_state?.hyperdriveActive ? points * 2 : points;
-      const activePlayer = players[room.current_player_index];
+    const ptsToAward = room.current_task_state?.hyperdriveActive ? points * 2 : points;
+    const activePlayer = players[room.current_player_index];
 
+    if (isCorrect && isMyTurn) {
       await addPlayerScore(
         room.id, 
         activePlayer, 
@@ -691,6 +729,14 @@ export default function App() {
         getCurrentTask()
       );
     }
+
+    await updateRoomState(room.id, {
+      current_task_state: {
+        ...room.current_task_state,
+        quizLocked: true,
+        selectedAnswer: answerIndex
+      }
+    });
   };
 
   const handleFinishTask = async () => {
@@ -1095,27 +1141,43 @@ export default function App() {
 
   // Wie ben ik
   const handleWhoamiAnswer = async (idx, t) => {
-    if (whoamiLocked) return;
-    setWhoamiLocked(true);
-    setWhoamiSelected(idx);
+    if (room.current_task_state?.quizLocked) return;
+
+    const isMyTurn = players[room.current_player_index]?.id === localPlayer?.id;
     const correct = idx === t.correct;
-    if (correct) {
+    if (correct && isMyTurn) {
       const basePts = whoamiRevealed === 1 ? 3 : whoamiRevealed === 2 ? 2 : 1;
       const pts = room.current_task_state?.hyperdriveActive ? basePts * 2 : basePts;
       await addPlayerScore(room.id, localPlayer, pts, `Hint Quest: correct geraden met ${whoamiRevealed} hint(s)`, 'knowledge');
     }
+
+    await updateRoomState(room.id, {
+      current_task_state: {
+        ...room.current_task_state,
+        quizLocked: true,
+        selectedAnswer: idx
+      }
+    });
   };
 
   // Feit of Fabel
   const handleFactAnswer = async (isTrue, t) => {
-    if (factLocked) return;
-    setFactLocked(true);
-    setFactSelected(isTrue);
+    if (room.current_task_state?.quizLocked) return;
+
+    const isMyTurn = players[room.current_player_index]?.id === localPlayer?.id;
     const correct = isTrue === t.correct;
-    if (correct) {
+    if (correct && isMyTurn) {
       const pts = room.current_task_state?.hyperdriveActive ? 4 : 2;
       await addPlayerScore(room.id, localPlayer, pts, `Feit of Fabel: stelling correct beoordeeld`, 'knowledge');
     }
+
+    await updateRoomState(room.id, {
+      current_task_state: {
+        ...room.current_task_state,
+        quizLocked: true,
+        selectedAnswer: isTrue
+      }
+    });
   };
 
   // Emoji Quiz text submission
@@ -1134,8 +1196,8 @@ export default function App() {
 
   // --- POWER CARDS PLAY LOGIC ---
   const handlePlayCard = async (cardKey, targetPlayerId = null) => {
-    const hands = room.current_task_state.player_hands || {};
-    let myHand = hands[localPlayer.id] || [];
+    const hands = { ...(room.current_task_state.player_hands || {}) };
+    let myHand = [...(hands[localPlayer.id] || [])];
 
     const idx = myHand.indexOf(cardKey);
     if (idx !== -1) {
@@ -1335,10 +1397,10 @@ export default function App() {
 
   const executeActiveAttack = async () => {
     const attack = room.current_task_state.activeAttack;
-    const hands = room.current_task_state.player_hands || {};
+    const hands = { ...(room.current_task_state.player_hands || {}) };
 
     if (attack.card === 'autopech') {
-      const frozen = room.current_task_state.frozenPlayers || {};
+      const frozen = { ...(room.current_task_state.frozenPlayers || {}) };
       frozen[attack.targetId] = true;
       await updateRoomState(room.id, {
         current_task_state: {
@@ -1363,31 +1425,46 @@ export default function App() {
         }
       });
     } else if (attack.card === 'abu') {
-      const targetHand = hands[attack.targetId] || [];
-      const attackerHand = hands[attack.attackerId] || [];
+      const targetHand = [...(hands[attack.targetId] || [])];
+      const attackerHand = [...(hands[attack.attackerId] || [])];
       if (targetHand.length > 0) {
         const rIdx = Math.floor(Math.random() * targetHand.length);
         const stolen = targetHand.splice(rIdx, 1)[0];
         attackerHand.push(stolen);
-        hands[attack.targetId] = targetHand;
-        hands[attack.attackerId] = attackerHand;
+        
+        const newHands = {
+          ...hands,
+          [attack.targetId]: targetHand,
+          [attack.attackerId]: attackerHand
+        };
+        await updateRoomState(room.id, {
+          current_task_state: {
+            ...room.current_task_state,
+            player_hands: newHands,
+            activeAttack: null
+          }
+        });
+      } else {
+        await updateRoomState(room.id, {
+          current_task_state: {
+            ...room.current_task_state,
+            activeAttack: null
+          }
+        });
       }
-      await updateRoomState(room.id, {
-        current_task_state: {
-          ...room.current_task_state,
-          player_hands: hands,
-          activeAttack: null
-        }
-      });
     } else if (attack.card === 'kuzco') {
-      const targetHand = hands[attack.targetId] || [];
-      const attackerHand = hands[attack.attackerId] || [];
-      hands[attack.targetId] = [...attackerHand];
-      hands[attack.attackerId] = [...targetHand];
+      const targetHand = [...(hands[attack.targetId] || [])];
+      const attackerHand = [...(hands[attack.attackerId] || [])];
+      
+      const newHands = {
+        ...hands,
+        [attack.targetId]: attackerHand,
+        [attack.attackerId]: targetHand
+      };
       await updateRoomState(room.id, {
         current_task_state: {
           ...room.current_task_state,
-          player_hands: hands,
+          player_hands: newHands,
           activeAttack: null
         }
       });
