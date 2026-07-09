@@ -237,6 +237,111 @@ const getMmRating = (turns, codeLength, maxTurns) => {
   return { label: "Matig", points: 1 };
 };
 
+const EMOJIS_6X6 = ["👑", "🍎", "🦁", "❄️", "🌹", "🧞‍♂️"];
+const EMOJIS_9X9 = ["👑", "🍎", "🦁", "❄️", "🌹", "🧞‍♂️", "🐚", "🚀", "🔮"];
+
+const SUDOKU_6X6_TEMPLATES = [
+  {
+    solution: [
+      [1, 2, 3, 4, 5, 6],
+      [4, 5, 6, 1, 2, 3],
+      [2, 3, 4, 5, 6, 1],
+      [5, 6, 1, 2, 3, 4],
+      [3, 4, 5, 6, 1, 2],
+      [6, 1, 2, 3, 4, 5]
+    ],
+    clues: [
+      [1, 0, 3, 0, 5, 0],
+      [0, 5, 0, 1, 0, 3],
+      [2, 0, 4, 0, 6, 0],
+      [0, 6, 0, 2, 0, 4],
+      [3, 0, 5, 0, 1, 0],
+      [0, 1, 0, 3, 0, 5]
+    ]
+  },
+  {
+    solution: [
+      [5, 6, 1, 2, 3, 4],
+      [2, 3, 4, 5, 6, 1],
+      [6, 1, 2, 3, 4, 5],
+      [3, 4, 5, 6, 1, 2],
+      [1, 2, 3, 4, 5, 6],
+      [4, 5, 6, 1, 2, 3]
+    ],
+    clues: [
+      [0, 6, 0, 2, 0, 0],
+      [2, 0, 0, 0, 6, 1],
+      [0, 1, 2, 0, 4, 0],
+      [3, 0, 5, 0, 0, 2],
+      [0, 0, 3, 4, 0, 6],
+      [4, 5, 0, 0, 2, 0]
+    ]
+  }
+];
+
+const SUDOKU_9X9_TEMPLATES = [
+  {
+    solution: [
+      [1, 2, 3, 4, 5, 6, 7, 8, 9],
+      [4, 5, 6, 7, 8, 9, 1, 2, 3],
+      [7, 8, 9, 1, 2, 3, 4, 5, 6],
+      [2, 3, 1, 5, 6, 4, 8, 9, 7],
+      [5, 6, 4, 8, 9, 7, 2, 3, 1],
+      [8, 9, 7, 2, 3, 1, 5, 6, 4],
+      [3, 1, 2, 6, 4, 5, 9, 7, 8],
+      [6, 4, 5, 9, 7, 8, 3, 1, 2],
+      [9, 7, 8, 3, 1, 2, 6, 4, 5]
+    ],
+    clues: [
+      [1, 0, 0, 4, 0, 0, 7, 0, 0],
+      [0, 5, 0, 0, 8, 0, 0, 2, 0],
+      [0, 0, 9, 0, 0, 3, 0, 0, 6],
+      [2, 0, 0, 5, 0, 0, 8, 0, 0],
+      [0, 6, 0, 0, 9, 0, 0, 3, 0],
+      [0, 0, 7, 0, 0, 1, 0, 0, 4],
+      [3, 0, 0, 6, 0, 0, 9, 0, 0],
+      [0, 4, 0, 0, 7, 0, 0, 1, 0],
+      [0, 0, 8, 0, 0, 2, 0, 0, 5]
+    ]
+  },
+  {
+    solution: [
+      [5, 3, 4, 6, 7, 8, 9, 1, 2],
+      [6, 7, 2, 1, 9, 5, 3, 4, 8],
+      [1, 9, 8, 3, 4, 2, 5, 6, 7],
+      [8, 5, 9, 7, 6, 1, 4, 2, 3],
+      [4, 2, 6, 8, 5, 3, 7, 9, 1],
+      [7, 1, 3, 9, 2, 4, 8, 5, 6],
+      [9, 6, 1, 5, 3, 7, 2, 8, 4],
+      [2, 8, 7, 4, 1, 9, 6, 3, 5],
+      [3, 4, 5, 2, 8, 6, 1, 7, 9]
+    ],
+    clues: [
+      [5, 3, 0, 0, 7, 0, 0, 0, 0],
+      [6, 0, 0, 1, 9, 5, 0, 0, 0],
+      [0, 9, 8, 0, 0, 0, 0, 6, 0],
+      [8, 0, 0, 0, 6, 0, 0, 0, 3],
+      [4, 0, 0, 8, 0, 3, 0, 0, 1],
+      [7, 0, 0, 0, 2, 0, 0, 0, 6],
+      [0, 6, 0, 0, 0, 0, 2, 8, 0],
+      [0, 0, 0, 4, 1, 9, 0, 0, 5],
+      [0, 0, 0, 0, 8, 0, 0, 7, 9]
+    ]
+  }
+];
+
+const getCellBorderStyles = (r, c, size) => {
+  const styles = {};
+  if (size === 6) {
+    if (c === 2) styles.borderRight = '3.5px solid var(--gold)';
+    if (r === 1 || r === 3) styles.borderBottom = '3.5px solid var(--gold)';
+  } else if (size === 9) {
+    if (c === 2 || c === 5) styles.borderRight = '3.5px solid var(--gold)';
+    if (r === 2 || r === 5) styles.borderBottom = '3.5px solid var(--gold)';
+  }
+  return styles;
+};
+
 export default function App() {
   const [screen, setScreen] = useState('portal');
   const [loading, setLoading] = useState(false);
@@ -263,6 +368,100 @@ export default function App() {
   const [soloHistory, setSoloHistory] = useState(() => JSON.parse(localStorage.getItem('disney_solo_history') || '[]'));
   const soloLoggedRef = useRef(false);
 
+  // Sudoku states
+  const [sudokuGrid, setSudokuGrid] = useState([]);
+  const [sudokuSolution, setSudokuSolution] = useState([]);
+  const [sudokuClues, setSudokuClues] = useState([]);
+  const [sudokuSize, setSudokuSize] = useState(6);
+  const [sudokuSelectedCell, setSudokuSelectedCell] = useState(null);
+  const [sudokuStartTime, setSudokuStartTime] = useState(0);
+  const [sudokuErrors, setSudokuErrors] = useState([]);
+  const [sudokuSolved, setSudokuSolved] = useState(false);
+  const [sudokuSolvedStats, setSudokuSolvedStats] = useState(null);
+
+  const checkSudokuConflicts = (grid, size) => {
+    const conflicts = [];
+    const blockRSize = size === 6 ? 2 : 3;
+    const blockCSize = 3;
+
+    for (let r = 0; r < size; r++) {
+      for (let c = 0; c < size; c++) {
+        const val = grid[r]?.[c];
+        if (!val) continue;
+
+        for (let c2 = 0; c2 < size; c2++) {
+          if (c !== c2 && grid[r]?.[c2] === val) {
+            conflicts.push({ r, c });
+          }
+        }
+
+        for (let r2 = 0; r2 < size; r2++) {
+          if (r !== r2 && grid[r2]?.[c] === val) {
+            conflicts.push({ r, c });
+          }
+        }
+
+        const startR = Math.floor(r / blockRSize) * blockRSize;
+        const startC = Math.floor(c / blockCSize) * blockCSize;
+
+        for (let br = startR; br < startR + blockRSize; br++) {
+          for (let bc = startC; bc < startC + blockCSize; bc++) {
+            if ((br !== r || bc !== c) && grid[br]?.[bc] === val) {
+              conflicts.push({ r, c });
+            }
+          }
+        }
+      }
+    }
+    return conflicts;
+  };
+
+  const generateSudoku = (size) => {
+    const templates = size === 6 ? SUDOKU_6X6_TEMPLATES : SUDOKU_9X9_TEMPLATES;
+    const template = templates[Math.floor(Math.random() * templates.length)];
+    const emojis = size === 6 ? EMOJIS_6X6 : EMOJIS_9X9;
+
+    const shuffledEmojis = [...emojis].sort(() => Math.random() - 0.5);
+    const mapping = {};
+    for (let i = 1; i <= size; i++) {
+      mapping[i] = shuffledEmojis[i - 1];
+    }
+
+    const newGrid = [];
+    const newSolution = [];
+    const newClues = [];
+
+    for (let r = 0; r < size; r++) {
+      const gridRow = [];
+      const solRow = [];
+      const clueRow = [];
+      for (let c = 0; c < size; c++) {
+        const solVal = template.solution[r][c];
+        const clueVal = template.clues[r][c];
+        
+        const mappedSol = mapping[solVal];
+        const mappedClue = clueVal === 0 ? null : mapping[clueVal];
+        
+        gridRow.push(mappedClue);
+        solRow.push(mappedSol);
+        clueRow.push(clueVal !== 0);
+      }
+      newGrid.push(gridRow);
+      newSolution.push(solRow);
+      newClues.push(clueRow);
+    }
+
+    setSudokuGrid(newGrid);
+    setSudokuSolution(newSolution);
+    setSudokuClues(newClues);
+    setSudokuSize(size);
+    setSudokuSelectedCell(null);
+    setSudokuStartTime(Date.now());
+    setSudokuErrors([]);
+    setSudokuSolved(false);
+    setSudokuSolvedStats(null);
+  };
+
   const logSoloAttempt = (points = 0, customReason = null) => {
     const currentTask = getCurrentTask();
     if (!currentTask) return;
@@ -272,6 +471,8 @@ export default function App() {
     if (!reason) {
       if (currentTask.type === 'mastermind') {
         reason = mmSolved ? `Code gekraakt in ${mmGuesses.length} beurten` : "Code niet gekraakt";
+      } else if (currentTask.type === 'sudoku') {
+        reason = sudokuSolved && sudokuSolvedStats ? sudokuSolvedStats : "Sudoku niet opgelost";
       } else {
         reason = `Opdracht afgerond`;
       }
@@ -323,7 +524,12 @@ export default function App() {
 
   const handleStartSoloGame = (category) => {
     let taskId;
-    if (category === 'Quiz') {
+    let size = 6;
+    if (category.startsWith('Disney Sudoku')) {
+      taskId = 'solo-sudoku';
+      size = category.endsWith('6x6') ? 6 : 9;
+      generateSudoku(size);
+    } else if (category === 'Quiz') {
       taskId = 'quiz-choice';
     } else {
       const tasksOfCat = DEFAULT_TASKS.filter(t => t.cat === category && t.active !== false);
@@ -341,10 +547,11 @@ export default function App() {
       game_mode: 'solo',
       current_task_id: taskId,
       current_task_state: {
-        usedTasks: taskId !== 'quiz-choice' ? [taskId] : [],
+        usedTasks: (taskId !== 'quiz-choice' && taskId !== 'solo-sudoku') ? [taskId] : [],
         taskHistory: [],
         codeLength: 5,
-        enabledCategories: [category]
+        enabledCategories: [category],
+        sudokuSize: size
       }
     });
 
@@ -626,6 +833,14 @@ export default function App() {
     if (room.current_task_id === 'quiz-choice') {
       return { id: "quiz-choice", cat: "Quiz", type: "quizChoice", title: "Kies je niveau", text: "Kies voor 1, 2 of 3 sterren.", points: 0 };
     }
+    if (room.current_task_id === 'solo-sudoku') {
+      return { 
+        id: "solo-sudoku", 
+        cat: room.current_task_state?.sudokuSize === 6 ? "Mickey Sudoku (6x6)" : "Kasteel Sudoku (9x9)", 
+        type: "sudoku" 
+      };
+    }
+    return DEFAULT_TASKS.find(t => t.id === room.current_task_id) || customTasks.find(t => t.id === room.current_task_id) || null;
   };
 
   // Reset task-specific states on task change
@@ -2292,10 +2507,10 @@ export default function App() {
                 <h2 className="sectiontitle">🎮 Kies een Speltype</h2>
                 <div style={{ display: 'grid', gridTemplateColumns: 'repeat(1, 1fr)', gap: '12px', marginTop: '14px' }}>
                   {[
-                    { cat: "Disney Mastermind", icon: "🧠", name: "Disney Mastermind (Code Breaker)", desc: "Kleurcode kraken (4, 5 of 6 stippen)", active: true },
-                    { cat: "Disney Dagboek", icon: "📔", name: "Disney Dagboek (Geheim)", desc: "Binnenkort beschikbaar", active: false },
-                    { cat: "Emoji Quiz", icon: "🎬", name: "Emoji Quiz (Film raden)", desc: "Binnenkort beschikbaar", active: false },
-                    { cat: "Quiz", icon: "❓", name: "Quiz (Kennisvragen)", desc: "Binnenkort beschikbaar", active: false }
+                    { cat: "Disney Mastermind", icon: "🧠", name: "Disney Mastermind", desc: "Kleurcode kraken (4, 5 of 6 stippen)", active: true },
+                    { cat: "Disney Sudoku 6x6", icon: "✨", name: "Mickey Sudoku (6x6)", desc: "Mickey-oren grid met 6 symbolen. Makkelijk.", active: true },
+                    { cat: "Disney Sudoku 9x9", icon: "🏰", name: "Kasteel Sudoku (9x9)", desc: "Klassiek Sudoku raster met 9 symbolen. Uitdagend.", active: true },
+                    { cat: "Disney Dagboek", icon: "📔", name: "Disney Dagboek (Geheim)", desc: "Binnenkort beschikbaar", active: false }
                   ].map(game => (
                     <button
                       key={game.cat}
@@ -2652,6 +2867,206 @@ export default function App() {
                           <div className="prompt">{t.text}</div>
 
                           <div style={{ marginTop: '20px' }}>
+                            {/* 0. DISNEY SUDOKU */}
+                            {t.type === "sudoku" && (
+                              <div>
+                                {sudokuSolved ? (
+                                  <div className="center" style={{ padding: '20px 10px' }}>
+                                    <div style={{ fontSize: '64px', margin: '20px 0', animation: 'bounce 1s infinite' }}>🏰</div>
+                                    <h2 style={{ color: 'var(--gold)', fontSize: '28px', marginBottom: '10px' }}>Sudoku Opgelost!</h2>
+                                    <p style={{ color: '#fff', fontSize: '15px', marginBottom: '20px', maxWidth: '300px', margin: '0 auto 20px' }}>
+                                      {sudokuSolvedStats}
+                                    </p>
+                                    <button 
+                                      className="btn primary full" 
+                                      onClick={handleFinishTask}
+                                    >
+                                      Beëindig & incasseer ★
+                                    </button>
+                                  </div>
+                                ) : (
+                                  <div>
+                                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '10px', fontSize: '13px', color: 'var(--muted)' }}>
+                                      <span>Tijd verstreken: {Math.floor((Date.now() - sudokuStartTime) / 1000)}s</span>
+                                      <span>Geen fouten maken voor bonussterren!</span>
+                                    </div>
+
+                                    {/* The Sudoku Grid */}
+                                    <div 
+                                      style={{ 
+                                        display: 'grid', 
+                                        gridTemplateColumns: `repeat(${sudokuSize}, 1fr)`, 
+                                        gap: '4px', 
+                                        maxWidth: '360px', 
+                                        margin: '10px auto', 
+                                        background: '#041026', 
+                                        padding: '8px', 
+                                        borderRadius: '16px', 
+                                        border: '2px solid var(--line)' 
+                                      }}
+                                    >
+                                      {sudokuGrid.map((row, rIdx) => 
+                                        row.map((cell, cIdx) => {
+                                          const isClue = sudokuClues[rIdx]?.[cIdx];
+                                          const isSelected = sudokuSelectedCell?.row === rIdx && sudokuSelectedCell?.col === cIdx;
+                                          const hasError = sudokuErrors.some(err => err.r === rIdx && err.c === cIdx);
+                                          const borderStyles = getCellBorderStyles(rIdx, cIdx, sudokuSize);
+
+                                          return (
+                                            <div
+                                              key={`${rIdx}-${cIdx}`}
+                                              onClick={() => {
+                                                if (isClue) return;
+                                                setSudokuSelectedCell({ row: rIdx, col: cIdx });
+                                              }}
+                                              style={{
+                                                aspectRatio: '1',
+                                                display: 'flex',
+                                                alignItems: 'center',
+                                                justifyContent: 'center',
+                                                fontSize: sudokuSize === 6 ? '24px' : '18px',
+                                                borderRadius: '8px',
+                                                cursor: isClue ? 'not-allowed' : 'pointer',
+                                                userSelect: 'none',
+                                                transition: 'all 0.15s ease',
+                                                background: isClue 
+                                                  ? 'rgba(255, 212, 92, 0.06)' 
+                                                  : isSelected 
+                                                    ? 'rgba(255, 212, 92, 0.15)' 
+                                                    : '#091c38',
+                                                border: isSelected 
+                                                  ? '2.5px solid var(--gold)' 
+                                                  : hasError 
+                                                    ? '1.5px solid var(--danger)' 
+                                                    : '1px solid var(--line)',
+                                                boxShadow: isSelected 
+                                                  ? '0 0 10px rgba(255, 212, 92, 0.4)' 
+                                                  : hasError 
+                                                    ? '0 0 8px rgba(255, 100, 100, 0.4)' 
+                                                    : 'none',
+                                                color: isClue ? 'var(--gold)' : '#fff',
+                                                fontWeight: isClue ? 'bold' : 'normal',
+                                                ...borderStyles
+                                              }}
+                                            >
+                                              {cell || ""}
+                                            </div>
+                                          );
+                                        })
+                                      )}
+                                    </div>
+
+                                    {/* Palette selector */}
+                                    <div style={{ marginTop: '20px' }}>
+                                      <p style={{ textAlign: 'center', fontSize: '13px', color: 'var(--muted)', marginBottom: '10px' }}>
+                                        {sudokuSelectedCell 
+                                          ? "Kies een symbool voor het geselecteerde vakje:" 
+                                          : "Klik op een leeg vakje om een symbool te plaatsen"
+                                        }
+                                      </p>
+
+                                      <div 
+                                        style={{ 
+                                          display: 'flex', 
+                                          justifyContent: 'center', 
+                                          gap: '8px', 
+                                          flexWrap: 'wrap', 
+                                          maxWidth: '360px', 
+                                          margin: '0 auto' 
+                                        }}
+                                      >
+                                        {(sudokuSize === 6 ? EMOJIS_6X6 : EMOJIS_9X9).map(emoji => (
+                                          <button
+                                            key={emoji}
+                                            disabled={!sudokuSelectedCell}
+                                            onClick={() => {
+                                              if (!sudokuSelectedCell) return;
+                                              const { row, col } = sudokuSelectedCell;
+                                              const newGrid = [...sudokuGrid];
+                                              newGrid[row][col] = emoji;
+                                              setSudokuGrid(newGrid);
+
+                                              const newConflicts = checkSudokuConflicts(newGrid, sudokuSize);
+                                              setSudokuErrors(newConflicts);
+
+                                              // Check completion
+                                              const isFilled = newGrid.every(r => r.every(c => c !== null));
+                                              if (isFilled && newConflicts.length === 0) {
+                                                const sec = Math.round((Date.now() - sudokuStartTime) / 1000);
+                                                let pts = 1;
+                                                let label = "Matig";
+                                                if (sudokuSize === 6) {
+                                                  if (sec <= 120) { pts = 3; label = "Goed"; }
+                                                  else if (sec <= 240) { pts = 2; label = "Gemiddeld"; }
+                                                } else {
+                                                  if (sec <= 300) { pts = 3; label = "Goed"; }
+                                                  else if (sec <= 480) { pts = 2; label = "Gemiddeld"; }
+                                                }
+                                                const statsStr = `${sudokuSize === 6 ? "Mickey Sudoku (6x6)" : "Kasteel Sudoku (9x9)"} gekraakt in ${Math.floor(sec / 60)}m ${sec % 60}s. Beoordeling: ${label}`;
+                                                setSudokuSolved(true);
+                                                setSudokuSolvedStats(statsStr);
+
+                                                // Award score
+                                                addPlayerScore('solo', localPlayer, pts, statsStr, 'knowledge');
+                                              }
+                                            }}
+                                            style={{
+                                              width: '44px',
+                                              height: '44px',
+                                              fontSize: '20px',
+                                              borderRadius: '10px',
+                                              background: '#091c38',
+                                              border: '1px solid var(--line)',
+                                              cursor: sudokuSelectedCell ? 'pointer' : 'not-allowed',
+                                              opacity: sudokuSelectedCell ? 1 : 0.4,
+                                              display: 'flex',
+                                              alignItems: 'center',
+                                              justifyContent: 'center',
+                                              transition: 'all 0.15s ease'
+                                            }}
+                                            className="sudoku-palette-btn"
+                                          >
+                                            {emoji}
+                                          </button>
+                                        ))}
+
+                                        <button
+                                          disabled={!sudokuSelectedCell}
+                                          onClick={() => {
+                                            if (!sudokuSelectedCell) return;
+                                            const { row, col } = sudokuSelectedCell;
+                                            const newGrid = [...sudokuGrid];
+                                            newGrid[row][col] = null;
+                                            setSudokuGrid(newGrid);
+
+                                            const newConflicts = checkSudokuConflicts(newGrid, sudokuSize);
+                                            setSudokuErrors(newConflicts);
+                                          }}
+                                          style={{
+                                            padding: '0 12px',
+                                            height: '44px',
+                                            fontSize: '13px',
+                                            borderRadius: '10px',
+                                            background: '#5a1d1d',
+                                            border: '1px solid var(--danger)',
+                                            color: '#fff',
+                                            cursor: sudokuSelectedCell ? 'pointer' : 'not-allowed',
+                                            opacity: sudokuSelectedCell ? 1 : 0.4,
+                                            display: 'flex',
+                                            alignItems: 'center',
+                                            justifyContent: 'center',
+                                            fontWeight: 'bold'
+                                          }}
+                                        >
+                                          Wis
+                                        </button>
+                                      </div>
+                                    </div>
+                                  </div>
+                                )}
+                              </div>
+                            )}
+
                             {/* 1. QUIZ LEVEL CHOICE */}
                             {t.type === "quizChoice" && (
                               <div>
