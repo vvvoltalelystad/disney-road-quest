@@ -1669,16 +1669,197 @@ export function AbaloneGame({ mode, room, localPlayer, players, updateRoomState,
   );
 }
 
+const MINI_GAME_RULES = {
+  othello: {
+    title: "Othello / Reversi",
+    intro: "Leg fiches op het bord en sluit fiches van de tegenstander in.",
+    rules: [
+      "Blauw begint.",
+      "Je mag alleen plaatsen op een vakje waarmee je minstens een fiche van de tegenstander insluit.",
+      "Alle ingesloten fiches tussen jouw nieuwe fiche en een bestaande fiche van jou draaien om naar jouw kleur.",
+      "Kun je geen geldige zet doen, dan gaat de beurt naar de tegenstander.",
+      "Als niemand meer kan zetten, wint de speler met de meeste fiches."
+    ],
+    solo: "Solo: jij speelt blauw tegen de computer.",
+    duel: "Duel: speler 1 is blauw, speler 2 is rood. Beurten worden realtime gesynchroniseerd."
+  },
+  dotsboxes: {
+    title: "Dots & Boxes",
+    intro: "Trek lijnen tussen punten en probeer de meeste vakjes te claimen.",
+    rules: [
+      "Tik op een stippellijn om die lijn te trekken.",
+      "Maak je de vierde zijde van een vakje af, dan claim je dat vakje.",
+      "Claim je een vakje, dan mag je nog een keer.",
+      "Maak je geen vakje af, dan gaat de beurt naar de volgende speler.",
+      "Als alle vakjes gevuld zijn, wint de speler met de meeste vakjes."
+    ],
+    solo: "Solo: jij speelt tegen de computer.",
+    duel: "Duel: elke getrokken lijn en elk geclaimd vakje verschijnt realtime bij de ander."
+  },
+  colorlines: {
+    title: "Color Lines",
+    intro: "Maak lijnen van vijf dezelfde bollen voordat het bord volloopt.",
+    rules: [
+      "Tik eerst een bol aan en tik daarna op een leeg vakje om hem te verplaatsen.",
+      "Een bol kan alleen bewegen als er een vrij pad naar het doelvakje is.",
+      "Maak horizontaal, verticaal of diagonaal een rij van vijf of meer gelijke bollen.",
+      "Na een zet zonder lijn verschijnen er nieuwe bollen.",
+      "Het spel eindigt wanneer er te weinig vrije plekken over zijn."
+    ],
+    solo: "Color Lines is een solo-puzzel. Je score wordt opgeslagen wanneer je klaar bent."
+  },
+  ricochet: {
+    title: "Ricochet Shot",
+    intro: "Schiet de bal via muren door het doolhof en verzamel sterren.",
+    rules: [
+      "Sleep de bal naar achteren om richting en kracht te bepalen.",
+      "Laat los om te schieten.",
+      "De bal stuitert tegen muren en obstakels.",
+      "Elke geraakte ster telt mee voor je score.",
+      "In duel krijgt elke speler een schot; de meeste sterren wint."
+    ],
+    solo: "Solo: je hebt meerdere schoten om zoveel mogelijk sterren te pakken.",
+    duel: "Duel: jouw schot en score worden realtime gedeeld met de tegenstander."
+  },
+  curling: {
+    title: "Curling Duel",
+    intro: "Schuif stenen over het ijs en eindig zo dicht mogelijk bij het midden.",
+    rules: [
+      "Sleep onderin de ijsbaan om richting en kracht te bepalen.",
+      "Laat los om een steen te schuiven.",
+      "Stenen kunnen botsen en elkaar verplaatsen.",
+      "Spelers schieten om de beurt.",
+      "Na alle stenen wint de speler met de steen het dichtst bij de stip."
+    ],
+    solo: "Solo: jij speelt tegen de computer.",
+    duel: "Duel: alle steenposities en botsingen worden realtime gesynchroniseerd."
+  },
+  abalone: {
+    title: "Marble Push (Abalone)",
+    intro: "Verplaats bollen op het hex-bord en duw bollen van de tegenstander eruit.",
+    rules: [
+      "Tik op een eigen bol om die te selecteren.",
+      "Tik daarna op een aangrenzend vakje om te bewegen.",
+      "Staat daar een tegenstander, dan probeer je die in dezelfde richting te duwen.",
+      "Je kunt alleen duwen als het vakje achter de tegenstander vrij is of buiten het bord ligt.",
+      "Duw zes bollen van de tegenstander van het bord om te winnen."
+    ],
+    solo: "Solo: jij speelt blauw tegen de computer.",
+    duel: "Duel: elke verplaatsing en duw wordt realtime gedeeld met de tegenstander."
+  }
+};
+
+function MiniGameRulesButton({ gameId, mode }) {
+  const [open, setOpen] = useState(false);
+  const rules = MINI_GAME_RULES[gameId];
+
+  if (!rules) return null;
+
+  const modeText = mode === 'duel' ? rules.duel : rules.solo;
+
+  return (
+    <div style={{ display: 'flex', justifyContent: 'flex-end', margin: '0 0 10px' }}>
+      <button
+        type="button"
+        className="btn ghost mini"
+        onClick={() => setOpen(true)}
+        aria-label={`Spelregels voor ${rules.title}`}
+        title={`Spelregels voor ${rules.title}`}
+        style={{
+          width: '34px',
+          height: '34px',
+          borderRadius: '50%',
+          padding: 0,
+          fontFamily: 'Outfit, Inter, sans-serif',
+          fontWeight: 800,
+          fontSize: '16px',
+          lineHeight: '1'
+        }}
+      >
+        i
+      </button>
+
+      {open && (
+        <div
+          role="presentation"
+          onClick={() => setOpen(false)}
+          style={{
+            position: 'fixed',
+            inset: 0,
+            zIndex: 1000,
+            background: 'rgba(2, 8, 20, 0.72)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            padding: '18px'
+          }}
+        >
+          <div
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="mini-game-rules-title"
+            onClick={(e) => e.stopPropagation()}
+            style={{
+              width: 'min(420px, 100%)',
+              maxHeight: '82vh',
+              overflowY: 'auto',
+              background: '#07152c',
+              border: '1px solid var(--line)',
+              borderRadius: '14px',
+              boxShadow: '0 18px 60px rgba(0,0,0,0.55)',
+              padding: '18px',
+              color: '#fff'
+            }}
+          >
+            <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: '12px', marginBottom: '10px' }}>
+              <div>
+                <h2 id="mini-game-rules-title" style={{ margin: 0, fontSize: '20px', color: 'var(--gold)' }}>
+                  {rules.title}
+                </h2>
+                <p style={{ margin: '6px 0 0', color: 'var(--muted)', fontSize: '13px', lineHeight: 1.45 }}>
+                  {rules.intro}
+                </p>
+              </div>
+              <button
+                type="button"
+                className="btn ghost mini"
+                onClick={() => setOpen(false)}
+                aria-label="Sluit spelregels"
+                title="Sluiten"
+                style={{ width: '32px', height: '32px', borderRadius: '50%', padding: 0, flex: '0 0 auto' }}
+              >
+                x
+              </button>
+            </div>
+
+            <ol style={{ margin: '14px 0', paddingLeft: '20px', display: 'grid', gap: '8px', fontSize: '14px', lineHeight: 1.45 }}>
+              {rules.rules.map((rule, idx) => (
+                <li key={idx}>{rule}</li>
+              ))}
+            </ol>
+
+            {modeText && (
+              <div style={{ marginTop: '14px', padding: '10px 12px', background: '#0b2145', border: '1px solid var(--line)', borderRadius: '10px', fontSize: '13px', lineHeight: 1.45 }}>
+                {modeText}
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
 // ----------------------------------------------------
 // MAIN WRAPPER RENDERER
 // ----------------------------------------------------
 export function MiniGameRenderer({ gameId, mode, room, localPlayer, players, updateRoomState, onFinish }) {
-  const isSolo = mode === 'solo' || room.id === 'solo';
-  const safeUpdateRoomState = updateRoomState || (async (roomId, updates) => {});
+  const safeUpdateRoomState = updateRoomState || (async () => {});
+  let gameView;
 
   switch (gameId) {
     case 'othello':
-      return (
+      gameView = (
         <OthelloGame
           mode={mode}
           room={room}
@@ -1688,8 +1869,9 @@ export function MiniGameRenderer({ gameId, mode, room, localPlayer, players, upd
           onFinish={onFinish}
         />
       );
+      break;
     case 'dotsboxes':
-      return (
+      gameView = (
         <DotsBoxesGame
           mode={mode}
           room={room}
@@ -1699,14 +1881,16 @@ export function MiniGameRenderer({ gameId, mode, room, localPlayer, players, upd
           onFinish={onFinish}
         />
       );
+      break;
     case 'colorlines':
-      return (
+      gameView = (
         <ColorLinesGame
           onFinish={(score, detail) => onFinish(score, detail)}
         />
       );
+      break;
     case 'ricochet':
-      return (
+      gameView = (
         <RicochetShotGame
           mode={mode}
           room={room}
@@ -1716,8 +1900,9 @@ export function MiniGameRenderer({ gameId, mode, room, localPlayer, players, upd
           onFinish={onFinish}
         />
       );
+      break;
     case 'curling':
-      return (
+      gameView = (
         <CurlingGame
           mode={mode}
           room={room}
@@ -1727,8 +1912,9 @@ export function MiniGameRenderer({ gameId, mode, room, localPlayer, players, upd
           onFinish={onFinish}
         />
       );
+      break;
     case 'abalone':
-      return (
+      gameView = (
         <AbaloneGame
           mode={mode}
           room={room}
@@ -1738,7 +1924,15 @@ export function MiniGameRenderer({ gameId, mode, room, localPlayer, players, upd
           onFinish={onFinish}
         />
       );
+      break;
     default:
       return <div className="center">Onbekend spel.</div>;
   }
+
+  return (
+    <div>
+      <MiniGameRulesButton gameId={gameId} mode={mode} />
+      {gameView}
+    </div>
+  );
 }
