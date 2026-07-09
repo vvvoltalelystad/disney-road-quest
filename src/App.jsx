@@ -366,7 +366,7 @@ export default function App() {
     }, 1000);
 
     return () => clearInterval(interval);
-  }, [room?.current_task_state?.activeAttack?.timer, room?.current_task_state?.activeAttack?.targetId]);
+  }, [room?.current_task_state?.activeAttack?.timer, room?.current_task_state?.activeAttack?.targetId, players, localPlayer]);
 
   // Real-time Group Timer Synchronization Hook
   useEffect(() => {
@@ -1401,6 +1401,16 @@ export default function App() {
     }
   };
 
+  const handleCancelActiveAttack = async () => {
+    if (!room) return;
+    await updateRoomState(room.id, {
+      current_task_state: {
+        ...room.current_task_state,
+        activeAttack: null
+      }
+    });
+  };
+
   // --- RENDERING HELPERS ---
 
   const renderAppHeader = (title = "Disney Road Quest", backAction = null) => {
@@ -1764,6 +1774,11 @@ export default function App() {
                 <p className="small" style={{ margin: '8px 0 0 0', color: 'rgba(255,255,255,0.7)', textAlign: 'center' }}>
                   Tik op een oplichtende verdedigingskaart in je hand om te blokkeren of te spiegelen!
                 </p>
+                <div style={{ display: 'flex', justifyContent: 'center', marginTop: '10px' }}>
+                  <button className="btn danger mini" onClick={handleCancelActiveAttack}>
+                    Duel Overslaan / Annuleren 🚫
+                  </button>
+                </div>
               </div>
             );
           } else {
@@ -1774,7 +1789,10 @@ export default function App() {
                   <span style={{ fontSize: '38px' }}>🪄</span>
                   <h3>Magisch Duel</h3>
                   <p><strong>{attacker?.name}</strong> valt <strong>{targetPlayerName}</strong> aan met <strong>{cardInfo?.name}</strong>!</p>
-                  <p className="small">Wachten op reactie... ({attack.timer}s)</p>
+                  <p className="small" style={{ marginBottom: '14px' }}>Wachten op reactie... ({attack.timer}s)</p>
+                  <button className="btn secondary mini full" onClick={handleCancelActiveAttack}>
+                    Duel Overslaan / Annuleren 🚫
+                  </button>
                 </div>
               </div>
             );
