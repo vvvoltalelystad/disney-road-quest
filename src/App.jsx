@@ -11,6 +11,7 @@ import {
   adjustScoreEntry,
   removeScoreEntry
 } from './multiplayer';
+import { MiniGameRenderer } from './MiniGames';
 
 const GAME_MODES = [
   { id: "mix", name: "Road Quest", icon: "🚗", description: "De volledige afwisselende mix van alle speltypen." },
@@ -368,6 +369,11 @@ export default function App() {
   const [soloHistory, setSoloHistory] = useState(() => JSON.parse(localStorage.getItem('disney_solo_history') || '[]'));
   const soloLoggedRef = useRef(false);
 
+  // Arcade Arena states
+  const [selectedArcadeGame, setSelectedArcadeGame] = useState(null);
+  const [arcadePlayMode, setArcadePlayMode] = useState(null); // 'solo' or 'duel'
+  const [arcadeLobbyCode, setArcadeLobbyCode] = useState('');
+
   // Sudoku states
   const [sudokuGrid, setSudokuGrid] = useState([]);
   const [sudokuSolution, setSudokuSolution] = useState([]);
@@ -563,6 +569,60 @@ export default function App() {
     setPlayers([pObj]);
     setLocalPlayer(pObj);
     setScreen('game');
+  };
+
+  const handleStartArcadeSolo = (gameId) => {
+    const name = playerNameInput.trim() || localStorage.getItem('disney_player_name') || 'Solo Speler';
+    localStorage.setItem('disney_player_name', name);
+    const p = { id: 'solo-player', name, score: 0 };
+    
+    setLocalPlayer(p);
+    setPlayers([p]);
+    setRoom({
+      id: 'solo',
+      status: 'playing',
+      game_mode: 'arcade-' + gameId,
+      current_task_id: 'solo-arcade-' + gameId,
+      current_player_index: 0,
+      current_task_state: {}
+    });
+    soloLoggedRef.current = false;
+    setScreen('game');
+  };
+
+  const handleCreateArcadeDuel = async (gameId) => {
+    if (!playerNameInput.trim()) {
+      setError("Voer een naam in om te kunnen starten.");
+      return;
+    }
+    setLoading(true);
+    setError(null);
+    try {
+      const { room: r, player: p } = await createRoom('mix', 1, 10, playerNameInput);
+      
+      const updates = { 
+        game_mode: 'arcade-' + gameId, 
+        current_task_id: 'duel-arcade-' + gameId,
+        status: 'lobby'
+      };
+      await dbUpdateRoomState(r.id, updates);
+      
+      const updatedRoom = { ...r, ...updates };
+
+      setRoom(updatedRoom);
+      setPlayers([p]);
+      setLocalPlayer(p);
+      
+      localStorage.setItem('disney_room_id', updatedRoom.id);
+      localStorage.setItem('disney_player_id', p.id);
+      localStorage.setItem('disney_player_name', p.name);
+
+      setScreen('lobby');
+    } catch (e) {
+      setError("Duel aanmaken mislukt: " + (e.message || e.toString() || "Onbekende fout"));
+    } finally {
+      setLoading(false);
+    }
   };
 
   const [timerRunning, setTimerRunning] = useState(false);
@@ -841,6 +901,29 @@ export default function App() {
         type: "sudoku" 
       };
     }
+    if (room.current_task_id?.startsWith('solo-arcade-') || room.current_task_id?.startsWith('duel-arcade-')) {
+      const isSolo = room.current_task_id.startsWith('solo-arcade-');
+      const gameId = isSolo 
+        ? room.current_task_id.replace('solo-arcade-', '') 
+        : room.current_task_id.replace('duel-arcade-', '');
+      const titles = {
+        othello: "Othello / Reversi",
+        dotsboxes: "Dots & Boxes",
+        colorlines: "Color Lines",
+        ricochet: "Ricochet Shot",
+        curling: "Curling Duel",
+        abalone: "Marble Push (Abalone)"
+      };
+      return {
+        id: room.current_task_id,
+        cat: "Duel Arena",
+        type: "arcade-game",
+        gameId,
+        mode: isSolo ? "solo" : "duel",
+        title: titles[gameId] || "Mini-Game",
+        text: "Laat de strijd beginnen!"
+      };
+    }
     return DEFAULT_TASKS.find(t => t.id === room.current_task_id) || customTasks.find(t => t.id === room.current_task_id) || null;
   };
 
@@ -1051,6 +1134,15 @@ export default function App() {
     }
     setLoading(true);
     try {
+      if (room?.game_mode?.startsWith('arcade-')) {
+        await updateRoomState(room.id, {
+          status: 'playing',
+          current_player_index: 0,
+          current_task_state: {}
+        });
+        setLoading(false);
+        return;
+      }
       const startingIndex = Math.floor(Math.random() * players.length);
       const totalRounds = isGroupOnly() ? room.rounds_per_player : room.rounds_per_player * players.length;
 
@@ -1155,8 +1247,17 @@ export default function App() {
         logSoloAttempt(0);
         soloLoggedRef.current = true;
       }
+      const targetScreen = room.game_mode?.startsWith('arcade-') ? 'arcade_select' : 'solo_select';
       setRoom(null);
-      setScreen('solo_select');
+      setScreen(targetScreen);
+      return;
+    }
+
+    if (room?.game_mode?.startsWith('arcade-')) {
+      await updateRoomState(room.id, {
+        status: 'ended'
+      });
+      setScreen('end');
       return;
     }
 
@@ -2488,6 +2589,23 @@ export default function App() {
                     <span className="btn-play music">Speel Quiz ➔</span>
                   </div>
                 </a>
+
+                {/* Game 3: Disney Duel Arena */}
+                <div className="portal-card duel-arena-card" onClick={() => setScreen('arcade_select')} role="button" tabIndex={0}>
+                  <div className="portal-card-header">
+                    <div className="portal-card-media" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'radial-gradient(circle, rgba(189, 83, 237, 0.15) 0%, transparent 75%)', height: '140px' }}>
+                      <span style={{ fontSize: '64px', filter: 'drop-shadow(0 0 12px rgba(189, 83, 237, 0.6))', animation: 'bounce 3s infinite' }}>🏰</span>
+                    </div>
+                    <span className="portal-card-badge arcade">6 Spellen</span>
+                  </div>
+                  <div className="portal-card-body">
+                    <h3>Disney Duel Arena</h3>
+                    <p>Daag jezelf uit in 6 klassieke bord- en actiespellen tegen een computer-tegenstander, of speel een realtime duel op je eigen telefoon!</p>
+                  </div>
+                  <div className="portal-card-footer">
+                    <span className="btn-play arcade">Start Arena ➔</span>
+                  </div>
+                </div>
               </div>
 
               <div className="portal-info-box">
@@ -2496,6 +2614,194 @@ export default function App() {
                   <strong>Magische Verbinding</strong> Beide spellen maken gebruik van dezelfde database op Supabase, maar werken apart. Open een kamer, laat je medereizigers de code scannen en laat de magie beginnen!
                 </div>
               </div>
+            </div>
+          )}
+
+          {/* SCREEN: ARCADE SELECT */}
+          {screen === 'arcade_select' && (
+            <div>
+              {renderAppHeader("Disney Duel Arena", () => setScreen('portal'))}
+
+              <section className="card">
+                <h2 className="sectiontitle">👤 Spelersinstellingen</h2>
+                <div style={{ marginBottom: '15px' }}>
+                  <label style={{ display: 'block', marginBottom: '8px', fontSize: '14px', fontWeight: 'bold' }}>Jouw Spelersnaam:</label>
+                  <input
+                    type="text"
+                    value={playerNameInput}
+                    onChange={(e) => setPlayerNameInput(e.target.value)}
+                    placeholder="Voer je naam in..."
+                    style={{ width: '100%', boxSizing: 'border-box' }}
+                  />
+                </div>
+              </section>
+
+              <section className="card">
+                <h2 className="sectiontitle">🎮 Kies een Arena Spel</h2>
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '10px', marginTop: '14px' }}>
+                  {[
+                    { id: 'othello', name: "Othello / Reversi", icon: "⚪", desc: "Verover het bord door vijandelijke fiches in te sluiten." },
+                    { id: 'dotsboxes', name: "Dots & Boxes", icon: "✏️", desc: "Trek lijntjes en claim de meeste kamertjes." },
+                    { id: 'colorlines', name: "Color Lines", icon: "🔴", desc: "Solo puzzel: maak rijen van 5 gelijke bollen." },
+                    { id: 'ricochet', name: "Ricochet Shot", icon: "💫", desc: "Richt en kaats de bal langs muren om sterren te pakken." },
+                    { id: 'curling', name: "Curling Duel", icon: "🥌", desc: "Glijd stenen en stoot je tegenstander uit het huis." },
+                    { id: 'abalone', name: "Marble Push (Abalone)", icon: "🐜", desc: "Duw de bollen van de tegenstander uit het hex-raster." }
+                  ].map(game => {
+                    const isSelected = selectedArcadeGame === game.id;
+                    return (
+                      <div
+                        key={game.id}
+                        onClick={() => {
+                          setSelectedArcadeGame(game.id);
+                          setArcadePlayMode(null);
+                        }}
+                        className={`category-item ${isSelected ? 'checked' : ''}`}
+                        style={{
+                          display: 'flex',
+                          flexDirection: 'column',
+                          alignItems: 'center',
+                          padding: '16px 12px',
+                          textAlign: 'center',
+                          cursor: 'pointer',
+                          borderRadius: '12px',
+                          background: isSelected ? '#122d56' : '#081730',
+                          border: isSelected ? '2px solid var(--gold)' : '2px solid var(--line)',
+                          transition: 'all 0.15s ease'
+                        }}
+                      >
+                        <span style={{ fontSize: '32px', marginBottom: '8px' }}>{game.icon}</span>
+                        <strong style={{ fontSize: '15px', color: '#fff', marginBottom: '4px' }}>{game.name}</strong>
+                        <span style={{ fontSize: '11px', color: 'var(--muted)', lineHeight: '1.3' }}>{game.desc}</span>
+                      </div>
+                    );
+                  })}
+                </div>
+              </section>
+
+              {selectedArcadeGame && (
+                <section className="card animate-fade-in">
+                  <h2 className="sectiontitle">🚀 Spelopties</h2>
+                  <p style={{ fontSize: '13px', color: 'var(--muted)', marginBottom: '15px' }}>
+                    Geselecteerd spel: <strong>{
+                      {
+                        othello: "Othello / Reversi",
+                        dotsboxes: "Dots & Boxes",
+                        colorlines: "Color Lines",
+                        ricochet: "Ricochet Shot",
+                        curling: "Curling Duel",
+                        abalone: "Marble Push (Abalone)"
+                      }[selectedArcadeGame]
+                    }</strong>
+                  </p>
+
+                  {(selectedArcadeGame === 'colorlines' || selectedArcadeGame === 'ricochet') ? (
+                    <button
+                      className="btn primary full"
+                      onClick={() => handleStartArcadeSolo(selectedArcadeGame)}
+                    >
+                      Speel Solo (Start)
+                    </button>
+                  ) : (
+                    <div>
+                      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px', marginBottom: '20px' }}>
+                        <button
+                          className={`btn ${arcadePlayMode === 'solo' ? 'primary' : 'secondary'}`}
+                          onClick={() => setArcadePlayMode('solo')}
+                        >
+                          👤 Tegen Computer
+                        </button>
+                        <button
+                          className={`btn ${arcadePlayMode === 'duel' ? 'primary' : 'secondary'}`}
+                          onClick={() => setArcadePlayMode('duel')}
+                        >
+                          ⚔️ Realtime Duel
+                        </button>
+                      </div>
+
+                      {arcadePlayMode === 'solo' && (
+                        <button
+                          className="btn primary full animate-fade-in"
+                          onClick={() => handleStartArcadeSolo(selectedArcadeGame)}
+                        >
+                          Start Solo Game
+                        </button>
+                      )}
+
+                      {arcadePlayMode === 'duel' && (
+                        <div className="animate-fade-in" style={{ background: '#07152c', padding: '16px', borderRadius: '12px', border: '1px solid var(--line)' }}>
+                          <h3 style={{ margin: '0 0 12px 0', fontSize: '15px', color: 'var(--gold)' }}>⚔️ Duel Lobby</h3>
+                          <button
+                            className="btn primary full"
+                            onClick={() => handleCreateArcadeDuel(selectedArcadeGame)}
+                            style={{ marginBottom: '15px' }}
+                          >
+                            Creëer een Duel Kamer (Host)
+                          </button>
+
+                          <div style={{ borderTop: '1px solid var(--line)', paddingTop: '15px', marginTop: '15px' }}>
+                            <label style={{ display: 'block', marginBottom: '8px', fontSize: '13px', fontWeight: 'bold' }}>Of neem deel via een kamercode:</label>
+                            <div style={{ display: 'flex', gap: '8px' }}>
+                              <input
+                                type="text"
+                                placeholder="CODE..."
+                                value={roomCodeInput}
+                                onChange={(e) => setRoomCodeInput(e.target.value.toUpperCase())}
+                                style={{ flexGrow: 1, padding: '10px', textTransform: 'uppercase', boxSizing: 'border-box', fontFamily: 'Outfit, Inter, sans-serif' }}
+                              />
+                              <button
+                                className="btn primary"
+                                onClick={handleJoinRoom}
+                              >
+                                Join
+                              </button>
+                            </div>
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  )}
+                </section>
+              )}
+
+              {/* Dedicated Arcade history log */}
+              <section className="card" style={{ marginTop: '20px' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '10px' }}>
+                  <h2 className="sectiontitle" style={{ margin: 0 }}>📊 Geschiedenis Arena</h2>
+                  {soloHistory.filter(h => h.details?.includes("Othello") || h.details?.includes("Color Lines") || h.details?.includes("Ricochet") || h.details?.includes("Curling") || h.details?.includes("Marble") || h.details?.includes("verhuren")).length > 0 && (
+                    <button 
+                      className="btn secondary mini" 
+                      onClick={() => {
+                        if (confirm("Weet je zeker dat je alle geschiedenis van de arena wilt wissen?")) {
+                          const updated = soloHistory.filter(h => !(h.details?.includes("Othello") || h.details?.includes("Color Lines") || h.details?.includes("Ricochet") || h.details?.includes("Curling") || h.details?.includes("Marble") || h.details?.includes("verhuren")));
+                          setSoloHistory(updated);
+                          localStorage.setItem('disney_solo_history', JSON.stringify(updated));
+                        }
+                      }}
+                      style={{ padding: '2px 8px', fontSize: '10px' }}
+                    >
+                      Wis Arena
+                    </button>
+                  )}
+                </div>
+
+                <div style={{ maxHeight: '200px', overflowY: 'auto', gap: '8px', display: 'flex', flexDirection: 'column' }}>
+                  {(() => {
+                    const arenaLogs = soloHistory.filter(h => h.details?.includes("Othello") || h.details?.includes("Color Lines") || h.details?.includes("Ricochet") || h.details?.includes("Curling") || h.details?.includes("Marble") || h.details?.includes("verhuren"));
+                    if (arenaLogs.length === 0) {
+                      return <p style={{ fontSize: '12px', color: 'var(--muted)', textAlign: 'center' }}>Nog geen arena spellen gespeeld.</p>;
+                    }
+                    return arenaLogs.map((log, idx) => (
+                      <div key={idx} style={{ padding: '8px 12px', background: '#081730', border: '1px solid var(--line)', borderRadius: '8px', fontSize: '12px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                        <div>
+                          <strong>{log.details}</strong>
+                          <div style={{ fontSize: '10px', color: 'var(--muted)', marginTop: '2px' }}>{log.date} · {log.time}</div>
+                        </div>
+                        <div style={{ color: 'var(--gold)', fontWeight: 'bold' }}>{log.stars} ★</div>
+                      </div>
+                    ));
+                  })()}
+                </div>
+              </section>
             </div>
           )}
 
@@ -2762,7 +3068,7 @@ export default function App() {
               {renderAppHeader("Wachtruimte", () => handleNewGameStart())}
               <section className="card hero">
                 <div className="badge">Kamer Code</div>
-                <h1 style={{ fontSize: '64px', margin: '10px 0', letterSpacing: '4px', color: 'var(--gold)' }}>{room?.code}</h1>
+                <h1 style={{ fontSize: '64px', margin: '10px 0', letterSpacing: '4px', color: 'var(--gold)', fontFamily: 'Outfit, Inter, sans-serif' }}>{room?.code}</h1>
                 <p>Vertel de anderen in de auto om deze code in te voeren op hun telefoon.</p>
               </section>
 
@@ -2837,8 +3143,12 @@ export default function App() {
 
                   <div className="routecaption">
                     {room.id === 'solo' 
-                      ? "Solo Spel · Disney Mastermind" 
-                      : `Kamer: ${room.code} · Mode: ${GAME_MODES.find(m => m.id === room.game_mode)?.name}`
+                      ? (room.game_mode?.startsWith('arcade-') ? `Solo Spel · Duel Arena` : "Solo Spel · Disney Mastermind")
+                      : (
+                        <span>
+                          Kamer: <span style={{ fontFamily: 'Outfit, Inter, sans-serif', fontWeight: 'bold' }}>{room.code}</span> · Mode: {room.game_mode?.startsWith('arcade-') ? "Duel Arena" : GAME_MODES.find(m => m.id === room.game_mode)?.name}
+                        </span>
+                      )
                     }
                   </div>
 
@@ -2867,7 +3177,25 @@ export default function App() {
                           <h2>{t.title}</h2>
                           <div className="prompt">{t.text}</div>
 
-                          <div style={{ marginTop: '20px' }}>
+                           <div style={{ marginTop: '20px' }}>
+                            {/* -1. DISNEY DUEL ARENA */}
+                            {t.type === "arcade-game" && (
+                              <MiniGameRenderer
+                                gameId={t.gameId}
+                                mode={t.mode}
+                                room={room}
+                                localPlayer={localPlayer}
+                                players={players}
+                                updateRoomState={updateRoomState}
+                                onFinish={(score, detail) => {
+                                  if (room.id === 'solo') {
+                                    logSoloAttempt(score, detail);
+                                  }
+                                  handleFinishTask();
+                                }}
+                              />
+                            )}
+
                             {/* 0. DISNEY SUDOKU */}
                             {t.type === "sudoku" && (
                               <div>

@@ -563,4 +563,19 @@ body.night-theme {
   }
 }
 
+/* Disney Duel Arena Styles */
+.portal-card-badge.arcade {
+  background: rgba(189, 83, 237, 0.1);
+  border: 1px solid rgba(189, 83, 237, 0.3);
+  color: #bd53ed;
+}
+.duel-arena-card h3 {
+  background: linear-gradient(90deg, #ffffff, #bd53ed);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+}
+.btn-play.arcade {
+  color: #bd53ed;
+}
+
 
