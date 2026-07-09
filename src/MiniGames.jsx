@@ -302,23 +302,65 @@ export function OthelloGame({ mode, room, localPlayer, players, updateRoomState,
 export function DotsBoxesGame({ mode, room, localPlayer, players, updateRoomState, onFinish }) {
   const isSolo = mode === 'solo' || room.id === 'solo';
   const playerColors = ['#008cff', '#ff2f3f', '#ffcc00', '#4cd964'];
-  const playerBoxEmojis = ['👑', '🍎', '⭐', '🍀'];
+  const playerBoxEmojis = ['\uD83D\uDC51', '\uD83C\uDF4E', '\u2B50', '\uD83C\uDF40'];
   
   const myIndex = players.findIndex(p => p.id === localPlayer.id);
   const activeIndex = room.current_player_index || 0;
   const myTurn = myIndex === activeIndex;
 
   const taskState = room.current_task_state || {};
-  const hLines = taskState.hLines || Array(12).fill(false);
-  const vLines = taskState.vLines || Array(12).fill(false);
-  const boxes = taskState.boxes || Array(9).fill(null);
+  const dotsGridSize = taskState.dotsGridSize || 4;
+  const boxGridSize = dotsGridSize - 1;
+  const hLineCount = dotsGridSize * boxGridSize;
+  const vLineCount = boxGridSize * dotsGridSize;
+  const boxCount = boxGridSize * boxGridSize;
+  const hLines = taskState.hLines?.length === hLineCount ? taskState.hLines : Array(hLineCount).fill(false);
+  const vLines = taskState.vLines?.length === vLineCount ? taskState.vLines : Array(vLineCount).fill(false);
+  const boxes = taskState.boxes?.length === boxCount ? taskState.boxes : Array(boxCount).fill(null);
+  const boardSize = 260;
+  const boardPadding = 28;
+  const boardStep = (boardSize - boardPadding * 2) / boxGridSize;
+  const claimedBoxInset = Math.max(5, boardStep * 0.1);
+  const claimedBoxSize = Math.max(26, boardStep - claimedBoxInset * 2);
+  const hasStarted = hLines.some(Boolean) || vLines.some(Boolean) || boxes.some(owner => owner !== null);
+  const canConfigureGrid = !hasStarted && (isSolo || players[0]?.id === localPlayer.id);
+
+  const createDotsState = (size) => ({
+    dotsGridSize: size,
+    hLines: Array(size * (size - 1)).fill(false),
+    vLines: Array((size - 1) * size).fill(false),
+    boxes: Array((size - 1) * (size - 1)).fill(null)
+  });
+
+  const getBoxSides = (boxIndex, horizontalLines = hLines, verticalLines = vLines) => {
+    const r = Math.floor(boxIndex / boxGridSize);
+    const c = boxIndex % boxGridSize;
+    return {
+      top: horizontalLines[r * boxGridSize + c],
+      bottom: horizontalLines[(r + 1) * boxGridSize + c],
+      left: verticalLines[r * dotsGridSize + c],
+      right: verticalLines[r * dotsGridSize + c + 1]
+    };
+  };
+
+  const handleGridSizeChange = (size) => {
+    if (!canConfigureGrid || size === dotsGridSize) return;
+    updateRoomState(room.id, {
+      current_player_index: 0,
+      current_task_state: {
+        ...taskState,
+        ...createDotsState(size)
+      }
+    });
+  };
 
   useEffect(() => {
-    if (!taskState.hLines) {
+    if (!taskState.hLines || taskState.hLines.length !== hLineCount || taskState.vLines?.length !== vLineCount || taskState.boxes?.length !== boxCount) {
       updateRoomState(room.id, {
         current_player_index: 0,
         current_task_state: {
           ...taskState,
+          dotsGridSize,
           hLines,
           vLines,
           boxes
@@ -347,14 +389,9 @@ export function DotsBoxesGame({ mode, room, localPlayer, players, updateRoomStat
           if (isHorizontal) testH[hIdx] = true;
           else testV[hIdx] = true;
 
-          for (let b = 0; b < 9; b++) {
+          for (let b = 0; b < boxCount; b++) {
             if (boxes[b] !== null) continue;
-            const r = Math.floor(b / 3);
-            const c = b % 3;
-            const top = testH[r * 3 + c];
-            const bottom = testH[(r + 1) * 3 + c];
-            const left = testV[r * 4 + c];
-            const right = testV[r * 4 + c + 1];
+            const { top, bottom, left, right } = getBoxSides(b, testH, testV);
             if (top && bottom && left && right) return true;
           }
           return false;
@@ -386,14 +423,9 @@ export function DotsBoxesGame({ mode, room, localPlayer, players, updateRoomStat
 
         const nextBoxes = [...boxes];
         let boxCompleted = false;
-        for (let b = 0; b < 9; b++) {
+        for (let b = 0; b < boxCount; b++) {
           if (nextBoxes[b] !== null) continue;
-          const r = Math.floor(b / 3);
-          const c = b % 3;
-          const top = nextH[r * 3 + c];
-          const bottom = nextH[(r + 1) * 3 + c];
-          const left = nextV[r * 4 + c];
-          const right = nextV[r * 4 + c + 1];
+          const { top, bottom, left, right } = getBoxSides(b, nextH, nextV);
           if (top && bottom && left && right) {
             nextBoxes[b] = 1;
             boxCompleted = true;
@@ -405,6 +437,7 @@ export function DotsBoxesGame({ mode, room, localPlayer, players, updateRoomStat
           current_player_index: nextActive,
           current_task_state: {
             ...taskState,
+            dotsGridSize,
             hLines: nextH,
             vLines: nextV,
             boxes: nextBoxes
@@ -413,7 +446,7 @@ export function DotsBoxesGame({ mode, room, localPlayer, players, updateRoomStat
       }, 800);
       return () => clearTimeout(timer);
     }
-  }, [activeIndex, isSolo, hLines, vLines, boxes]);
+  }, [activeIndex, isSolo, hLines, vLines, boxes, dotsGridSize]);
 
   const handleLineClick = (index, isHorizontal) => {
     if (!myTurn || isSolo && activeIndex === 1) return;
@@ -427,14 +460,9 @@ export function DotsBoxesGame({ mode, room, localPlayer, players, updateRoomStat
 
     const nextBoxes = [...boxes];
     let boxCompleted = false;
-    for (let b = 0; b < 9; b++) {
+    for (let b = 0; b < boxCount; b++) {
       if (nextBoxes[b] !== null) continue;
-      const r = Math.floor(b / 3);
-      const c = b % 3;
-      const top = nextH[r * 3 + c];
-      const bottom = nextH[(r + 1) * 3 + c];
-      const left = nextV[r * 4 + c];
-      const right = nextV[r * 4 + c + 1];
+      const { top, bottom, left, right } = getBoxSides(b, nextH, nextV);
       if (top && bottom && left && right) {
         nextBoxes[b] = myIndex;
         boxCompleted = true;
@@ -448,6 +476,7 @@ export function DotsBoxesGame({ mode, room, localPlayer, players, updateRoomStat
       current_player_index: nextActive,
       current_task_state: {
         ...taskState,
+        dotsGridSize,
         hLines: nextH,
         vLines: nextV,
         boxes: nextBoxes
@@ -479,6 +508,23 @@ export function DotsBoxesGame({ mode, room, localPlayer, players, updateRoomStat
 
   return (
     <div style={{ textAlign: 'center' }}>
+      <div style={{ margin: '8px 0 12px', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px', flexWrap: 'wrap' }}>
+        <span style={{ fontSize: '12px', color: 'var(--muted)', fontWeight: 'bold' }}>Raster:</span>
+        {[4, 5, 6].map(size => (
+          <button
+            key={size}
+            type="button"
+            className={`btn mini ${dotsGridSize === size ? 'primary' : 'ghost'}`}
+            onClick={() => handleGridSizeChange(size)}
+            disabled={!canConfigureGrid}
+            title={canConfigureGrid ? `${size} x ${size} punten` : 'Raster kan alleen voor de eerste zet worden aangepast'}
+            style={{ padding: '5px 9px', fontSize: '12px', opacity: canConfigureGrid || dotsGridSize === size ? 1 : 0.45 }}
+          >
+            {size}x{size}
+          </button>
+        ))}
+      </div>
+
       <div style={{ display: 'flex', justifyContent: 'center', gap: '15px', margin: '10px 0', flexWrap: 'wrap' }}>
         {(isSolo ? ["Jij", "Computer"] : players.map(p => p.name)).map((name, idx) => (
           <div key={idx} style={{ color: playerColors[idx] || '#fff', fontWeight: 'bold' }}>
@@ -497,29 +543,42 @@ export function DotsBoxesGame({ mode, room, localPlayer, players, updateRoomStat
         )}
       </div>
 
-      <svg width="240" height="240" viewBox="0 0 240 240" style={{ margin: '20px auto', display: 'block', background: '#091c38', borderRadius: '16px', border: '1px solid var(--line)' }}>
+      <svg width="260" height="260" viewBox={`0 0 ${boardSize} ${boardSize}`} style={{ margin: '20px auto', display: 'block', background: '#091c38', borderRadius: '16px', border: '1px solid var(--line)' }}>
         {boxes.map((owner, idx) => {
           if (owner === null) return null;
-          const r = Math.floor(idx / 3);
-          const c = idx % 3;
+          const r = Math.floor(idx / boxGridSize);
+          const c = idx % boxGridSize;
+          const x = boardPadding + c * boardStep + claimedBoxInset;
+          const y = boardPadding + r * boardStep + claimedBoxInset;
+          const centerX = x + claimedBoxSize / 2;
+          const centerY = y + claimedBoxSize / 2;
           return (
             <g key={idx}>
               <rect
-                x={30 + c * 60 + 5}
-                y={30 + r * 60 + 5}
-                width="50"
-                height="50"
+                x={x}
+                y={y}
+                width={claimedBoxSize}
+                height={claimedBoxSize}
                 fill={playerColors[owner] || '#fff'}
-                opacity="0.88"
+                opacity="0.94"
                 rx="6"
                 stroke={owner === 0 ? '#7ed1ff' : '#ff9aa3'}
                 strokeWidth="2"
               />
+              <circle
+                cx={centerX}
+                cy={centerY}
+                r={Math.max(12, claimedBoxSize * 0.28)}
+                fill="#fff"
+                opacity="0.94"
+                stroke="rgba(0,0,0,0.28)"
+                strokeWidth="1"
+              />
               <text
-                x={30 + c * 60 + 30}
-                y={30 + r * 60 + 38}
+                x={centerX}
+                y={centerY + Math.max(6, claimedBoxSize * 0.15)}
                 textAnchor="middle"
-                fontSize="25"
+                fontSize={Math.max(17, claimedBoxSize * 0.38)}
                 style={{ pointerEvents: 'none' }}
               >
                 {playerBoxEmojis[owner] || '★'}
@@ -529,19 +588,19 @@ export function DotsBoxesGame({ mode, room, localPlayer, players, updateRoomStat
         })}
 
         {hLines.map((line, idx) => {
-          const r = Math.floor(idx / 3);
-          const c = idx % 3;
-          const x1 = 30 + c * 60;
-          const y1 = 30 + r * 60;
+          const r = Math.floor(idx / boxGridSize);
+          const c = idx % boxGridSize;
+          const x1 = boardPadding + c * boardStep;
+          const y1 = boardPadding + r * boardStep;
           return (
             <line
               key={`h-${idx}`}
               x1={x1}
               y1={y1}
-              x2={x1 + 60}
+              x2={x1 + boardStep}
               y2={y1}
               stroke={line ? (playerColors[0]) : 'rgba(255,255,255,0.1)'}
-              strokeWidth="5"
+              strokeWidth={line ? 6 : 5}
               strokeDasharray={line ? "none" : "3,3"}
               style={{ cursor: myTurn ? 'pointer' : 'default' }}
               onClick={() => handleLineClick(idx, true)}
@@ -550,19 +609,19 @@ export function DotsBoxesGame({ mode, room, localPlayer, players, updateRoomStat
         })}
 
         {vLines.map((line, idx) => {
-          const r = Math.floor(idx / 4);
-          const c = idx % 4;
-          const x1 = 30 + c * 60;
-          const y1 = 30 + r * 60;
+          const r = Math.floor(idx / dotsGridSize);
+          const c = idx % dotsGridSize;
+          const x1 = boardPadding + c * boardStep;
+          const y1 = boardPadding + r * boardStep;
           return (
             <line
               key={`v-${idx}`}
               x1={x1}
               y1={y1}
               x2={x1}
-              y2={y1 + 60}
+              y2={y1 + boardStep}
               stroke={line ? (playerColors[0]) : 'rgba(255,255,255,0.1)'}
-              strokeWidth="5"
+              strokeWidth={line ? 6 : 5}
               strokeDasharray={line ? "none" : "3,3"}
               style={{ cursor: myTurn ? 'pointer' : 'default' }}
               onClick={() => handleLineClick(idx, false)}
@@ -570,14 +629,14 @@ export function DotsBoxesGame({ mode, room, localPlayer, players, updateRoomStat
           );
         })}
 
-        {Array.from({ length: 16 }).map((_, idx) => {
-          const r = Math.floor(idx / 4);
-          const c = idx % 4;
+        {Array.from({ length: dotsGridSize * dotsGridSize }).map((_, idx) => {
+          const r = Math.floor(idx / dotsGridSize);
+          const c = idx % dotsGridSize;
           return (
             <circle
               key={idx}
-              cx={30 + c * 60}
-              cy={30 + r * 60}
+              cx={boardPadding + c * boardStep}
+              cy={boardPadding + r * boardStep}
               r="6"
               fill="#fff"
               stroke="var(--gold)"
