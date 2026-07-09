@@ -6,8 +6,8 @@ import {
   joinRoom,
   fetchRoomData,
   subscribeToRoom,
-  updateRoomState,
-  addPlayerScore,
+  updateRoomState as dbUpdateRoomState,
+  addPlayerScore as dbAddPlayerScore,
   adjustScoreEntry,
   removeScoreEntry
 } from './multiplayer';
@@ -258,6 +258,104 @@ export default function App() {
   const [players, setPlayers] = useState([]);
   const [scoreHistory, setScoreHistory] = useState([]);
   const [sound, setSound] = useState(true);
+
+  // Solo mode states and history
+  const [soloHistory, setSoloHistory] = useState(() => JSON.parse(localStorage.getItem('disney_solo_history') || '[]'));
+  const soloLoggedRef = useRef(false);
+
+  const logSoloAttempt = (points = 0, customReason = null) => {
+    const currentTask = getCurrentTask();
+    if (!currentTask) return;
+
+    const gameName = currentTask.cat || "Onbekend Spel";
+    let reason = customReason || "";
+    if (!reason) {
+      if (currentTask.type === 'mastermind') {
+        reason = mmSolved ? `Code gekraakt in ${mmGuesses.length} beurten` : "Code niet gekraakt";
+      } else {
+        reason = `Opdracht afgerond`;
+      }
+    }
+
+    const newEntry = {
+      gameType: gameName,
+      date: new Date().toISOString(),
+      score: points,
+      details: reason
+    };
+
+    setSoloHistory(prev => {
+      const updated = [newEntry, ...prev];
+      localStorage.setItem('disney_solo_history', JSON.stringify(updated));
+      return updated;
+    });
+  };
+
+  const updateRoomState = async (roomId, updates) => {
+    if (roomId === 'solo') {
+      setRoom(prev => {
+        const nextState = {
+          ...prev,
+          ...updates,
+          current_task_state: {
+            ...(prev?.current_task_state || {}),
+            ...(updates?.current_task_state || {})
+          }
+        };
+        return nextState;
+      });
+      return;
+    }
+    await dbUpdateRoomState(roomId, updates);
+  };
+
+  const addPlayerScore = async (roomId, player, delta, reason, bucket, taskObj = null) => {
+    if (roomId === 'solo') {
+      setPlayers(prev => prev.map(p => p.id === player.id ? { ...p, score: (p.score || 0) + delta } : p));
+      if (!soloLoggedRef.current) {
+        logSoloAttempt(delta, reason);
+        soloLoggedRef.current = true;
+      }
+      return;
+    }
+    await dbAddPlayerScore(roomId, player, delta, reason, bucket, taskObj);
+  };
+
+  const handleStartSoloGame = (category) => {
+    let taskId;
+    if (category === 'Quiz') {
+      taskId = 'quiz-choice';
+    } else {
+      const tasksOfCat = DEFAULT_TASKS.filter(t => t.cat === category && t.active !== false);
+      if (!tasksOfCat.length) {
+        alert("Geen opdrachten beschikbaar voor deze categorie.");
+        return;
+      }
+      const task = tasksOfCat[Math.floor(Math.random() * tasksOfCat.length)];
+      taskId = task.id;
+    }
+    
+    setRoom({
+      id: 'solo',
+      status: 'playing',
+      game_mode: 'solo',
+      current_task_id: taskId,
+      current_task_state: {
+        usedTasks: taskId !== 'quiz-choice' ? [taskId] : [],
+        taskHistory: [],
+        codeLength: 5,
+        enabledCategories: [category]
+      }
+    });
+
+    soloLoggedRef.current = false;
+
+    const name = playerNameInput.trim() || localStorage.getItem('disney_player_name') || 'Solo Speler';
+    const pObj = { id: 'solo-player', name, score: 0 };
+    setPlayers([pObj]);
+    setLocalPlayer(pObj);
+    setScreen('game');
+  };
 
   const [timerRunning, setTimerRunning] = useState(false);
   const [secondsLeft, setSecondsLeft] = useState(0);
@@ -836,6 +934,16 @@ export default function App() {
     setQuizSelectedAnswer(null);
     setLocalEstimate('');
 
+    if (room?.id === 'solo') {
+      if (!soloLoggedRef.current) {
+        logSoloAttempt(0);
+        soloLoggedRef.current = true;
+      }
+      setRoom(null);
+      setScreen('solo_select');
+      return;
+    }
+
     const wasGroup = getCurrentTask()?.type === "group";
     const nextRound = (room.round || 0) + 1;
 
@@ -892,6 +1000,16 @@ export default function App() {
     setQuizLocked(false);
     setQuizSelectedAnswer(null);
     setLocalEstimate('');
+
+    if (room?.id === 'solo') {
+      if (!soloLoggedRef.current) {
+        logSoloAttempt(0, "Opdracht overgeslagen");
+        soloLoggedRef.current = true;
+      }
+      setRoom(null);
+      setScreen('solo_select');
+      return;
+    }
 
     if (neverShowAgain && room.current_task_id) {
       const deactivated = room.current_task_state?.deactivated || [];
@@ -1627,6 +1745,7 @@ export default function App() {
   };
 
   const renderRouteProgressRoad = () => {
+    if (room?.id === 'solo') return null;
     const pct = Math.min(100, Math.round((room.round / room.total_rounds) * 100));
     const stations = [
       { pct: 0, label: "Start", icon: "🔑" },
@@ -2164,6 +2283,97 @@ export default function App() {
             </div>
           )}
 
+          {/* SCREEN: SOLO SELECT */}
+          {screen === 'solo_select' && (
+            <div>
+              {renderAppHeader("Solo Spel", () => setScreen('home'))}
+              
+              <section className="card">
+                <h2 className="sectiontitle">🎮 Kies een Speltype</h2>
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(1, 1fr)', gap: '12px', marginTop: '14px' }}>
+                  {[
+                    { cat: "Disney Mastermind", icon: "🧠", name: "Disney Mastermind (Code Breaker)", desc: "Kleurcode kraken (4, 5 of 6 stippen)", active: true },
+                    { cat: "Disney Dagboek", icon: "📔", name: "Disney Dagboek (Geheim)", desc: "Binnenkort beschikbaar", active: false },
+                    { cat: "Emoji Quiz", icon: "🎬", name: "Emoji Quiz (Film raden)", desc: "Binnenkort beschikbaar", active: false },
+                    { cat: "Quiz", icon: "❓", name: "Quiz (Kennisvragen)", desc: "Binnenkort beschikbaar", active: false }
+                  ].map(game => (
+                    <button
+                      key={game.cat}
+                      disabled={!game.active}
+                      onClick={() => handleStartSoloGame(game.cat)}
+                      style={{
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '16px',
+                        padding: '16px',
+                        background: '#091c38',
+                        border: '1px solid var(--line)',
+                        borderRadius: '16px',
+                        cursor: game.active ? 'pointer' : 'default',
+                        opacity: game.active ? 1 : 0.5,
+                        width: '100%',
+                        textAlign: 'left',
+                        transition: 'all 0.15s ease'
+                      }}
+                      className="solo-game-card"
+                    >
+                      <span style={{ fontSize: '32px' }}>{game.icon}</span>
+                      <div style={{ flex: 1 }}>
+                        <span style={{ fontSize: '15px', fontWeight: 'bold', color: '#fff', display: 'block' }}>{game.name}</span>
+                        <span style={{ fontSize: '12px', color: 'var(--muted)' }}>{game.desc}</span>
+                      </div>
+                      {game.active && <span style={{ color: 'var(--gold)', fontSize: '18px' }}>➔</span>}
+                    </button>
+                  ))}
+                </div>
+              </section>
+
+              <section className="card">
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '14px' }}>
+                  <h2 className="sectiontitle" style={{ margin: 0 }}>📜 Solo Geschiedenis</h2>
+                  {soloHistory.length > 0 && (
+                    <button 
+                      className="btn secondary mini" 
+                      onClick={() => {
+                        if (confirm("Weet je zeker dat je alle geschiedenis wilt wissen?")) {
+                          setSoloHistory([]);
+                          localStorage.removeItem('disney_solo_history');
+                        }
+                      }}
+                      style={{ padding: '4px 8px', fontSize: '11px' }}
+                    >
+                      Wis alles
+                    </button>
+                  )}
+                </div>
+                
+                {soloHistory.length === 0 ? (
+                  <div className="center" style={{ padding: '20px 0', color: 'var(--muted)', fontSize: '14px' }}>
+                    Je hebt nog geen solo spelletjes gespeeld. Start hierboven een spel!
+                  </div>
+                ) : (
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', maxHeight: '300px', overflowY: 'auto', paddingRight: '4px' }}>
+                    {soloHistory.map((item, idx) => {
+                      const dateObj = new Date(item.date);
+                      const timeStr = `${String(dateObj.getDate()).padStart(2, '0')}-${String(dateObj.getMonth() + 1).padStart(2, '0')} ${String(dateObj.getHours()).padStart(2, '0')}:${String(dateObj.getMinutes()).padStart(2, '0')}`;
+                      return (
+                        <div key={idx} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: '#091c38', padding: '10px 14px', borderRadius: '12px', border: '1px solid var(--line)' }}>
+                          <div>
+                            <strong style={{ fontSize: '14px', display: 'block', color: '#fff' }}>{item.gameType}</strong>
+                            <span style={{ fontSize: '11px', color: 'var(--muted)' }}>{timeStr} · {item.details}</span>
+                          </div>
+                          <div style={{ fontSize: '15px', fontWeight: 'bold', color: 'var(--gold)' }}>
+                            +{item.score} ★
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
+              </section>
+            </div>
+          )}
+
           {/* SCREEN: HOME */}
           {screen === 'home' && (
             <div>
@@ -2218,6 +2428,13 @@ export default function App() {
                   <button className="btn primary" onClick={handleJoinRoom}>Deelnemen</button>
                   <button className="btn secondary" onClick={() => setScreen('setup')}>Nieuwe Kamer</button>
                 </div>
+                <button 
+                  className="btn primary" 
+                  style={{ background: 'var(--gold)', color: '#000', width: '100%', marginTop: '12px' }} 
+                  onClick={() => setScreen('solo_select')}
+                >
+                  🎮 Solo Spel (1 Speler)
+                </button>
               </section>
 
               <section className="card">
@@ -2384,14 +2601,29 @@ export default function App() {
               ) : (
                 // ACTIVE GAME VIEW
                 <div>
-                  {renderAppHeader("Road Quest", () => {
-                    setScoreReturnScreen('game');
-                    setScreen('scores');
-                  })}
+                  {renderAppHeader(
+                    room.id === 'solo' ? "Solo Mastermind" : "Road Quest", 
+                    () => {
+                      if (room.id === 'solo') {
+                        if (!soloLoggedRef.current) {
+                          logSoloAttempt(0, "Opdracht verlaten");
+                          soloLoggedRef.current = true;
+                        }
+                        setRoom(null);
+                        setScreen('solo_select');
+                      } else {
+                        setScoreReturnScreen('game');
+                        setScreen('scores');
+                      }
+                    }
+                  )}
                   {renderScoreBar()}
 
                   <div className="routecaption">
-                    Kamer: {room.code} · Mode: {GAME_MODES.find(m => m.id === room.game_mode)?.name}
+                    {room.id === 'solo' 
+                      ? "Solo Spel · Disney Mastermind" 
+                      : `Kamer: ${room.code} · Mode: ${GAME_MODES.find(m => m.id === room.game_mode)?.name}`
+                    }
                   </div>
 
                   {/* Render animated road progress */}
