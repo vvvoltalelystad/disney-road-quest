@@ -2835,6 +2835,555 @@ export function DisneyQwixxGame({ mode, room, localPlayer, players, updateRoomSt
   );
 }
 
+const KEER_COLORS = [
+  { id: "red", name: "Mickey Rood", color: "#ff4d5d" },
+  { id: "yellow", name: "Belle Geel", color: "#ffd45c" },
+  { id: "green", name: "Tiana Groen", color: "#32d583" },
+  { id: "blue", name: "Elsa Blauw", color: "#5bbcff" },
+  { id: "purple", name: "Rapunzel Paars", color: "#b16cff" }
+];
+
+const KEER_BOARD = [
+  ["red", "yellow", "blue", "green", "purple", "red", "yellow"],
+  ["green", "red", "yellow", "blue", "green", "purple", "red"],
+  ["blue", "green", "red", "yellow", "blue", "green", "purple"],
+  ["purple", "blue", "green", "red", "yellow", "blue", "green"],
+  ["yellow", "purple", "blue", "green", "red", "yellow", "blue"],
+  ["red", "yellow", "purple", "blue", "green", "red", "yellow"],
+  ["green", "red", "yellow", "purple", "blue", "green", "red"]
+];
+
+const KEER_STARS = ["0-2", "1-5", "3-3", "4-0", "5-4", "6-1"];
+
+function rollKeerDie(max) {
+  return Math.floor(Math.random() * max) + 1;
+}
+
+function rollKeerDice() {
+  return {
+    colors: [
+      KEER_COLORS[Math.floor(Math.random() * KEER_COLORS.length)].id,
+      KEER_COLORS[Math.floor(Math.random() * KEER_COLORS.length)].id,
+      KEER_COLORS[Math.floor(Math.random() * KEER_COLORS.length)].id
+    ],
+    numbers: [rollKeerDie(5), rollKeerDie(5), rollKeerDie(5)]
+  };
+}
+
+function createKeerBoards() {
+  return [[], []];
+}
+
+function getKeerColor(colorId) {
+  return KEER_COLORS.find(color => color.id === colorId) || KEER_COLORS[0];
+}
+
+function getKeerCellKey(row, col) {
+  return `${row}-${col}`;
+}
+
+function getKeerNeighbors(row, col) {
+  return [
+    [row - 1, col],
+    [row + 1, col],
+    [row, col - 1],
+    [row, col + 1]
+  ].filter(([r, c]) => r >= 0 && r < KEER_BOARD.length && c >= 0 && c < KEER_BOARD[0].length);
+}
+
+function isKeerSelectionConnected(cells) {
+  if (cells.length <= 1) return true;
+  const selected = new Set(cells);
+  const visited = new Set([cells[0]]);
+  const queue = [cells[0]];
+
+  while (queue.length) {
+    const key = queue.shift();
+    const [row, col] = key.split("-").map(Number);
+    getKeerNeighbors(row, col).forEach(([r, c]) => {
+      const nextKey = getKeerCellKey(r, c);
+      if (selected.has(nextKey) && !visited.has(nextKey)) {
+        visited.add(nextKey);
+        queue.push(nextKey);
+      }
+    });
+  }
+
+  return visited.size === cells.length;
+}
+
+function touchesKeerMarkedArea(cells, boardMarks) {
+  if (boardMarks.length === 0) return true;
+  const marked = new Set(boardMarks);
+  return cells.some(key => {
+    const [row, col] = key.split("-").map(Number);
+    return getKeerNeighbors(row, col).some(([r, c]) => marked.has(getKeerCellKey(r, c)));
+  });
+}
+
+function getKeerFilledColumns(boardMarks = []) {
+  const marked = new Set(boardMarks);
+  let columns = 0;
+  for (let col = 0; col < KEER_BOARD[0].length; col++) {
+    let full = true;
+    for (let row = 0; row < KEER_BOARD.length; row++) {
+      if (!marked.has(getKeerCellKey(row, col))) {
+        full = false;
+        break;
+      }
+    }
+    if (full) columns += 1;
+  }
+  return columns;
+}
+
+function getKeerFilledColors(boardMarks = []) {
+  const marked = new Set(boardMarks);
+  return KEER_COLORS.reduce((count, color) => {
+    const allCells = [];
+    KEER_BOARD.forEach((row, r) => row.forEach((cellColor, c) => {
+      if (cellColor === color.id) allCells.push(getKeerCellKey(r, c));
+    }));
+    return count + (allCells.every(key => marked.has(key)) ? 1 : 0);
+  }, 0);
+}
+
+function getKeerPlayerTotal(boardMarks = [], penalties = 0) {
+  const marked = new Set(boardMarks);
+  const markedPoints = boardMarks.length;
+  const columnBonus = getKeerFilledColumns(boardMarks) * 5;
+  const colorBonus = getKeerFilledColors(boardMarks) * 8;
+  const openStarPenalty = KEER_STARS.filter(key => !marked.has(key)).length * 2;
+  return markedPoints + columnBonus + colorBonus - openStarPenalty - penalties * 3;
+}
+
+function isKeerComplete(nextState) {
+  const boards = nextState.keerBoards || [[], []];
+  return (nextState.keerRound || 1) > 18
+    || (nextState.keerPenalties || []).some(value => value >= 4)
+    || boards.some(board => board.length >= KEER_BOARD.length * KEER_BOARD[0].length);
+}
+
+function chooseKeerAiMove(dice, boardMarks = []) {
+  if (!dice) return null;
+  const marked = new Set(boardMarks);
+  const bestMoves = [];
+
+  dice.colors.forEach(colorId => {
+    dice.numbers.forEach(number => {
+      const candidates = [];
+      KEER_BOARD.forEach((row, r) => row.forEach((cellColor, c) => {
+        const key = getKeerCellKey(r, c);
+        if (cellColor === colorId && !marked.has(key)) {
+          candidates.push(key);
+        }
+      }));
+
+      candidates.forEach(startKey => {
+        const selected = [startKey];
+        const selectedSet = new Set(selected);
+        let expanded = true;
+
+        while (selected.length < number && expanded) {
+          expanded = false;
+          for (const key of [...selected]) {
+            const [row, col] = key.split("-").map(Number);
+            const neighbor = getKeerNeighbors(row, col)
+              .map(([r, c]) => getKeerCellKey(r, c))
+              .find(nextKey => {
+                const [nr, nc] = nextKey.split("-").map(Number);
+                return KEER_BOARD[nr][nc] === colorId && !marked.has(nextKey) && !selectedSet.has(nextKey);
+              });
+            if (neighbor) {
+              selected.push(neighbor);
+              selectedSet.add(neighbor);
+              expanded = true;
+              break;
+            }
+          }
+        }
+
+        if (touchesKeerMarkedArea(selected, boardMarks)) {
+          bestMoves.push({ colorId, number, cells: selected });
+        }
+      });
+    });
+  });
+
+  return bestMoves
+    .sort((a, b) => {
+      const starDiff = b.cells.filter(key => KEER_STARS.includes(key)).length - a.cells.filter(key => KEER_STARS.includes(key)).length;
+      if (starDiff !== 0) return starDiff;
+      return b.cells.length - a.cells.length;
+    })[0] || null;
+}
+
+export function DisneyKeerOpKeerGame({ mode, room, localPlayer, players, updateRoomState, onFinish }) {
+  const isSolo = mode === 'solo' || room.id === 'solo';
+  const taskState = room.current_task_state || {};
+  const activeIndex = room.current_player_index || 0;
+  const myIndex = Math.max(0, players.findIndex(p => p.id === localPlayer.id));
+  const playerNames = [
+    isSolo ? "Jij" : (players[0]?.name || "Speler 1"),
+    isSolo ? "Computer" : (players[1]?.name || "Speler 2")
+  ];
+
+  const boards = Array.isArray(taskState.keerBoards) ? taskState.keerBoards : createKeerBoards();
+  const penalties = Array.isArray(taskState.keerPenalties) ? taskState.keerPenalties : [0, 0];
+  const dice = taskState.keerDice || null;
+  const rolled = Boolean(taskState.keerRolled);
+  const round = taskState.keerRound || 1;
+  const selectedColor = taskState.keerSelectedColor || null;
+  const selectedNumber = taskState.keerSelectedNumber || null;
+  const pendingCells = taskState.keerPendingCells || [];
+  const complete = Boolean(taskState.keerComplete);
+  const myTurn = activeIndex === myIndex && !complete;
+  const myBoard = boards[activeIndex] || [];
+  const aiTurnRef = useRef("");
+
+  useEffect(() => {
+    if (!taskState.keerBoards) {
+      updateRoomState(room.id, {
+        current_player_index: 0,
+        current_task_state: {
+          ...taskState,
+          keerBoards: createKeerBoards(),
+          keerPenalties: [0, 0],
+          keerDice: null,
+          keerRolled: false,
+          keerRound: 1,
+          keerSelectedColor: null,
+          keerSelectedNumber: null,
+          keerPendingCells: [],
+          keerComplete: false,
+          keerLastMove: null
+        }
+      });
+    }
+  }, []);
+
+  const finishTurn = (nextBoards, nextPenalties, lastMove) => {
+    const nextRound = activeIndex === 1 ? round + 1 : round;
+    const nextState = {
+      ...taskState,
+      keerBoards: nextBoards,
+      keerPenalties: nextPenalties,
+      keerDice: null,
+      keerRolled: false,
+      keerRound: nextRound,
+      keerSelectedColor: null,
+      keerSelectedNumber: null,
+      keerPendingCells: [],
+      keerLastMove: lastMove
+    };
+    const nextComplete = isKeerComplete(nextState);
+
+    updateRoomState(room.id, {
+      current_player_index: nextComplete ? activeIndex : (activeIndex + 1) % 2,
+      current_task_state: {
+        ...nextState,
+        keerComplete: nextComplete
+      }
+    });
+  };
+
+  const handleRoll = () => {
+    if (!myTurn || rolled) return;
+    updateRoomState(room.id, {
+      current_task_state: {
+        ...taskState,
+        keerDice: rollKeerDice(),
+        keerRolled: true,
+        keerSelectedColor: null,
+        keerSelectedNumber: null,
+        keerPendingCells: [],
+        keerLastMove: null
+      }
+    });
+  };
+
+  const chooseColor = (colorId) => {
+    if (!myTurn || !rolled) return;
+    updateRoomState(room.id, {
+      current_task_state: {
+        ...taskState,
+        keerSelectedColor: colorId,
+        keerPendingCells: []
+      }
+    });
+  };
+
+  const chooseNumber = (number) => {
+    if (!myTurn || !rolled) return;
+    updateRoomState(room.id, {
+      current_task_state: {
+        ...taskState,
+        keerSelectedNumber: number,
+        keerPendingCells: []
+      }
+    });
+  };
+
+  const toggleCell = (row, col) => {
+    if (!myTurn || !rolled || !selectedColor || !selectedNumber || complete) return;
+    if (KEER_BOARD[row][col] !== selectedColor) return;
+    const key = getKeerCellKey(row, col);
+    if (myBoard.includes(key)) return;
+
+    const nextPending = pendingCells.includes(key)
+      ? pendingCells.filter(cell => cell !== key)
+      : pendingCells.length < selectedNumber
+        ? [...pendingCells, key]
+        : pendingCells;
+
+    updateRoomState(room.id, {
+      current_task_state: {
+        ...taskState,
+        keerPendingCells: nextPending
+      }
+    });
+  };
+
+  const pendingIsValid = pendingCells.length > 0
+    && pendingCells.length <= (selectedNumber || 0)
+    && isKeerSelectionConnected(pendingCells)
+    && touchesKeerMarkedArea(pendingCells, myBoard);
+
+  const handleConfirm = () => {
+    if (!myTurn || !pendingIsValid) return;
+    const nextBoards = boards.map((board, index) => (
+      index === activeIndex ? [...board, ...pendingCells] : board
+    ));
+    const colorName = getKeerColor(selectedColor).name;
+    finishTurn(
+      nextBoards,
+      penalties,
+      `${playerNames[activeIndex]} kleurde ${pendingCells.length} vakjes in ${colorName}.`
+    );
+  };
+
+  const handlePass = () => {
+    if (!myTurn || !rolled || complete) return;
+    const nextPenalties = penalties.map((value, index) => index === activeIndex ? value + 1 : value);
+    finishTurn(
+      boards,
+      nextPenalties,
+      `${playerNames[activeIndex]} paste en kreeg een minpunt.`
+    );
+  };
+
+  useEffect(() => {
+    if (!isSolo || activeIndex !== 1 || complete || !taskState.keerBoards) return;
+
+    const aiKey = `${round}-${rolled}-${JSON.stringify(dice)}-${JSON.stringify(boards[1])}-${penalties[1]}`;
+    if (aiTurnRef.current === aiKey) return;
+    aiTurnRef.current = aiKey;
+
+    const timer = setTimeout(() => {
+      if (!rolled) {
+        updateRoomState(room.id, {
+          current_task_state: {
+            ...taskState,
+            keerDice: rollKeerDice(),
+            keerRolled: true,
+            keerLastMove: "Computer rolt de dobbelstenen."
+          }
+        });
+        return;
+      }
+
+      const move = chooseKeerAiMove(dice, boards[1] || []);
+      if (!move) {
+        const nextPenalties = penalties.map((value, index) => index === 1 ? value + 1 : value);
+        finishTurn(boards, nextPenalties, "Computer paste en kreeg een minpunt.");
+        return;
+      }
+
+      const nextBoards = boards.map((board, index) => (
+        index === 1 ? [...board, ...move.cells] : board
+      ));
+      finishTurn(
+        nextBoards,
+        penalties,
+        `Computer kleurde ${move.cells.length} vakjes in ${getKeerColor(move.colorId).name}.`
+      );
+    }, rolled ? 900 : 650);
+
+    return () => clearTimeout(timer);
+  }, [isSolo, activeIndex, complete, rolled, dice, round, taskState.keerBoards]);
+
+  const handleFinish = () => {
+    const myTotal = getKeerPlayerTotal(boards[myIndex] || boards[0], penalties[myIndex] || 0);
+    const otherIndex = myIndex === 0 ? 1 : 0;
+    const otherTotal = getKeerPlayerTotal(boards[otherIndex] || [], penalties[otherIndex] || 0);
+    const won = myTotal > otherTotal;
+    const tie = myTotal === otherTotal;
+    const points = won ? 3 : tie ? 2 : 1;
+    const detail = won
+      ? `Disney Keer op Keer gewonnen: ${myTotal}-${otherTotal}`
+      : tie
+        ? `Disney Keer op Keer gelijkspel: ${myTotal}-${otherTotal}`
+        : `Disney Keer op Keer verloren: ${myTotal}-${otherTotal}`;
+    onFinish(points, detail);
+  };
+
+  const totals = [
+    getKeerPlayerTotal(boards[0], penalties[0]),
+    getKeerPlayerTotal(boards[1], penalties[1])
+  ];
+  const winnerText = totals[0] === totals[1]
+    ? "Gelijkspel"
+    : `${playerNames[totals[0] > totals[1] ? 0 : 1]} wint!`;
+  const visibleBoard = boards[myIndex] || boards[0] || [];
+  const visibleMarked = new Set(visibleBoard);
+  const pendingSet = new Set(pendingCells);
+
+  return (
+    <div style={{ textAlign: 'center' }}>
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px', marginBottom: '12px' }}>
+        {[0, 1].map(index => (
+          <div
+            key={index}
+            style={{
+              padding: '10px',
+              borderRadius: '12px',
+              background: activeIndex === index && !complete ? '#10264c' : '#07152c',
+              border: activeIndex === index && !complete ? '2px solid var(--gold)' : '1px solid var(--line)'
+            }}
+          >
+            <div style={{ fontWeight: 800, fontSize: '13px', color: index === 0 ? '#5bbcff' : '#ff5b5b' }}>{playerNames[index]}</div>
+            <div style={{ fontSize: '24px', fontWeight: 900 }}>{totals[index]}</div>
+            <div style={{ fontSize: '11px', color: 'var(--muted)' }}>Ronde {round}/18 · Straf {penalties[index] || 0}/4</div>
+          </div>
+        ))}
+      </div>
+
+      <div style={{ margin: '8px 0 12px', minHeight: '22px', color: 'var(--muted)', fontSize: '13px' }}>
+        {complete
+          ? <strong style={{ color: 'var(--gold)' }}>{winnerText}</strong>
+          : activeIndex === 1 && isSolo
+            ? "Computer puzzelt..."
+            : myTurn
+              ? rolled ? "Kies kleur + aantal en tik vakjes op je bord." : "Jouw beurt: rol de dobbelstenen."
+              : `Wachten op ${playerNames[activeIndex]}...`}
+        {taskState.keerLastMove && (
+          <div style={{ marginTop: '4px' }}>{taskState.keerLastMove}</div>
+        )}
+      </div>
+
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px', marginBottom: '12px' }}>
+        <div style={{ background: '#07152c', border: '1px solid var(--line)', borderRadius: '12px', padding: '8px' }}>
+          <strong style={{ fontSize: '12px' }}>Kleur</strong>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '6px', marginTop: '8px' }}>
+            {(dice?.colors || [null, null, null]).map((colorId, index) => {
+              const color = colorId ? getKeerColor(colorId) : null;
+              return (
+                <button
+                  key={index}
+                  type="button"
+                  className="btn mini"
+                  disabled={!myTurn || !rolled || !colorId || complete}
+                  onClick={() => chooseColor(colorId)}
+                  style={{
+                    padding: '8px 2px',
+                    background: color?.color || '#061225',
+                    color: colorId === 'yellow' ? '#07152c' : '#fff',
+                    border: selectedColor === colorId ? '2px solid var(--gold)' : '1px solid var(--line)',
+                    fontSize: '10px'
+                  }}
+                >
+                  {color ? color.name.split(" ")[1] : "?"}
+                </button>
+              );
+            })}
+          </div>
+        </div>
+
+        <div style={{ background: '#07152c', border: '1px solid var(--line)', borderRadius: '12px', padding: '8px' }}>
+          <strong style={{ fontSize: '12px' }}>Aantal</strong>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '6px', marginTop: '8px' }}>
+            {(dice?.numbers || [null, null, null]).map((number, index) => (
+              <button
+                key={index}
+                type="button"
+                className={`btn mini ${selectedNumber === number ? 'primary' : 'secondary'}`}
+                disabled={!myTurn || !rolled || !number || complete}
+                onClick={() => chooseNumber(number)}
+                style={{ padding: '8px 2px', fontSize: '13px', fontWeight: 900 }}
+              >
+                {number || "?"}
+              </button>
+            ))}
+          </div>
+        </div>
+      </div>
+
+      <div style={{ display: 'grid', gridTemplateColumns: rolled ? '1fr 1fr 1fr' : '1fr', gap: '8px', marginBottom: '12px' }}>
+        <button className="btn primary full" onClick={handleRoll} disabled={!myTurn || rolled || complete}>
+          Rol dobbelstenen
+        </button>
+        {rolled && (
+          <>
+            <button className="btn primary full" onClick={handleConfirm} disabled={!pendingIsValid}>
+              Kleur in ({pendingCells.length})
+            </button>
+            <button className="btn secondary full" onClick={handlePass} disabled={!myTurn || complete}>
+              Pas (-3)
+            </button>
+          </>
+        )}
+      </div>
+
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)', gap: '5px', maxWidth: '360px', margin: '0 auto' }}>
+        {KEER_BOARD.map((row, r) => row.map((colorId, c) => {
+          const key = getKeerCellKey(r, c);
+          const color = getKeerColor(colorId);
+          const marked = visibleMarked.has(key);
+          const pending = pendingSet.has(key);
+          const star = KEER_STARS.includes(key);
+          const selectable = myTurn && rolled && selectedColor === colorId && selectedNumber && !marked && !complete;
+
+          return (
+            <button
+              key={key}
+              type="button"
+              className="btn mini"
+              disabled={!selectable}
+              onClick={() => toggleCell(r, c)}
+              style={{
+                minWidth: 0,
+                aspectRatio: '1',
+                padding: 0,
+                borderRadius: '8px',
+                background: marked || pending ? color.color : '#061225',
+                border: pending ? '2px solid var(--gold)' : `1px solid ${color.color}`,
+                color: marked || pending ? (colorId === 'yellow' ? '#07152c' : '#fff') : color.color,
+                opacity: selectable || marked || pending ? 1 : 0.52,
+                fontSize: '13px',
+                fontWeight: 900
+              }}
+            >
+              {marked || pending ? "X" : star ? "*" : ""}
+            </button>
+          );
+        }))}
+      </div>
+
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '6px', margin: '12px auto 0', maxWidth: '360px', color: 'var(--muted)', fontSize: '11px' }}>
+        <span>Kolommen: {getKeerFilledColumns(visibleBoard)} x 5</span>
+        <span>Kleuren: {getKeerFilledColors(visibleBoard)} x 8</span>
+        <span>Sterren open: {KEER_STARS.filter(key => !visibleMarked.has(key)).length}</span>
+      </div>
+
+      {complete && (
+        <button className="btn primary full" onClick={handleFinish} style={{ marginTop: '14px' }}>
+          Score opslaan & terug
+        </button>
+      )}
+    </div>
+  );
+}
+
 const MINI_GAME_RULES = {
   othello: {
     title: "Othello / Reversi",
@@ -2951,6 +3500,19 @@ const MINI_GAME_RULES = {
     ],
     solo: "Solo: jij speelt tegen de computer. De computer kiest automatisch een geldig vakje of past.",
     duel: "Duel: spelers gooien om de beurt. De gedeelde scorekaart wordt realtime bijgewerkt."
+  },
+  keeropkeer: {
+    title: "Disney Keer op Keer",
+    intro: "Rol kleur en aantal, kleur vakjes op je bord en maak slimme bonuslijnen.",
+    rules: [
+      "Rol drie kleur- en drie getaldobbelstenen.",
+      "Kies een kleur en een aantal uit de worp.",
+      "Tik vakjes van die kleur aan; je selectie moet aan elkaar grenzen.",
+      "Nieuwe vakjes moeten aansluiten op je bestaande gekleurde gebied, behalve bij je eerste zet.",
+      "Volle kolommen en volle kleuren leveren bonuspunten op. Open sterren kosten minpunten."
+    ],
+    solo: "Solo: jij speelt tegen de computer. De computer kiest automatisch een kleur/aantal-combinatie.",
+    duel: "Duel: spelers kleuren om de beurt hun eigen bord. De score wordt realtime gedeeld."
   }
 };
 
@@ -3157,6 +3719,18 @@ export function MiniGameRenderer({ gameId, mode, room, localPlayer, players, upd
     case 'qwixx':
       gameView = (
         <DisneyQwixxGame
+          mode={mode}
+          room={room}
+          localPlayer={localPlayer}
+          players={players}
+          updateRoomState={safeUpdateRoomState}
+          onFinish={onFinish}
+        />
+      );
+      break;
+    case 'keeropkeer':
+      gameView = (
+        <DisneyKeerOpKeerGame
           mode={mode}
           room={room}
           localPlayer={localPlayer}

@@ -503,7 +503,7 @@ export default function App() {
     const text = `${item?.gameType || ''} ${item?.details || ''}`;
     return item?.category === 'arena'
       || item?.gameType === 'Duel Arena'
-      || /Othello|Dots|Color Lines|Ricochet|Curling|Marble|Pirates|Plank|Yahtzee|Qwixx|verhuren/i.test(text);
+      || /Othello|Dots|Color Lines|Ricochet|Curling|Marble|Pirates|Plank|Yahtzee|Qwixx|Keer op Keer|verhuren/i.test(text);
   };
 
   const updateRoomState = async (roomId, updates) => {
@@ -923,7 +923,8 @@ export default function App() {
         abalone: "Marble Push (Abalone)",
         piratesplank: "Pirates' Plank",
         yahtzee: "Disney Yahtzee",
-        qwixx: "Disney Qwixx"
+        qwixx: "Disney Qwixx",
+        keeropkeer: "Disney Keer op Keer"
       };
       return {
         id: room.current_task_id,
@@ -2608,7 +2609,7 @@ export default function App() {
                     <div className="portal-card-media" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'radial-gradient(circle, rgba(189, 83, 237, 0.15) 0%, transparent 75%)', height: '140px' }}>
                       <span style={{ fontSize: '64px', filter: 'drop-shadow(0 0 12px rgba(189, 83, 237, 0.6))', animation: 'bounce 3s infinite' }}>🏰</span>
                     </div>
-                    <span className="portal-card-badge arcade">9 Spellen</span>
+                    <span className="portal-card-badge arcade">10 Spellen</span>
                   </div>
                   <div className="portal-card-body">
                     <h3>Disney Duel Arena</h3>
@@ -2660,7 +2661,8 @@ export default function App() {
                     { id: 'abalone', name: "Marble Push (Abalone)", icon: "🐜", desc: "Duw de bollen van de tegenstander uit het hex-raster." },
                     { id: 'piratesplank', name: "Pirates' Plank", icon: "☠️", desc: "Raad Disney-woorden voordat de piraat van de plank loopt." },
                     { id: 'yahtzee', name: "Disney Yahtzee", icon: "🎲", desc: "Gooi, houd dobbelstenen vast en vul je magische scorekaart." },
-                    { id: 'qwixx', name: "Disney Qwixx", icon: "✏️", desc: "Streep gekleurde rijen af en ontwijk strafvakjes." }
+                    { id: 'qwixx', name: "Disney Qwixx", icon: "✏️", desc: "Streep gekleurde rijen af en ontwijk strafvakjes." },
+                    { id: 'keeropkeer', name: "Disney Keer op Keer", icon: "🌈", desc: "Rol kleur en aantal, kleur vakjes en scoor bonuslijnen." }
                   ].map(game => {
                     const isSelected = selectedArcadeGame === game.id;
                     return (
@@ -2707,7 +2709,8 @@ export default function App() {
                         abalone: "Marble Push (Abalone)",
                         piratesplank: "Pirates' Plank",
                         yahtzee: "Disney Yahtzee",
-                        qwixx: "Disney Qwixx"
+                        qwixx: "Disney Qwixx",
+                        keeropkeer: "Disney Keer op Keer"
                       }[selectedArcadeGame]
                     }</strong>
                   </p>
