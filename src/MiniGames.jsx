@@ -2074,6 +2074,359 @@ export function PiratesPlankGame({ mode, room, localPlayer, players, updateRoomS
   );
 }
 
+const YAHTZEE_DICE = [
+  { value: 1, label: "Kasteel" },
+  { value: 2, label: "Ster" },
+  { value: 3, label: "Muziek" },
+  { value: 4, label: "Kroon" },
+  { value: 5, label: "Tover" },
+  { value: 6, label: "Vuurwerk" }
+];
+
+const YAHTZEE_CATEGORIES = [
+  { id: "ones", name: "Eentjes", hint: "Alle 1'en", upperValue: 1 },
+  { id: "twos", name: "Tweetjes", hint: "Alle 2'en", upperValue: 2 },
+  { id: "threes", name: "Drietjes", hint: "Alle 3'en", upperValue: 3 },
+  { id: "fours", name: "Viertjes", hint: "Alle 4'en", upperValue: 4 },
+  { id: "fives", name: "Vijfjes", hint: "Alle 5'en", upperValue: 5 },
+  { id: "sixes", name: "Zesjes", hint: "Alle 6'en", upperValue: 6 },
+  { id: "threeKind", name: "3 gelijk", hint: "Drie dezelfde: totaal" },
+  { id: "fourKind", name: "4 gelijk", hint: "Vier dezelfde: totaal" },
+  { id: "fullHouse", name: "Full House", hint: "3 + 2 gelijk: 25" },
+  { id: "smallStreet", name: "Kleine straat", hint: "Vier op rij: 30" },
+  { id: "largeStreet", name: "Grote straat", hint: "Vijf op rij: 40" },
+  { id: "yahtzee", name: "Yahtzee", hint: "Vijf dezelfde: 50" },
+  { id: "chance", name: "Chance", hint: "Alle ogen samen" }
+];
+
+function rollYahtzeeDie() {
+  return Math.floor(Math.random() * 6) + 1;
+}
+
+function makeYahtzeeScores() {
+  return [{}, {}];
+}
+
+function getYahtzeeCounts(dice) {
+  return dice.reduce((acc, value) => {
+    if (value) acc[value] = (acc[value] || 0) + 1;
+    return acc;
+  }, {});
+}
+
+function hasYahtzeeRun(values, run) {
+  return run.every(value => values.includes(value));
+}
+
+function scoreYahtzeeCategory(categoryId, dice) {
+  if (!dice.every(Boolean)) return 0;
+  const counts = getYahtzeeCounts(dice);
+  const values = Object.keys(counts).map(Number).sort((a, b) => a - b);
+  const total = dice.reduce((sum, value) => sum + value, 0);
+  const category = YAHTZEE_CATEGORIES.find(item => item.id === categoryId);
+
+  if (category?.upperValue) {
+    return dice.filter(value => value === category.upperValue).reduce((sum, value) => sum + value, 0);
+  }
+
+  const countValues = Object.values(counts);
+  switch (categoryId) {
+    case "threeKind":
+      return countValues.some(count => count >= 3) ? total : 0;
+    case "fourKind":
+      return countValues.some(count => count >= 4) ? total : 0;
+    case "fullHouse":
+      return (countValues.includes(3) && countValues.includes(2)) || countValues.includes(5) ? 25 : 0;
+    case "smallStreet":
+      return hasYahtzeeRun(values, [1, 2, 3, 4]) || hasYahtzeeRun(values, [2, 3, 4, 5]) || hasYahtzeeRun(values, [3, 4, 5, 6]) ? 30 : 0;
+    case "largeStreet":
+      return hasYahtzeeRun(values, [1, 2, 3, 4, 5]) || hasYahtzeeRun(values, [2, 3, 4, 5, 6]) ? 40 : 0;
+    case "yahtzee":
+      return countValues.includes(5) ? 50 : 0;
+    case "chance":
+      return total;
+    default:
+      return 0;
+  }
+}
+
+function getYahtzeeTotal(scoreCard = {}) {
+  return Object.values(scoreCard).reduce((sum, value) => sum + (Number(value) || 0), 0);
+}
+
+function isYahtzeeComplete(scores) {
+  return [0, 1].every(index => YAHTZEE_CATEGORIES.every(category => scores?.[index]?.[category.id] !== undefined));
+}
+
+function chooseYahtzeeAiCategory(dice, scoreCard = {}) {
+  const openCategories = YAHTZEE_CATEGORIES.filter(category => scoreCard[category.id] === undefined);
+  return openCategories
+    .map(category => ({ ...category, score: scoreYahtzeeCategory(category.id, dice) }))
+    .sort((a, b) => b.score - a.score)[0];
+}
+
+export function DisneyYahtzeeGame({ mode, room, localPlayer, players, updateRoomState, onFinish }) {
+  const isSolo = mode === 'solo' || room.id === 'solo';
+  const taskState = room.current_task_state || {};
+  const activeIndex = room.current_player_index || 0;
+  const myIndex = Math.max(0, players.findIndex(p => p.id === localPlayer.id));
+  const playerNames = [
+    isSolo ? "Jij" : (players[0]?.name || "Speler 1"),
+    isSolo ? "Computer" : (players[1]?.name || "Speler 2")
+  ];
+  const playerColors = ["#5bbcff", "#ff5b5b"];
+
+  const scores = Array.isArray(taskState.yahtzeeScores) ? taskState.yahtzeeScores : makeYahtzeeScores();
+  const dice = Array.isArray(taskState.yahtzeeDice) ? taskState.yahtzeeDice : [null, null, null, null, null];
+  const held = Array.isArray(taskState.yahtzeeHeld) ? taskState.yahtzeeHeld : [false, false, false, false, false];
+  const rolls = taskState.yahtzeeRolls || 0;
+  const isComplete = taskState.yahtzeeComplete || isYahtzeeComplete(scores);
+  const myTurn = activeIndex === myIndex && !isComplete;
+  const aiTurnRef = useRef("");
+
+  useEffect(() => {
+    if (!taskState.yahtzeeScores) {
+      updateRoomState(room.id, {
+        current_player_index: 0,
+        current_task_state: {
+          ...taskState,
+          yahtzeeScores: makeYahtzeeScores(),
+          yahtzeeDice: [null, null, null, null, null],
+          yahtzeeHeld: [false, false, false, false, false],
+          yahtzeeRolls: 0,
+          yahtzeeComplete: false,
+          yahtzeeLastMove: null
+        }
+      });
+    }
+  }, []);
+
+  useEffect(() => {
+    if (!isSolo || activeIndex !== 1 || isComplete || !taskState.yahtzeeScores) return;
+
+    const aiKey = JSON.stringify(scores[1] || {});
+    if (aiTurnRef.current === aiKey) return;
+    aiTurnRef.current = aiKey;
+
+    const timer = setTimeout(() => {
+      const aiDice = Array.from({ length: 5 }, rollYahtzeeDie);
+      const aiChoice = chooseYahtzeeAiCategory(aiDice, scores[1] || {});
+      if (!aiChoice) return;
+
+      const nextScores = [
+        { ...(scores[0] || {}) },
+        { ...(scores[1] || {}), [aiChoice.id]: aiChoice.score }
+      ];
+      const nextComplete = isYahtzeeComplete(nextScores);
+
+      updateRoomState(room.id, {
+        current_player_index: nextComplete ? 1 : 0,
+        current_task_state: {
+          ...taskState,
+          yahtzeeScores: nextScores,
+          yahtzeeDice: [null, null, null, null, null],
+          yahtzeeHeld: [false, false, false, false, false],
+          yahtzeeRolls: 0,
+          yahtzeeComplete: nextComplete,
+          yahtzeeLastMove: `Computer koos ${aiChoice.name} voor ${aiChoice.score} punten.`
+        }
+      });
+    }, 900);
+
+    return () => clearTimeout(timer);
+  }, [isSolo, activeIndex, isComplete, taskState.yahtzeeScores]);
+
+  const handleRoll = () => {
+    if (!myTurn || rolls >= 3) return;
+    const nextDice = dice.map((value, index) => (held[index] && value ? value : rollYahtzeeDie()));
+    updateRoomState(room.id, {
+      current_task_state: {
+        ...taskState,
+        yahtzeeDice: nextDice,
+        yahtzeeHeld: rolls === 0 ? [false, false, false, false, false] : held,
+        yahtzeeRolls: rolls + 1,
+        yahtzeeLastMove: null
+      }
+    });
+  };
+
+  const toggleHold = (index) => {
+    if (!myTurn || rolls === 0) return;
+    const nextHeld = held.map((value, heldIndex) => heldIndex === index ? !value : value);
+    updateRoomState(room.id, {
+      current_task_state: {
+        ...taskState,
+        yahtzeeHeld: nextHeld
+      }
+    });
+  };
+
+  const handleScoreCategory = (categoryId) => {
+    if (!myTurn || rolls === 0 || scores[activeIndex]?.[categoryId] !== undefined) return;
+
+    const score = scoreYahtzeeCategory(categoryId, dice);
+    const nextScores = [
+      { ...(scores[0] || {}) },
+      { ...(scores[1] || {}) }
+    ];
+    nextScores[activeIndex][categoryId] = score;
+    const nextComplete = isYahtzeeComplete(nextScores);
+    const category = YAHTZEE_CATEGORIES.find(item => item.id === categoryId);
+
+    updateRoomState(room.id, {
+      current_player_index: nextComplete ? activeIndex : (activeIndex + 1) % 2,
+      current_task_state: {
+        ...taskState,
+        yahtzeeScores: nextScores,
+        yahtzeeDice: [null, null, null, null, null],
+        yahtzeeHeld: [false, false, false, false, false],
+        yahtzeeRolls: 0,
+        yahtzeeComplete: nextComplete,
+        yahtzeeLastMove: `${playerNames[activeIndex]} koos ${category?.name || "categorie"} voor ${score} punten.`
+      }
+    });
+  };
+
+  const handleFinish = () => {
+    const myTotal = getYahtzeeTotal(scores[myIndex] || scores[0]);
+    const otherIndex = myIndex === 0 ? 1 : 0;
+    const otherTotal = getYahtzeeTotal(scores[otherIndex] || {});
+    const won = myTotal > otherTotal;
+    const tie = myTotal === otherTotal;
+    const points = won ? 3 : tie ? 2 : 1;
+    const detail = won
+      ? `Disney Yahtzee gewonnen: ${myTotal}-${otherTotal}`
+      : tie
+        ? `Disney Yahtzee gelijkspel: ${myTotal}-${otherTotal}`
+        : `Disney Yahtzee verloren: ${myTotal}-${otherTotal}`;
+    onFinish(points, detail);
+  };
+
+  const totals = [getYahtzeeTotal(scores[0]), getYahtzeeTotal(scores[1])];
+  const winnerText = totals[0] === totals[1]
+    ? "Gelijkspel"
+    : `${playerNames[totals[0] > totals[1] ? 0 : 1]} wint!`;
+
+  return (
+    <div style={{ textAlign: 'center' }}>
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px', marginBottom: '12px' }}>
+        {[0, 1].map(index => (
+          <div
+            key={index}
+            style={{
+              padding: '10px',
+              borderRadius: '12px',
+              background: activeIndex === index && !isComplete ? '#10264c' : '#07152c',
+              border: activeIndex === index && !isComplete ? '2px solid var(--gold)' : '1px solid var(--line)'
+            }}
+          >
+            <div style={{ color: playerColors[index], fontWeight: 800, fontSize: '13px' }}>{playerNames[index]}</div>
+            <div style={{ fontSize: '24px', fontWeight: 900 }}>{totals[index]}</div>
+          </div>
+        ))}
+      </div>
+
+      <div style={{ margin: '8px 0 12px', minHeight: '22px', color: 'var(--muted)', fontSize: '13px' }}>
+        {isComplete
+          ? <strong style={{ color: 'var(--gold)' }}>{winnerText}</strong>
+          : activeIndex === 1 && isSolo
+            ? "Computer denkt na..."
+            : myTurn
+              ? `Jouw beurt: worp ${Math.min(rolls + 1, 3)} van 3.`
+              : `Wachten op ${playerNames[activeIndex]}...`}
+        {taskState.yahtzeeLastMove && (
+          <div style={{ marginTop: '4px' }}>{taskState.yahtzeeLastMove}</div>
+        )}
+      </div>
+
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(5, 1fr)', gap: '8px', maxWidth: '360px', margin: '0 auto 12px' }}>
+        {dice.map((value, index) => {
+          const die = YAHTZEE_DICE.find(item => item.value === value);
+          return (
+            <button
+              key={index}
+              type="button"
+              className={`btn ${held[index] ? 'primary' : 'secondary'}`}
+              onClick={() => toggleHold(index)}
+              disabled={!myTurn || rolls === 0 || isComplete}
+              style={{
+                minWidth: 0,
+                aspectRatio: '1',
+                padding: '6px 2px',
+                display: 'flex',
+                flexDirection: 'column',
+                alignItems: 'center',
+                justifyContent: 'center',
+                fontSize: '12px',
+                lineHeight: 1.1
+              }}
+            >
+              <strong style={{ fontSize: '24px' }}>{value || "?"}</strong>
+              <span style={{ fontSize: '9px' }}>{die?.label || "Worp"}</span>
+            </button>
+          );
+        })}
+      </div>
+
+      <button
+        className="btn primary full"
+        onClick={handleRoll}
+        disabled={!myTurn || rolls >= 3 || isComplete}
+        style={{ marginBottom: '12px' }}
+      >
+        {rolls === 0 ? "Gooi dobbelstenen" : rolls < 3 ? "Gooi opnieuw" : "Kies een score"}
+      </button>
+
+      <div style={{ display: 'grid', gap: '6px', marginTop: '8px' }}>
+        {YAHTZEE_CATEGORIES.map(category => {
+          const p1Score = scores[0]?.[category.id];
+          const p2Score = scores[1]?.[category.id];
+          const isUsed = scores[activeIndex]?.[category.id] !== undefined;
+          const preview = rolls > 0 ? scoreYahtzeeCategory(category.id, dice) : null;
+          return (
+            <div
+              key={category.id}
+              style={{
+                display: 'grid',
+                gridTemplateColumns: '1.2fr 44px 44px 82px',
+                alignItems: 'center',
+                gap: '6px',
+                padding: '8px',
+                borderRadius: '10px',
+                background: '#07152c',
+                border: '1px solid var(--line)',
+                textAlign: 'left'
+              }}
+            >
+              <div>
+                <strong style={{ fontSize: '13px' }}>{category.name}</strong>
+                <div style={{ fontSize: '10px', color: 'var(--muted)' }}>{category.hint}</div>
+              </div>
+              <div style={{ textAlign: 'center', color: playerColors[0], fontWeight: 800 }}>{p1Score ?? "-"}</div>
+              <div style={{ textAlign: 'center', color: playerColors[1], fontWeight: 800 }}>{p2Score ?? "-"}</div>
+              <button
+                type="button"
+                className="btn mini secondary"
+                disabled={!myTurn || rolls === 0 || isUsed || isComplete}
+                onClick={() => handleScoreCategory(category.id)}
+                style={{ padding: '6px 4px', fontSize: '11px' }}
+              >
+                {isUsed ? "Gekozen" : preview === null ? "Kies" : `+${preview}`}
+              </button>
+            </div>
+          );
+        })}
+      </div>
+
+      {isComplete && (
+        <button className="btn primary full" onClick={handleFinish} style={{ marginTop: '14px' }}>
+          Score opslaan & terug
+        </button>
+      )}
+    </div>
+  );
+}
+
 const MINI_GAME_RULES = {
   othello: {
     title: "Othello / Reversi",
@@ -2164,6 +2517,19 @@ const MINI_GAME_RULES = {
     ],
     solo: "Solo: probeer het woord met zo min mogelijk foute letters te raden.",
     duel: "Duel: spelers raden om de beurt. Een goede letter geeft nog een beurt; de speler die het woord afmaakt wint."
+  },
+  yahtzee: {
+    title: "Disney Yahtzee",
+    intro: "Gooi vijf dobbelstenen en vul slim je scorekaart.",
+    rules: [
+      "Je mag per beurt maximaal drie keer gooien.",
+      "Na je eerste worp kun je dobbelstenen vasthouden door erop te tikken.",
+      "Na elke worp mag je een vrije scorecategorie kiezen.",
+      "Elke categorie kan maar een keer gebruikt worden, ook als je daar nul punten scoort.",
+      "Als alle categorieen gevuld zijn, wint de speler met de meeste punten."
+    ],
+    solo: "Solo: jij speelt tegen de computer. De computer vult automatisch een categorie na zijn worp.",
+    duel: "Duel: spelers gooien om de beurt en vullen samen realtime de scorekaart."
   }
 };
 
@@ -2346,6 +2712,18 @@ export function MiniGameRenderer({ gameId, mode, room, localPlayer, players, upd
     case 'piratesplank':
       gameView = (
         <PiratesPlankGame
+          mode={mode}
+          room={room}
+          localPlayer={localPlayer}
+          players={players}
+          updateRoomState={safeUpdateRoomState}
+          onFinish={onFinish}
+        />
+      );
+      break;
+    case 'yahtzee':
+      gameView = (
+        <DisneyYahtzeeGame
           mode={mode}
           room={room}
           localPlayer={localPlayer}
