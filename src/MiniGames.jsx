@@ -1889,6 +1889,191 @@ export function AbaloneGame({ mode, room, localPlayer, players, updateRoomState,
   );
 }
 
+const PIRATES_PLANK_WORDS = [
+  { word: "JACK SPARROW", hint: "Kapitein met kompasproblemen" },
+  { word: "DAVY JONES", hint: "Kapitein van de Flying Dutchman" },
+  { word: "BLACK PEARL", hint: "Beroemd piratenschip" },
+  { word: "ELSA", hint: "Laat het los" },
+  { word: "SIMBA", hint: "Koning van de savanne" },
+  { word: "MULAN", hint: "Strijder met veel moed" },
+  { word: "STITCH", hint: "Experiment 626" },
+  { word: "RAPUNZEL", hint: "Magisch lang haar" },
+  { word: "WOODY", hint: "Sheriff uit de speelgoedkist" },
+  { word: "BUZZ LIGHTYEAR", hint: "Tot voorbij de sterren" },
+  { word: "MIGUEL", hint: "Muziek en familie" },
+  { word: "MOANA", hint: "De oceaan roept" },
+  { word: "OLAF", hint: "Houdt van warme knuffels" },
+  { word: "GENIE", hint: "Drie wensen" },
+  { word: "ARIEL", hint: "Droomt van benen" },
+  { word: "BAYMAX", hint: "Persoonlijke zorgrobot" },
+  { word: "RATATOUILLE", hint: "Koken in Parijs" },
+  { word: "ENCANTO", hint: "Een magisch huis vol familie" },
+  { word: "COCO", hint: "Muziek op Dia de los Muertos" },
+  { word: "NEMO", hint: "Kleine vis, grote zoektocht" }
+];
+
+const PLANK_LETTERS = "ABCDEFGHIJKLMNOPQRSTUVWXYZ".split("");
+
+function createPiratesPlankState() {
+  const entry = PIRATES_PLANK_WORDS[Math.floor(Math.random() * PIRATES_PLANK_WORDS.length)];
+  return {
+    plankWord: entry.word,
+    plankHint: entry.hint,
+    plankGuesses: [],
+    plankWrong: 0,
+    plankWinnerId: null,
+    plankFailed: false
+  };
+}
+
+export function PiratesPlankGame({ mode, room, localPlayer, players, updateRoomState, onFinish }) {
+  const isSolo = mode === 'solo' || room.id === 'solo';
+  const maxWrong = 7;
+  const taskState = room.current_task_state || {};
+  const activeIndex = room.current_player_index || 0;
+  const myIndex = Math.max(0, players.findIndex(p => p.id === localPlayer.id));
+  const myTurn = isSolo || activeIndex === myIndex;
+
+  const word = taskState.plankWord || "";
+  const hint = taskState.plankHint || "";
+  const guesses = taskState.plankGuesses || [];
+  const wrong = taskState.plankWrong || 0;
+  const winnerId = taskState.plankWinnerId || null;
+  const failed = taskState.plankFailed || false;
+  const isFinished = Boolean(winnerId) || failed;
+
+  useEffect(() => {
+    if (!taskState.plankWord) {
+      updateRoomState(room.id, {
+        current_player_index: 0,
+        current_task_state: {
+          ...taskState,
+          ...createPiratesPlankState()
+        }
+      });
+    }
+  }, []);
+
+  const visibleWord = word.split("").map(char => {
+    if (char === " " || char === "-" || char === "'") return char;
+    return guesses.includes(char) ? char : "_";
+  });
+
+  const guessedWrongLetters = guesses.filter(letter => !word.includes(letter));
+  const remainingSafeSteps = Math.max(0, maxWrong - wrong);
+
+  const handleGuess = (letter) => {
+    if (!word || isFinished || !myTurn || guesses.includes(letter)) return;
+
+    const nextGuesses = [...guesses, letter];
+    const isCorrect = word.includes(letter);
+    const nextWrong = isCorrect ? wrong : wrong + 1;
+    const solved = word.split("").every(char => char === " " || char === "-" || char === "'" || nextGuesses.includes(char));
+    const nextFailed = nextWrong >= maxWrong && !solved;
+    const totalPlayers = isSolo ? 1 : players.length;
+
+    updateRoomState(room.id, {
+      current_player_index: isCorrect || isSolo ? activeIndex : (activeIndex + 1) % totalPlayers,
+      current_task_state: {
+        ...taskState,
+        plankGuesses: nextGuesses,
+        plankWrong: nextWrong,
+        plankWinnerId: solved ? localPlayer.id : null,
+        plankFailed: nextFailed
+      }
+    });
+  };
+
+  const handleFinish = () => {
+    const won = winnerId === localPlayer.id || (isSolo && winnerId);
+    const pts = won ? (wrong <= 2 ? 3 : 2) : 1;
+    const detail = winnerId
+      ? `Pirates' Plank opgelost: ${word}`
+      : `Pirates' Plank gemist: ${word}`;
+    onFinish(pts, detail);
+  };
+
+  const winnerName = winnerId
+    ? (players.find(p => p.id === winnerId)?.name || (isSolo ? "Jij" : "Speler"))
+    : null;
+
+  return (
+    <div style={{ textAlign: 'center' }}>
+      <div style={{ display: 'grid', gap: '10px', justifyItems: 'center' }}>
+        <div style={{ fontSize: '42px', letterSpacing: '2px' }}>
+          {"☠️".repeat(Math.min(wrong, maxWrong))}{"🌊".repeat(remainingSafeSteps)}
+        </div>
+        <div style={{ width: '100%', maxWidth: '340px', height: '12px', background: '#061225', borderRadius: '999px', border: '1px solid var(--line)', overflow: 'hidden' }}>
+          <div style={{ width: `${Math.min(100, (wrong / maxWrong) * 100)}%`, height: '100%', background: 'linear-gradient(90deg, #ffd45c, #ff3b30)' }} />
+        </div>
+        <div style={{ color: 'var(--muted)', fontSize: '13px' }}>Hint: {hint || "De flespost wordt geopend..."}</div>
+      </div>
+
+      <div style={{
+        margin: '18px auto',
+        padding: '14px',
+        maxWidth: '360px',
+        background: '#081730',
+        border: '1px solid var(--line)',
+        borderRadius: '12px',
+        fontFamily: 'Outfit, Inter, sans-serif',
+        fontSize: '24px',
+        letterSpacing: '4px',
+        color: '#fff',
+        wordBreak: 'break-word'
+      }}>
+        {visibleWord.join(" ")}
+      </div>
+
+      <div style={{ margin: '8px 0 12px', fontSize: '13px' }}>
+        {isFinished ? (
+          <div style={{ display: 'grid', gap: '10px', justifyItems: 'center' }}>
+            <strong style={{ color: winnerId ? 'var(--gold)' : 'var(--danger)' }}>
+              {winnerId ? `${winnerName} heeft het woord gevonden!` : "De piraat is over de plank gegaan!"}
+            </strong>
+            <div style={{ color: 'var(--muted)' }}>Het woord was: <strong style={{ color: '#fff' }}>{word}</strong></div>
+            <button className="btn primary" onClick={handleFinish}>Score opslaan & terug</button>
+          </div>
+        ) : myTurn ? (
+          <span style={{ color: 'var(--gold)', fontWeight: 'bold' }}>Jouw beurt: kies een letter.</span>
+        ) : (
+          <span>Wachten op de andere speler...</span>
+        )}
+      </div>
+
+      {guessedWrongLetters.length > 0 && (
+        <div style={{ color: 'var(--muted)', fontSize: '12px', marginBottom: '10px' }}>
+          Foute letters: {guessedWrongLetters.join(", ")}
+        </div>
+      )}
+
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(6, 1fr)', gap: '6px', maxWidth: '360px', margin: '0 auto' }}>
+        {PLANK_LETTERS.map(letter => {
+          const used = guesses.includes(letter);
+          const correct = used && word.includes(letter);
+          return (
+            <button
+              key={letter}
+              type="button"
+              className={`btn mini ${correct ? 'primary' : 'ghost'}`}
+              disabled={used || !myTurn || isFinished}
+              onClick={() => handleGuess(letter)}
+              style={{
+                minWidth: 0,
+                padding: '8px 0',
+                opacity: used && !correct ? 0.35 : 1,
+                color: used && !correct ? 'var(--muted)' : undefined
+              }}
+            >
+              {letter}
+            </button>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
 const MINI_GAME_RULES = {
   othello: {
     title: "Othello / Reversi",
@@ -1966,6 +2151,19 @@ const MINI_GAME_RULES = {
     ],
     solo: "Solo: jij speelt blauw tegen de computer.",
     duel: "Duel: elke verplaatsing en duw wordt realtime gedeeld met de tegenstander."
+  },
+  piratesplank: {
+    title: "Pirates' Plank",
+    intro: "Raad het Disney-woord voordat de piraat van de plank loopt.",
+    rules: [
+      "Gebruik de hint om het verborgen Disney/Pixar woord te raden.",
+      "Kies per beurt een letter.",
+      "Een goede letter verschijnt overal in het woord.",
+      "Een foute letter schuift de piraat dichter naar de rand van de plank.",
+      "Los het woord op voordat je zeven foute letters hebt."
+    ],
+    solo: "Solo: probeer het woord met zo min mogelijk foute letters te raden.",
+    duel: "Duel: spelers raden om de beurt. Een goede letter geeft nog een beurt; de speler die het woord afmaakt wint."
   }
 };
 
@@ -2136,6 +2334,18 @@ export function MiniGameRenderer({ gameId, mode, room, localPlayer, players, upd
     case 'abalone':
       gameView = (
         <AbaloneGame
+          mode={mode}
+          room={room}
+          localPlayer={localPlayer}
+          players={players}
+          updateRoomState={safeUpdateRoomState}
+          onFinish={onFinish}
+        />
+      );
+      break;
+    case 'piratesplank':
+      gameView = (
+        <PiratesPlankGame
           mode={mode}
           room={room}
           localPlayer={localPlayer}
