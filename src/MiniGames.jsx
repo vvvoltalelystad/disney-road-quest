@@ -106,6 +106,7 @@ export function OthelloGame({ mode, room, localPlayer, players, updateRoomState,
 
   const validMoves = getOthelloValidMoves(board, activeColor);
   const myTurn = activeColor === myColor;
+  const othelloFinal = taskState.othelloFinal || null;
 
   const countPieces = () => {
     let blue = 0;
@@ -171,8 +172,7 @@ export function OthelloGame({ mode, room, localPlayer, players, updateRoomState,
               }
             });
           } else {
-            // Both stuck, end game
-            handleEndGame(board);
+            markGameOver(board);
           }
         }
       }, 800);
@@ -193,8 +193,7 @@ export function OthelloGame({ mode, room, localPlayer, players, updateRoomState,
       // Opponent passes
       const myNextMoves = getOthelloValidMoves(nextBoard, myColor);
       if (myNextMoves.length === 0) {
-        // Both pass, end game
-        handleEndGame(nextBoard);
+        markGameOver(nextBoard);
         return;
       }
       nextTurn = myColor;
@@ -209,13 +208,30 @@ export function OthelloGame({ mode, room, localPlayer, players, updateRoomState,
     });
   };
 
-  const handleEndGame = (finalBoard) => {
+  const getFinalCounts = (finalBoard) => {
     let bCount = 0;
     let rCount = 0;
     finalBoard.forEach(row => row.forEach(cell => {
       if (cell === 'blue') bCount++;
       if (cell === 'red') rCount++;
     }));
+    return { blue: bCount, red: rCount };
+  };
+
+  const markGameOver = (finalBoard) => {
+    const finalCounts = getFinalCounts(finalBoard);
+    updateRoomState(room.id, {
+      current_task_state: {
+        ...taskState,
+        othelloBoard: finalBoard,
+        othelloGameOver: true,
+        othelloFinal: finalCounts
+      }
+    });
+  };
+
+  const handleEndGame = (finalBoard) => {
+    const { blue: bCount, red: rCount } = othelloFinal || getFinalCounts(finalBoard);
 
     let won = false;
     if (myColor === 'blue' && bCount > rCount) won = true;
@@ -227,7 +243,14 @@ export function OthelloGame({ mode, room, localPlayer, players, updateRoomState,
     onFinish(score, detail);
   };
 
-  const isGameOver = getOthelloValidMoves(board, 'blue').length === 0 && getOthelloValidMoves(board, 'red').length === 0;
+  const isGameOver = taskState.othelloGameOver || (getOthelloValidMoves(board, 'blue').length === 0 && getOthelloValidMoves(board, 'red').length === 0);
+  const finalBlue = othelloFinal?.blue ?? blue;
+  const finalRed = othelloFinal?.red ?? red;
+  const winnerText = finalBlue === finalRed
+    ? "Gelijkspel"
+    : finalBlue > finalRed
+      ? `${isP1 ? "Jij" : (players[0]?.name || "Speler 1")} wint`
+      : `${!isP1 ? "Jij" : (isSolo ? "Computer" : (players[1]?.name || "Speler 2"))} wint`;
 
   return (
     <div style={{ textAlign: 'center' }}>
@@ -242,7 +265,15 @@ export function OthelloGame({ mode, room, localPlayer, players, updateRoomState,
 
       <div style={{ margin: '10px 0', fontSize: '14px', color: '#fff' }}>
         {isGameOver ? (
-          <button className="btn primary" onClick={() => handleEndGame(board)}>Voltooien & Score opslaan</button>
+          <div style={{ display: 'grid', gap: '10px', justifyItems: 'center' }}>
+            <div style={{ padding: '12px 14px', border: '1px solid var(--line)', borderRadius: '12px', background: '#081730' }}>
+              <strong style={{ color: 'var(--gold)' }}>{winnerText}</strong>
+              <div style={{ fontSize: '13px', marginTop: '4px' }}>
+                Eindstand: blauw {finalBlue} - rood {finalRed}
+              </div>
+            </div>
+            <button className="btn primary" onClick={() => handleEndGame(board)}>Score opslaan & terug</button>
+          </div>
         ) : myTurn ? (
           <span style={{ color: 'var(--gold)', fontWeight: 'bold' }}>⚡ Het is JOUW beurt! Tik op een vakje met een gloed.</span>
         ) : (
@@ -660,6 +691,11 @@ export function ColorLinesGame({ onFinish }) {
   const [gameOver, setGameOver] = useState(false);
 
   const colors = ['#0077ff', '#ff3b30', '#ffcc00', '#4cd964', '#bd53ed', '#ff9500'];
+  const makeNextColors = () => [
+    colors[Math.floor(Math.random() * colors.length)],
+    colors[Math.floor(Math.random() * colors.length)],
+    colors[Math.floor(Math.random() * colors.length)]
+  ];
 
   useEffect(() => {
     const initialBoard = Array(81).fill(null);
@@ -673,11 +709,7 @@ export function ColorLinesGame({ onFinish }) {
     });
     setBoard(initialBoard);
 
-    setNextColors([
-      colors[Math.floor(Math.random() * colors.length)],
-      colors[Math.floor(Math.random() * colors.length)],
-      colors[Math.floor(Math.random() * colors.length)]
-    ]);
+    setNextColors(makeNextColors());
   }, []);
 
   const hasPath = (start, end) => {
@@ -709,7 +741,7 @@ export function ColorLinesGame({ onFinish }) {
     return false;
   };
 
-  const checkLines = (currentBoard) => {
+  const clearLines = (currentBoard) => {
     const toClear = new Set();
 
     const checkDir = (start, dr, dc) => {
@@ -747,11 +779,10 @@ export function ColorLinesGame({ onFinish }) {
     if (toClear.size > 0) {
       const nextBoard = [...currentBoard];
       toClear.forEach(idx => { nextBoard[idx] = null; });
-      setBoard(nextBoard);
       setScore(prev => prev + toClear.size * 2);
-      return true;
+      return { board: nextBoard, cleared: true };
     }
-    return false;
+    return { board: currentBoard, cleared: false };
   };
 
   const handleCellClick = (idx) => {
@@ -765,32 +796,29 @@ export function ColorLinesGame({ onFinish }) {
         nextBoard[idx] = board[selectedIdx];
         nextBoard[selectedIdx] = null;
 
-        const cleared = checkLines(nextBoard);
-        if (!cleared) {
+        let resolved = clearLines(nextBoard);
+        if (!resolved.cleared) {
           const emptyIndices = [];
           nextBoard.forEach((cell, i) => { if (cell === null) emptyIndices.push(i); });
 
-          if (emptyIndices.length <= 3) {
+          if (emptyIndices.length === 0) {
+            setBoard(nextBoard);
             setGameOver(true);
             return;
           }
 
-          for (let i = 0; i < 3; i++) {
+          const colorsToAdd = nextColors.length === 3 ? nextColors : makeNextColors();
+          const ballsToAdd = Math.min(3, emptyIndices.length);
+          for (let i = 0; i < ballsToAdd; i++) {
             const rIdx = emptyIndices.splice(Math.floor(Math.random() * emptyIndices.length), 1)[0];
-            nextBoard[rIdx] = nextColors[i];
+            nextBoard[rIdx] = colorsToAdd[i];
           }
 
-          checkLines(nextBoard);
-          setBoard(nextBoard);
-
-          setNextColors([
-            colors[Math.floor(Math.random() * colors.length)],
-            colors[Math.floor(Math.random() * colors.length)],
-            colors[Math.floor(Math.random() * colors.length)]
-          ]);
-        } else {
-          setBoard(nextBoard);
+          resolved = clearLines(nextBoard);
+          setNextColors(makeNextColors());
         }
+        setBoard(resolved.board);
+        if (resolved.board.every(cell => cell !== null)) setGameOver(true);
         setSelectedIdx(null);
       }
     }
@@ -815,6 +843,9 @@ export function ColorLinesGame({ onFinish }) {
             <div key={i} style={{ width: '12px', height: '12px', borderRadius: '50%', background: col }}></div>
           ))}
         </div>
+      </div>
+      <div style={{ margin: '8px auto 12px', maxWidth: '340px', color: 'var(--muted)', fontSize: '12px', lineHeight: 1.4 }}>
+        Verplaats een bol naar een leeg vakje. Maak een rij van 5 dezelfde kleuren om ze weg te spelen. Er is geen eindbaas: probeer zo lang mogelijk door te gaan en haal een hoge score.
       </div>
 
       {gameOver ? (
@@ -874,13 +905,57 @@ export function ColorLinesGame({ onFinish }) {
 // ----------------------------------------------------
 // 4. RICOCHET SHOT COMPONENT (Fysica & Realtime Duel)
 // ----------------------------------------------------
-const createRicochetStars = () => [
-  { x: 80, y: 70, collected: false },
-  { x: 220, y: 80, collected: false },
-  { x: 150, y: 150, collected: false },
-  { x: 60, y: 220, collected: false },
-  { x: 240, y: 220, collected: false }
+const RICOCHET_LEVELS = [
+  {
+    name: "Sterrenpoort",
+    stars: [
+      { x: 80, y: 70 }, { x: 220, y: 80 }, { x: 150, y: 150 }, { x: 60, y: 220 }, { x: 240, y: 220 }
+    ],
+    walls: [
+      { x1: 0, y1: 0, x2: 300, y2: 0 },
+      { x1: 0, y1: 0, x2: 0, y2: 300 },
+      { x1: 300, y1: 0, x2: 300, y2: 300 },
+      { x1: 0, y1: 300, x2: 300, y2: 300 },
+      { x1: 0, y1: 110, x2: 110, y2: 110 },
+      { x1: 190, y1: 110, x2: 300, y2: 110 },
+      { x1: 100, y1: 190, x2: 200, y2: 190 }
+    ]
+  },
+  {
+    name: "Kasteelbocht",
+    stars: [
+      { x: 55, y: 65 }, { x: 245, y: 60 }, { x: 85, y: 155 }, { x: 215, y: 190 }, { x: 150, y: 245 }
+    ],
+    walls: [
+      { x1: 0, y1: 0, x2: 300, y2: 0 },
+      { x1: 0, y1: 0, x2: 0, y2: 300 },
+      { x1: 300, y1: 0, x2: 300, y2: 300 },
+      { x1: 0, y1: 300, x2: 300, y2: 300 },
+      { x1: 70, y1: 105, x2: 235, y2: 105 },
+      { x1: 70, y1: 105, x2: 70, y2: 220 },
+      { x1: 155, y1: 170, x2: 285, y2: 170 }
+    ]
+  },
+  {
+    name: "Maanlabyrint",
+    stars: [
+      { x: 55, y: 225 }, { x: 75, y: 80 }, { x: 150, y: 130 }, { x: 225, y: 80 }, { x: 245, y: 225 }
+    ],
+    walls: [
+      { x1: 0, y1: 0, x2: 300, y2: 0 },
+      { x1: 0, y1: 0, x2: 0, y2: 300 },
+      { x1: 300, y1: 0, x2: 300, y2: 300 },
+      { x1: 0, y1: 300, x2: 300, y2: 300 },
+      { x1: 55, y1: 125, x2: 130, y2: 125 },
+      { x1: 170, y1: 125, x2: 245, y2: 125 },
+      { x1: 120, y1: 190, x2: 180, y2: 190 },
+      { x1: 150, y1: 45, x2: 150, y2: 105 },
+      { x1: 150, y1: 210, x2: 150, y2: 265 }
+    ]
+  }
 ];
+
+const createRicochetStars = (level = 0) => RICOCHET_LEVELS[level].stars.map(star => ({ ...star, collected: false }));
 
 const createRicochetBall = () => ({ x: 150, y: 270, vx: 0, vy: 0, isMoving: false });
 
@@ -890,13 +965,16 @@ export function RicochetShotGame({ mode, room, localPlayer, players, updateRoomS
   const activeIndex = room.current_player_index || 0;
   const taskState = room.current_task_state || {};
 
-  const syncedStars = taskState.ricochetStars || createRicochetStars();
+  const syncedLevel = taskState.ricochetLevel || 0;
+  const [localLevel, setLocalLevel] = useState(0);
+  const level = isSolo ? localLevel : syncedLevel;
+  const syncedStars = taskState.ricochetStars || createRicochetStars(syncedLevel);
   const syncedBall = taskState.ricochetBall || createRicochetBall();
   const syncedScores = taskState.ricochetScores || {};
   const totalDuelPlayers = Math.min(2, players.length || 2);
   const duelFinished = !isSolo && Object.keys(syncedScores).length >= totalDuelPlayers;
 
-  const [localStars, setLocalStars] = useState(createRicochetStars);
+  const [localStars, setLocalStars] = useState(() => createRicochetStars(0));
   const [shotsLeft, setShotsLeft] = useState(5);
   const [localBall, setLocalBall] = useState(createRicochetBall);
   const [dragStart, setDragStart] = useState(null);
@@ -905,21 +983,15 @@ export function RicochetShotGame({ mode, room, localPlayer, players, updateRoomS
   const canvasRef = useRef(null);
   const animationRef = useRef(null);
 
-  const walls = [
-    { x1: 0, y1: 0, x2: 300, y2: 0 },
-    { x1: 0, y1: 0, x2: 0, y2: 300 },
-    { x1: 300, y1: 0, x2: 300, y2: 300 },
-    { x1: 0, y1: 300, x2: 300, y2: 300 },
-    { x1: 0, y1: 110, x2: 110, y2: 110 },
-    { x1: 190, y1: 110, x2: 300, y2: 110 },
-    { x1: 100, y1: 190, x2: 200, y2: 190 }
-  ];
-
   const stars = isSolo ? localStars : syncedStars;
   const ball = isSolo ? localBall : syncedBall;
+  const walls = RICOCHET_LEVELS[level].walls;
   const myTurn = isSolo || activeIndex === myIndex;
   const hasPlayedDuelShot = !isSolo && syncedScores[myIndex] !== undefined;
   const canShoot = myTurn && !ball.isMoving && !duelFinished && !hasPlayedDuelShot;
+  const canChangeLevel = isSolo
+    ? shotsLeft === 5 && !ball.isMoving && localStars.every(star => !star.collected)
+    : players[0]?.id === localPlayer.id && !ball.isMoving && Object.keys(syncedScores).length === 0;
   const physicsBallRef = useRef(ball);
   const physicsStarsRef = useRef(stars);
 
@@ -936,7 +1008,8 @@ export function RicochetShotGame({ mode, room, localPlayer, players, updateRoomS
       current_task_state: {
         ...taskState,
         ricochetInitialized: true,
-        ricochetStars: createRicochetStars(),
+        ricochetLevel: 0,
+        ricochetStars: createRicochetStars(0),
         ricochetBall: createRicochetBall(),
         ricochetScores: {}
       }
@@ -945,6 +1018,8 @@ export function RicochetShotGame({ mode, room, localPlayer, players, updateRoomS
 
   const handlePointerDown = (e) => {
     if (!canShoot || (isSolo && shotsLeft === 0)) return;
+    e.preventDefault();
+    e.currentTarget.setPointerCapture?.(e.pointerId);
     const rect = e.currentTarget.getBoundingClientRect();
     const x = e.clientX - rect.left;
     const y = e.clientY - rect.top;
@@ -955,8 +1030,32 @@ export function RicochetShotGame({ mode, room, localPlayer, players, updateRoomS
     }
   };
 
+  const handleLevelChange = (nextLevel) => {
+    if (!canChangeLevel || nextLevel === level) return;
+
+    if (isSolo) {
+      setLocalLevel(nextLevel);
+      setLocalStars(createRicochetStars(nextLevel));
+      setLocalBall(createRicochetBall());
+      setShotsLeft(5);
+      return;
+    }
+
+    updateRoomState(room.id, {
+      current_player_index: 0,
+      current_task_state: {
+        ...taskState,
+        ricochetLevel: nextLevel,
+        ricochetStars: createRicochetStars(nextLevel),
+        ricochetBall: createRicochetBall(),
+        ricochetScores: {}
+      }
+    });
+  };
+
   const handlePointerMove = (e) => {
     if (!dragStart) return;
+    e.preventDefault();
     const rect = e.currentTarget.getBoundingClientRect();
     const x = e.clientX - rect.left;
     const y = e.clientY - rect.top;
@@ -1006,9 +1105,22 @@ export function RicochetShotGame({ mode, room, localPlayer, players, updateRoomS
       if (ny < 8) { ny = 8; nvy = -nvy; }
       if (ny > 292) { ny = 292; nvy = -nvy; }
 
-      if (ny > 102 && ny < 118 && nx < 110) { nvy = -nvy; ny = currentBall.y; }
-      if (ny > 102 && ny < 118 && nx > 190) { nvy = -nvy; ny = currentBall.y; }
-      if (ny > 182 && ny < 198 && nx > 100 && nx < 200) { nvy = -nvy; ny = currentBall.y; }
+      walls.slice(4).forEach(wall => {
+        const minX = Math.min(wall.x1, wall.x2) - 4;
+        const maxX = Math.max(wall.x1, wall.x2) + 4;
+        const minY = Math.min(wall.y1, wall.y2) - 4;
+        const maxY = Math.max(wall.y1, wall.y2) + 4;
+
+        if (wall.y1 === wall.y2 && nx >= minX && nx <= maxX && ny >= minY && ny <= maxY) {
+          nvy = -nvy;
+          ny = currentBall.y;
+        }
+
+        if (wall.x1 === wall.x2 && ny >= minY && ny <= maxY && nx >= minX && nx <= maxX) {
+          nvx = -nvx;
+          nx = currentBall.x;
+        }
+      });
 
       const nextStars = currentStars.map(star => {
         if (star.collected) return star;
@@ -1066,7 +1178,7 @@ export function RicochetShotGame({ mode, room, localPlayer, players, updateRoomS
 
         nextState.ricochetScores = nextScores;
         if (!allDone) {
-          nextState.ricochetStars = createRicochetStars();
+          nextState.ricochetStars = createRicochetStars(level);
           nextState.ricochetBall = createRicochetBall();
         }
 
@@ -1111,6 +1223,22 @@ export function RicochetShotGame({ mode, room, localPlayer, players, updateRoomS
 
   return (
     <div style={{ textAlign: 'center' }}>
+      <div style={{ margin: '8px 0 12px', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px', flexWrap: 'wrap' }}>
+        <span style={{ fontSize: '12px', color: 'var(--muted)', fontWeight: 'bold' }}>Level:</span>
+        {RICOCHET_LEVELS.map((item, idx) => (
+          <button
+            key={item.name}
+            type="button"
+            className={`btn mini ${level === idx ? 'primary' : 'ghost'}`}
+            onClick={() => handleLevelChange(idx)}
+            disabled={!canChangeLevel}
+            title={canChangeLevel ? item.name : 'Level kan alleen voor het eerste schot worden aangepast'}
+            style={{ padding: '5px 9px', fontSize: '12px', opacity: canChangeLevel || level === idx ? 1 : 0.45 }}
+          >
+            {idx + 1}
+          </button>
+        ))}
+      </div>
       <div style={{ display: 'flex', justifyContent: 'space-between', gap: '8px', margin: '10px 20px', flexWrap: 'wrap' }}>
         <div style={{ color: 'var(--gold)', fontWeight: 'bold' }}>Sterren: {collectedCount}/5</div>
         {isSolo ? (
@@ -1135,6 +1263,9 @@ export function RicochetShotGame({ mode, room, localPlayer, players, updateRoomS
           <span>Kaatsen...</span>
         )}
       </div>
+      <div style={{ margin: '0 auto 10px', maxWidth: '320px', color: 'var(--muted)', fontSize: '12px', lineHeight: 1.4 }}>
+        Doel: raak met je schot zoveel mogelijk sterren. Sleep de blauwe bal naar achteren, laat los, en gebruik de muren om te kaatsen.
+      </div>
 
       <svg
         width="300"
@@ -1144,13 +1275,20 @@ export function RicochetShotGame({ mode, room, localPlayer, players, updateRoomS
         onPointerDown={handlePointerDown}
         onPointerMove={handlePointerMove}
         onPointerUp={handlePointerUp}
+        onPointerCancel={() => {
+          setDragStart(null);
+          setDragCurrent(null);
+        }}
+        onTouchMove={(e) => e.preventDefault()}
         style={{
           background: '#041026',
           borderRadius: '16px',
           border: '2px solid var(--line)',
           display: 'block',
           margin: '15px auto',
-          touchAction: 'none'
+          touchAction: 'none',
+          overscrollBehavior: 'contain',
+          userSelect: 'none'
         }}
       >
         {walls.map((w, i) => (
@@ -1213,6 +1351,8 @@ export function CurlingGame({ mode, room, localPlayer, players, updateRoomState,
 
   const handlePointerDown = (e) => {
     if (!myTurn || isSolo && activeIndex === 1) return;
+    e.preventDefault();
+    e.currentTarget.setPointerCapture?.(e.pointerId);
     const rect = e.currentTarget.getBoundingClientRect();
     const x = e.clientX - rect.left;
     const y = e.clientY - rect.top;
@@ -1225,6 +1365,7 @@ export function CurlingGame({ mode, room, localPlayer, players, updateRoomState,
 
   const handlePointerMove = (e) => {
     if (!dragStart) return;
+    e.preventDefault();
     const rect = e.currentTarget.getBoundingClientRect();
     const x = e.clientX - rect.left;
     const y = e.clientY - rect.top;
@@ -1426,13 +1567,20 @@ export function CurlingGame({ mode, room, localPlayer, players, updateRoomState,
         onPointerDown={handlePointerDown}
         onPointerMove={handlePointerMove}
         onPointerUp={handlePointerUp}
+        onPointerCancel={() => {
+          setDragStart(null);
+          setDragCurrent(null);
+        }}
+        onTouchMove={(e) => e.preventDefault()}
         style={{
           background: '#eef8ff',
           borderRadius: '16px',
           border: '2px solid var(--line)',
           display: 'block',
           margin: '15px auto',
-          touchAction: 'none'
+          touchAction: 'none',
+          overscrollBehavior: 'contain',
+          userSelect: 'none'
         }}
       >
         <circle cx="150" cy="70" r="45" fill="rgba(255, 37, 37, 0.2)" stroke="#ff2525" strokeWidth="2" />

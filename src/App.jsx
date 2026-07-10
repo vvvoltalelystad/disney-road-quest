@@ -485,6 +485,7 @@ export default function App() {
     }
 
     const newEntry = {
+      category: currentTask.type === 'arcade-game' ? 'arena' : 'quest-solo',
       gameType: gameName,
       date: new Date().toISOString(),
       score: points,
@@ -496,6 +497,13 @@ export default function App() {
       localStorage.setItem('disney_solo_history', JSON.stringify(updated));
       return updated;
     });
+  };
+
+  const isArenaHistoryItem = (item) => {
+    const text = `${item?.gameType || ''} ${item?.details || ''}`;
+    return item?.category === 'arena'
+      || item?.gameType === 'Duel Arena'
+      || /Othello|Dots|Color Lines|Ricochet|Curling|Marble|verhuren/i.test(text);
   };
 
   const updateRoomState = async (roomId, updates) => {
@@ -1323,8 +1331,9 @@ export default function App() {
         logSoloAttempt(0, "Opdracht overgeslagen");
         soloLoggedRef.current = true;
       }
+      const targetScreen = room.game_mode?.startsWith('arcade-') ? 'arcade_select' : 'solo_select';
       setRoom(null);
-      setScreen('solo_select');
+      setScreen(targetScreen);
       return;
     }
 
@@ -2767,12 +2776,12 @@ export default function App() {
               <section className="card" style={{ marginTop: '20px' }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '10px' }}>
                   <h2 className="sectiontitle" style={{ margin: 0 }}>📊 Geschiedenis Arena</h2>
-                  {soloHistory.filter(h => h.details?.includes("Othello") || h.details?.includes("Color Lines") || h.details?.includes("Ricochet") || h.details?.includes("Curling") || h.details?.includes("Marble") || h.details?.includes("verhuren")).length > 0 && (
+                  {soloHistory.filter(isArenaHistoryItem).length > 0 && (
                     <button 
                       className="btn secondary mini" 
                       onClick={() => {
                         if (confirm("Weet je zeker dat je alle geschiedenis van de arena wilt wissen?")) {
-                          const updated = soloHistory.filter(h => !(h.details?.includes("Othello") || h.details?.includes("Color Lines") || h.details?.includes("Ricochet") || h.details?.includes("Curling") || h.details?.includes("Marble") || h.details?.includes("verhuren")));
+                          const updated = soloHistory.filter(h => !isArenaHistoryItem(h));
                           setSoloHistory(updated);
                           localStorage.setItem('disney_solo_history', JSON.stringify(updated));
                         }
@@ -2786,19 +2795,23 @@ export default function App() {
 
                 <div style={{ maxHeight: '200px', overflowY: 'auto', gap: '8px', display: 'flex', flexDirection: 'column' }}>
                   {(() => {
-                    const arenaLogs = soloHistory.filter(h => h.details?.includes("Othello") || h.details?.includes("Color Lines") || h.details?.includes("Ricochet") || h.details?.includes("Curling") || h.details?.includes("Marble") || h.details?.includes("verhuren"));
+                    const arenaLogs = soloHistory.filter(isArenaHistoryItem);
                     if (arenaLogs.length === 0) {
                       return <p style={{ fontSize: '12px', color: 'var(--muted)', textAlign: 'center' }}>Nog geen arena spellen gespeeld.</p>;
                     }
-                    return arenaLogs.map((log, idx) => (
-                      <div key={idx} style={{ padding: '8px 12px', background: '#081730', border: '1px solid var(--line)', borderRadius: '8px', fontSize: '12px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                        <div>
-                          <strong>{log.details}</strong>
-                          <div style={{ fontSize: '10px', color: 'var(--muted)', marginTop: '2px' }}>{log.date} · {log.time}</div>
+                    return arenaLogs.map((log, idx) => {
+                      const dateObj = new Date(log.date);
+                      const timeStr = `${String(dateObj.getDate()).padStart(2, '0')}-${String(dateObj.getMonth() + 1).padStart(2, '0')} ${String(dateObj.getHours()).padStart(2, '0')}:${String(dateObj.getMinutes()).padStart(2, '0')}`;
+                      return (
+                        <div key={idx} style={{ padding: '8px 12px', background: '#081730', border: '1px solid var(--line)', borderRadius: '8px', fontSize: '12px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                          <div>
+                            <strong>{log.details}</strong>
+                            <div style={{ fontSize: '10px', color: 'var(--muted)', marginTop: '2px' }}>{timeStr}</div>
+                          </div>
+                          <div style={{ color: 'var(--gold)', fontWeight: 'bold' }}>+{log.score ?? log.stars ?? 0} ★</div>
                         </div>
-                        <div style={{ color: 'var(--gold)', fontWeight: 'bold' }}>{log.stars} ★</div>
-                      </div>
-                    ));
+                      );
+                    });
                   })()}
                 </div>
               </section>
@@ -2853,13 +2866,14 @@ export default function App() {
               <section className="card">
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '14px' }}>
                   <h2 className="sectiontitle" style={{ margin: 0 }}>📜 Solo Geschiedenis</h2>
-                  {soloHistory.length > 0 && (
+                  {soloHistory.filter(h => !isArenaHistoryItem(h)).length > 0 && (
                     <button 
                       className="btn secondary mini" 
                       onClick={() => {
                         if (confirm("Weet je zeker dat je alle geschiedenis wilt wissen?")) {
-                          setSoloHistory([]);
-                          localStorage.removeItem('disney_solo_history');
+                          const updated = soloHistory.filter(isArenaHistoryItem);
+                          setSoloHistory(updated);
+                          localStorage.setItem('disney_solo_history', JSON.stringify(updated));
                         }
                       }}
                       style={{ padding: '4px 8px', fontSize: '11px' }}
@@ -2869,13 +2883,13 @@ export default function App() {
                   )}
                 </div>
                 
-                {soloHistory.length === 0 ? (
+                {soloHistory.filter(h => !isArenaHistoryItem(h)).length === 0 ? (
                   <div className="center" style={{ padding: '20px 0', color: 'var(--muted)', fontSize: '14px' }}>
                     Je hebt nog geen solo spelletjes gespeeld. Start hierboven een spel!
                   </div>
                 ) : (
                   <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', maxHeight: '300px', overflowY: 'auto', paddingRight: '4px' }}>
-                    {soloHistory.map((item, idx) => {
+                    {soloHistory.filter(h => !isArenaHistoryItem(h)).map((item, idx) => {
                       const dateObj = new Date(item.date);
                       const timeStr = `${String(dateObj.getDate()).padStart(2, '0')}-${String(dateObj.getMonth() + 1).padStart(2, '0')} ${String(dateObj.getHours()).padStart(2, '0')}:${String(dateObj.getMinutes()).padStart(2, '0')}`;
                       return (
@@ -2955,7 +2969,14 @@ export default function App() {
                   style={{ background: 'var(--gold)', color: '#000', width: '100%', marginTop: '12px' }} 
                   onClick={() => setScreen('solo_select')}
                 >
-                  🎮 Solo Spel (1 Speler)
+                  Quest Solo (Mastermind & Sudoku)
+                </button>
+                <button 
+                  className="btn secondary" 
+                  style={{ width: '100%', marginTop: '10px' }} 
+                  onClick={() => setScreen('arcade_select')}
+                >
+                  Duel Arena Solo & Duel
                 </button>
               </section>
 
@@ -3124,15 +3145,23 @@ export default function App() {
                 // ACTIVE GAME VIEW
                 <div>
                   {renderAppHeader(
-                    room.id === 'solo' ? "Solo Mastermind" : "Road Quest", 
+                    room.id === 'solo'
+                      ? (room.game_mode?.startsWith('arcade-') ? "Duel Arena" : "Quest Solo")
+                      : (room.game_mode?.startsWith('arcade-') ? "Duel Arena" : "Road Quest"), 
                     () => {
                       if (room.id === 'solo') {
                         if (!soloLoggedRef.current) {
                           logSoloAttempt(0, "Opdracht verlaten");
                           soloLoggedRef.current = true;
                         }
+                        const targetScreen = room.game_mode?.startsWith('arcade-') ? 'arcade_select' : 'solo_select';
                         setRoom(null);
-                        setScreen('solo_select');
+                        setScreen(targetScreen);
+                      } else if (room.game_mode?.startsWith('arcade-')) {
+                        setRoom(null);
+                        setPlayers([]);
+                        setScoreHistory([]);
+                        setScreen('arcade_select');
                       } else {
                         setScoreReturnScreen('game');
                         setScreen('scores');
@@ -3190,6 +3219,7 @@ export default function App() {
                                 onFinish={(score, detail) => {
                                   if (room.id === 'solo') {
                                     logSoloAttempt(score, detail);
+                                    soloLoggedRef.current = true;
                                   }
                                   handleFinishTask();
                                 }}
