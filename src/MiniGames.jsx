@@ -2427,6 +2427,414 @@ export function DisneyYahtzeeGame({ mode, room, localPlayer, players, updateRoom
   );
 }
 
+const QWIXX_ROWS = [
+  { id: "red", name: "Mickey Rood", color: "#ff4d5d", values: [2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12] },
+  { id: "yellow", name: "Belle Geel", color: "#ffd45c", values: [2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12] },
+  { id: "green", name: "Tiana Groen", color: "#32d583", values: [12, 11, 10, 9, 8, 7, 6, 5, 4, 3, 2] },
+  { id: "blue", name: "Elsa Blauw", color: "#5bbcff", values: [12, 11, 10, 9, 8, 7, 6, 5, 4, 3, 2] }
+];
+
+function rollQwixxDie() {
+  return Math.floor(Math.random() * 6) + 1;
+}
+
+function createQwixxMarks() {
+  return QWIXX_ROWS.reduce((acc, row) => ({ ...acc, [row.id]: [] }), {});
+}
+
+function createQwixxScores() {
+  return [createQwixxMarks(), createQwixxMarks()];
+}
+
+function isQwixxValueOpen(row, marks = [], value, lockedRows = []) {
+  if (lockedRows.includes(row.id) || !row.values.includes(value) || marks.includes(value)) return false;
+  const valueIndex = row.values.indexOf(value);
+  const furthestIndex = marks.reduce((max, markedValue) => Math.max(max, row.values.indexOf(markedValue)), -1);
+  return valueIndex > furthestIndex;
+}
+
+function getQwixxOptions(dice, marks, lockedRows) {
+  if (!dice) return [];
+  const whiteSum = dice.white1 + dice.white2;
+  const options = [];
+
+  QWIXX_ROWS.forEach(row => {
+    const rowMarks = marks?.[row.id] || [];
+    const candidates = [
+      { value: whiteSum, source: "witte som" },
+      { value: dice.white1 + dice[row.id], source: "wit + kleur" },
+      { value: dice.white2 + dice[row.id], source: "wit + kleur" }
+    ];
+
+    candidates.forEach(candidate => {
+      if (isQwixxValueOpen(row, rowMarks, candidate.value, lockedRows)) {
+        const key = `${row.id}-${candidate.value}`;
+        if (!options.some(option => option.key === key)) {
+          options.push({ key, rowId: row.id, value: candidate.value, source: candidate.source });
+        }
+      }
+    });
+  });
+
+  return options;
+}
+
+function scoreQwixxMarks(count) {
+  return (count * (count + 1)) / 2;
+}
+
+function getQwixxPlayerTotal(marks = createQwixxMarks(), penalties = 0) {
+  const rowScore = QWIXX_ROWS.reduce((sum, row) => sum + scoreQwixxMarks((marks[row.id] || []).length), 0);
+  return rowScore - penalties * 5;
+}
+
+function isQwixxComplete(nextState) {
+  return (nextState.qwixxLockedRows || []).length >= 2
+    || (nextState.qwixxPenalties || []).some(value => value >= 4)
+    || (nextState.qwixxRound || 1) > 16;
+}
+
+export function DisneyQwixxGame({ mode, room, localPlayer, players, updateRoomState, onFinish }) {
+  const isSolo = mode === 'solo' || room.id === 'solo';
+  const taskState = room.current_task_state || {};
+  const activeIndex = room.current_player_index || 0;
+  const myIndex = Math.max(0, players.findIndex(p => p.id === localPlayer.id));
+  const playerNames = [
+    isSolo ? "Jij" : (players[0]?.name || "Speler 1"),
+    isSolo ? "Computer" : (players[1]?.name || "Speler 2")
+  ];
+
+  const marks = Array.isArray(taskState.qwixxMarks) ? taskState.qwixxMarks : createQwixxScores();
+  const penalties = Array.isArray(taskState.qwixxPenalties) ? taskState.qwixxPenalties : [0, 0];
+  const dice = taskState.qwixxDice || null;
+  const rolled = Boolean(taskState.qwixxRolled);
+  const round = taskState.qwixxRound || 1;
+  const lockedRows = taskState.qwixxLockedRows || [];
+  const complete = Boolean(taskState.qwixxComplete);
+  const myTurn = activeIndex === myIndex && !complete;
+  const aiTurnRef = useRef("");
+
+  useEffect(() => {
+    if (!taskState.qwixxMarks) {
+      updateRoomState(room.id, {
+        current_player_index: 0,
+        current_task_state: {
+          ...taskState,
+          qwixxMarks: createQwixxScores(),
+          qwixxPenalties: [0, 0],
+          qwixxDice: null,
+          qwixxRolled: false,
+          qwixxRound: 1,
+          qwixxLockedRows: [],
+          qwixxComplete: false,
+          qwixxLastMove: null
+        }
+      });
+    }
+  }, []);
+
+  const currentOptions = getQwixxOptions(dice, marks[activeIndex] || createQwixxMarks(), lockedRows);
+
+  const finishTurn = (nextMarks, nextPenalties, nextLockedRows, lastMove) => {
+    const nextRound = activeIndex === 1 ? round + 1 : round;
+    const nextState = {
+      ...taskState,
+      qwixxMarks: nextMarks,
+      qwixxPenalties: nextPenalties,
+      qwixxDice: null,
+      qwixxRolled: false,
+      qwixxRound: nextRound,
+      qwixxLockedRows: nextLockedRows,
+      qwixxLastMove: lastMove
+    };
+    const nextComplete = isQwixxComplete(nextState);
+
+    updateRoomState(room.id, {
+      current_player_index: nextComplete ? activeIndex : (activeIndex + 1) % 2,
+      current_task_state: {
+        ...nextState,
+        qwixxComplete: nextComplete
+      }
+    });
+  };
+
+  const handleRoll = () => {
+    if (!myTurn || rolled) return;
+    updateRoomState(room.id, {
+      current_task_state: {
+        ...taskState,
+        qwixxDice: {
+          white1: rollQwixxDie(),
+          white2: rollQwixxDie(),
+          red: rollQwixxDie(),
+          yellow: rollQwixxDie(),
+          green: rollQwixxDie(),
+          blue: rollQwixxDie()
+        },
+        qwixxRolled: true,
+        qwixxLastMove: null
+      }
+    });
+  };
+
+  const handleMark = (rowId, value) => {
+    if (!myTurn || !rolled || complete) return;
+    const row = QWIXX_ROWS.find(item => item.id === rowId);
+    const option = currentOptions.find(item => item.rowId === rowId && item.value === value);
+    if (!row || !option) return;
+
+    const nextMarks = marks.map((playerMarks, index) => {
+      if (index !== activeIndex) return playerMarks;
+      return {
+        ...playerMarks,
+        [rowId]: [...(playerMarks[rowId] || []), value]
+      };
+    });
+    const rowMarksCount = nextMarks[activeIndex][rowId].length;
+    const isLastValue = row.values.indexOf(value) === row.values.length - 1;
+    const nextLockedRows = isLastValue && rowMarksCount >= 5 && !lockedRows.includes(rowId)
+      ? [...lockedRows, rowId]
+      : lockedRows;
+
+    finishTurn(
+      nextMarks,
+      penalties,
+      nextLockedRows,
+      `${playerNames[activeIndex]} streepte ${value} af in ${row.name}.`
+    );
+  };
+
+  const handlePass = () => {
+    if (!myTurn || !rolled || complete) return;
+    const nextPenalties = penalties.map((value, index) => index === activeIndex ? value + 1 : value);
+    finishTurn(
+      marks,
+      nextPenalties,
+      lockedRows,
+      `${playerNames[activeIndex]} paste en kreeg een strafvakje.`
+    );
+  };
+
+  useEffect(() => {
+    if (!isSolo || activeIndex !== 1 || complete || !taskState.qwixxMarks) return;
+
+    const aiKey = `${round}-${rolled}-${JSON.stringify(dice)}-${JSON.stringify(marks[1])}-${penalties[1]}`;
+    if (aiTurnRef.current === aiKey) return;
+    aiTurnRef.current = aiKey;
+
+    const timer = setTimeout(() => {
+      if (!rolled) {
+        updateRoomState(room.id, {
+          current_task_state: {
+            ...taskState,
+            qwixxDice: {
+              white1: rollQwixxDie(),
+              white2: rollQwixxDie(),
+              red: rollQwixxDie(),
+              yellow: rollQwixxDie(),
+              green: rollQwixxDie(),
+              blue: rollQwixxDie()
+            },
+            qwixxRolled: true,
+            qwixxLastMove: "Computer gooit de dobbelstenen."
+          }
+        });
+        return;
+      }
+
+      const aiOptions = getQwixxOptions(dice, marks[1] || createQwixxMarks(), lockedRows);
+      const bestOption = aiOptions
+        .map(option => {
+          const row = QWIXX_ROWS.find(item => item.id === option.rowId);
+          return {
+            ...option,
+            row,
+            priority: row.values.indexOf(option.value) + (row.values.indexOf(option.value) === row.values.length - 1 ? 4 : 0)
+          };
+        })
+        .sort((a, b) => b.priority - a.priority)[0];
+
+      if (!bestOption) {
+        const nextPenalties = penalties.map((value, index) => index === 1 ? value + 1 : value);
+        finishTurn(marks, nextPenalties, lockedRows, "Computer paste en kreeg een strafvakje.");
+        return;
+      }
+
+      const nextMarks = marks.map((playerMarks, index) => {
+        if (index !== 1) return playerMarks;
+        return {
+          ...playerMarks,
+          [bestOption.rowId]: [...(playerMarks[bestOption.rowId] || []), bestOption.value]
+        };
+      });
+      const rowMarksCount = nextMarks[1][bestOption.rowId].length;
+      const isLastValue = bestOption.row.values.indexOf(bestOption.value) === bestOption.row.values.length - 1;
+      const nextLockedRows = isLastValue && rowMarksCount >= 5 && !lockedRows.includes(bestOption.rowId)
+        ? [...lockedRows, bestOption.rowId]
+        : lockedRows;
+
+      finishTurn(
+        nextMarks,
+        penalties,
+        nextLockedRows,
+        `Computer streepte ${bestOption.value} af in ${bestOption.row.name}.`
+      );
+    }, rolled ? 850 : 650);
+
+    return () => clearTimeout(timer);
+  }, [isSolo, activeIndex, complete, rolled, dice, round, taskState.qwixxMarks]);
+
+  const handleFinish = () => {
+    const myTotal = getQwixxPlayerTotal(marks[myIndex] || marks[0], penalties[myIndex] || 0);
+    const otherIndex = myIndex === 0 ? 1 : 0;
+    const otherTotal = getQwixxPlayerTotal(marks[otherIndex] || {}, penalties[otherIndex] || 0);
+    const won = myTotal > otherTotal;
+    const tie = myTotal === otherTotal;
+    const points = won ? 3 : tie ? 2 : 1;
+    const detail = won
+      ? `Disney Qwixx gewonnen: ${myTotal}-${otherTotal}`
+      : tie
+        ? `Disney Qwixx gelijkspel: ${myTotal}-${otherTotal}`
+        : `Disney Qwixx verloren: ${myTotal}-${otherTotal}`;
+    onFinish(points, detail);
+  };
+
+  const totals = [
+    getQwixxPlayerTotal(marks[0], penalties[0]),
+    getQwixxPlayerTotal(marks[1], penalties[1])
+  ];
+  const winnerText = totals[0] === totals[1]
+    ? "Gelijkspel"
+    : `${playerNames[totals[0] > totals[1] ? 0 : 1]} wint!`;
+
+  return (
+    <div style={{ textAlign: 'center' }}>
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px', marginBottom: '12px' }}>
+        {[0, 1].map(index => (
+          <div
+            key={index}
+            style={{
+              padding: '10px',
+              borderRadius: '12px',
+              background: activeIndex === index && !complete ? '#10264c' : '#07152c',
+              border: activeIndex === index && !complete ? '2px solid var(--gold)' : '1px solid var(--line)'
+            }}
+          >
+            <div style={{ fontWeight: 800, fontSize: '13px', color: index === 0 ? '#5bbcff' : '#ff5b5b' }}>{playerNames[index]}</div>
+            <div style={{ fontSize: '24px', fontWeight: 900 }}>{totals[index]}</div>
+            <div style={{ fontSize: '11px', color: 'var(--muted)' }}>Straf: {penalties[index] || 0}/4</div>
+          </div>
+        ))}
+      </div>
+
+      <div style={{ margin: '8px 0 12px', minHeight: '22px', color: 'var(--muted)', fontSize: '13px' }}>
+        {complete
+          ? <strong style={{ color: 'var(--gold)' }}>{winnerText}</strong>
+          : activeIndex === 1 && isSolo
+            ? "Computer speelt..."
+            : myTurn
+              ? rolled ? "Kies een geldig vakje of pas." : "Jouw beurt: gooi de dobbelstenen."
+              : `Wachten op ${playerNames[activeIndex]}...`}
+        {taskState.qwixxLastMove && (
+          <div style={{ marginTop: '4px' }}>{taskState.qwixxLastMove}</div>
+        )}
+      </div>
+
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(6, 1fr)', gap: '6px', margin: '0 auto 12px', maxWidth: '360px' }}>
+        {[
+          ["W1", dice?.white1, "#f8fbff"],
+          ["W2", dice?.white2, "#f8fbff"],
+          ["R", dice?.red, "#ff4d5d"],
+          ["G", dice?.green, "#32d583"],
+          ["B", dice?.blue, "#5bbcff"],
+          ["Y", dice?.yellow, "#ffd45c"]
+        ].map(([label, value, color]) => (
+          <div
+            key={label}
+            style={{
+              aspectRatio: '1',
+              borderRadius: '10px',
+              background: color,
+              color: label.startsWith("W") || label === "Y" ? '#07152c' : '#fff',
+              display: 'flex',
+              flexDirection: 'column',
+              alignItems: 'center',
+              justifyContent: 'center',
+              border: '1px solid rgba(255,255,255,0.35)',
+              boxShadow: 'inset 0 -8px 14px rgba(0,0,0,0.18)'
+            }}
+          >
+            <strong style={{ fontSize: '20px' }}>{value || "?"}</strong>
+            <span style={{ fontSize: '10px', fontWeight: 800 }}>{label}</span>
+          </div>
+        ))}
+      </div>
+
+      <div style={{ display: 'grid', gridTemplateColumns: rolled ? '1fr 1fr' : '1fr', gap: '8px', marginBottom: '12px' }}>
+        <button className="btn primary full" onClick={handleRoll} disabled={!myTurn || rolled || complete}>
+          Gooi dobbelstenen
+        </button>
+        {rolled && (
+          <button className="btn secondary full" onClick={handlePass} disabled={!myTurn || complete}>
+            Pas (-5)
+          </button>
+        )}
+      </div>
+
+      <div style={{ display: 'grid', gap: '8px' }}>
+        {QWIXX_ROWS.map(row => {
+          const rowMarks = marks[activeIndex]?.[row.id] || [];
+          const rowLocked = lockedRows.includes(row.id);
+          return (
+            <div key={row.id} style={{ background: '#07152c', border: '1px solid var(--line)', borderRadius: '12px', padding: '8px' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '6px' }}>
+                <strong style={{ color: row.color, fontSize: '13px' }}>{row.name}</strong>
+                <span style={{ color: 'var(--muted)', fontSize: '11px' }}>
+                  {rowMarks.length} kruisjes {rowLocked ? "· gesloten" : ""}
+                </span>
+              </div>
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(11, 1fr)', gap: '4px' }}>
+                {row.values.map(value => {
+                  const marked = rowMarks.includes(value);
+                  const playable = currentOptions.some(option => option.rowId === row.id && option.value === value);
+                  return (
+                    <button
+                      key={value}
+                      type="button"
+                      className="btn mini"
+                      disabled={!myTurn || !rolled || complete || !playable}
+                      onClick={() => handleMark(row.id, value)}
+                      style={{
+                        minWidth: 0,
+                        padding: '7px 0',
+                        borderRadius: '8px',
+                        background: marked ? row.color : playable ? '#12345f' : '#061225',
+                        border: playable ? `1px solid ${row.color}` : '1px solid var(--line)',
+                        color: marked ? (row.id === 'yellow' ? '#07152c' : '#fff') : '#fff',
+                        opacity: marked ? 1 : playable ? 1 : 0.58,
+                        fontSize: '11px',
+                        fontWeight: 900
+                      }}
+                    >
+                      {marked ? "X" : value}
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+          );
+        })}
+      </div>
+
+      {complete && (
+        <button className="btn primary full" onClick={handleFinish} style={{ marginTop: '14px' }}>
+          Score opslaan & terug
+        </button>
+      )}
+    </div>
+  );
+}
+
 const MINI_GAME_RULES = {
   othello: {
     title: "Othello / Reversi",
@@ -2530,6 +2938,19 @@ const MINI_GAME_RULES = {
     ],
     solo: "Solo: jij speelt tegen de computer. De computer vult automatisch een categorie na zijn worp.",
     duel: "Duel: spelers gooien om de beurt en vullen samen realtime de scorekaart."
+  },
+  qwixx: {
+    title: "Disney Qwixx",
+    intro: "Streep getallen af in gekleurde Disney-rijen en pak zoveel mogelijk punten.",
+    rules: [
+      "Gooi twee witte en vier gekleurde dobbelstenen.",
+      "Je mag alleen getallen afstrepen die verder naar rechts staan dan je eerdere kruisjes in die rij.",
+      "De rode en gele rij lopen van 2 naar 12; de groene en blauwe rij lopen van 12 naar 2.",
+      "Een beurt eindigt nadat je een geldig vakje kiest of past.",
+      "Passen levert een strafvakje op van min vijf punten."
+    ],
+    solo: "Solo: jij speelt tegen de computer. De computer kiest automatisch een geldig vakje of past.",
+    duel: "Duel: spelers gooien om de beurt. De gedeelde scorekaart wordt realtime bijgewerkt."
   }
 };
 
@@ -2724,6 +3145,18 @@ export function MiniGameRenderer({ gameId, mode, room, localPlayer, players, upd
     case 'yahtzee':
       gameView = (
         <DisneyYahtzeeGame
+          mode={mode}
+          room={room}
+          localPlayer={localPlayer}
+          players={players}
+          updateRoomState={safeUpdateRoomState}
+          onFinish={onFinish}
+        />
+      );
+      break;
+    case 'qwixx':
+      gameView = (
+        <DisneyQwixxGame
           mode={mode}
           room={room}
           localPlayer={localPlayer}
