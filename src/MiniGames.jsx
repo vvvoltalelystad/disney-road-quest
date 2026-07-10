@@ -1021,7 +1021,7 @@ export function RicochetShotGame({ mode, room, localPlayer, players, updateRoomS
   const syncedStars = taskState.ricochetStars || createRicochetStars(syncedLevel);
   const syncedBall = taskState.ricochetBall || createRicochetBall();
   const syncedScores = taskState.ricochetScores || {};
-  const totalDuelPlayers = Math.min(2, players.length || 2);
+  const totalDuelPlayers = Math.min(4, players.length || 2);
   const duelFinished = !isSolo && Object.keys(syncedScores).length >= totalDuelPlayers;
 
   const [localStars, setLocalStars] = useState(() => createRicochetStars(0));

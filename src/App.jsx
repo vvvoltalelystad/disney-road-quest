@@ -56,6 +56,21 @@ const POWER_CARDS = {
   elsa: { name: "Elsa's Bevriezing \u{2744}\u{FE0F}", desc: "Zet de actieve timer gedurende 15 seconden volledig stil om rustig na te denken.", icon: "\u{2744}\u{FE0F}", type: "self" }
 };
 
+const ARENA_GAMES = [
+  { id: 'othello', name: "Othello / Reversi", icon: "\u26AA", desc: "Verover het bord door vijandelijke fiches in te sluiten.", maxPlayers: 2 },
+  { id: 'dotsboxes', name: "Dots & Boxes", icon: "\u270F\uFE0F", desc: "Trek lijntjes en claim de meeste kamertjes.", maxPlayers: 4 },
+  { id: 'colorlines', name: "Color Lines", icon: "\u{1F534}", desc: "Solo puzzel: maak rijen van 5 gelijke bollen.", maxPlayers: 1 },
+  { id: 'ricochet', name: "Ricochet Shot", icon: "\u{1F4AB}", desc: "Richt en kaats de bal langs muren om sterren te pakken.", maxPlayers: 4 },
+  { id: 'curling', name: "Curling Duel", icon: "\u{1F94C}", desc: "Glijd stenen en stoot je tegenstander uit het huis.", maxPlayers: 2 },
+  { id: 'abalone', name: "Marble Push (Abalone)", icon: "\u{1F41C}", desc: "Duw de bollen van de tegenstander uit het hex-raster.", maxPlayers: 2 },
+  { id: 'piratesplank', name: "Pirates' Plank", icon: "\u2620\uFE0F", desc: "Raad Disney-woorden voordat de piraat van de plank loopt.", maxPlayers: 4 },
+  { id: 'yahtzee', name: "Disney Yahtzee", icon: "\u{1F3B2}", desc: "Gooi, houd dobbelstenen vast en vul je magische scorekaart.", maxPlayers: 2 },
+  { id: 'qwixx', name: "Disney Qwixx", icon: "\u270F\uFE0F", desc: "Streep gekleurde rijen af en ontwijk strafvakjes.", maxPlayers: 2 },
+  { id: 'keeropkeer', name: "Disney Keer op Keer", icon: "\u{1F308}", desc: "Rol kleur en aantal, kleur vakjes en scoor bonuslijnen.", maxPlayers: 2 }
+];
+
+const getArenaGame = (gameId) => ARENA_GAMES.find(game => game.id === gameId);
+
 const assetPath = (path) => {
   if (location.hostname.includes('github.io')) {
     return '/disney-road-quest/' + path;
@@ -603,7 +618,9 @@ export default function App() {
       }
       return;
     }
-    awardStarsToCollector(player?.name, delta);
+    if (delta > 0) {
+      awardStarsToCollector(player?.name, delta);
+    }
     await dbAddPlayerScore(roomId, player, delta, reason, bucket, taskObj);
   };
 
@@ -678,13 +695,18 @@ export default function App() {
     setLoading(true);
     setError(null);
     try {
+      const arenaGame = getArenaGame(gameId);
       const { room: r, player: p } = await createRoom('mix', 1, 10, playerNameInput);
       
       const updates = { 
         game_mode: 'arcade-' + gameId, 
         current_task_id: 'duel-arcade-' + gameId,
         status: 'lobby',
-        current_task_state: { aiLevel }
+        current_task_state: {
+          aiLevel,
+          arcadeGameId: gameId,
+          arcadeMaxPlayers: arenaGame?.maxPlayers || 2
+        }
       };
       await dbUpdateRoomState(r.id, updates);
       
@@ -1218,13 +1240,20 @@ export default function App() {
       alert("Er is minimaal 1 speler nodig om te starten.");
       return;
     }
+    const arcadeMaxPlayers = room?.current_task_state?.arcadeMaxPlayers;
+    if (room?.game_mode?.startsWith('arcade-') && arcadeMaxPlayers && players.length > arcadeMaxPlayers) {
+      alert(`Dit Arena-spel is geschikt voor maximaal ${arcadeMaxPlayers} speler${arcadeMaxPlayers === 1 ? '' : 's'}.`);
+      return;
+    }
     setLoading(true);
     try {
       if (room?.game_mode?.startsWith('arcade-')) {
         await updateRoomState(room.id, {
           status: 'playing',
           current_player_index: 0,
-          current_task_state: {}
+          current_task_state: {
+            ...(room.current_task_state || {})
+          }
         });
         setLoading(false);
         return;
@@ -1298,12 +1327,15 @@ export default function App() {
   const handleAnswerQuiz = async (answerIndex, correctAnswerIndex, points) => {
     if (room.current_task_state?.quizLocked) return;
 
+    const isHost = players[0]?.id === localPlayer?.id;
     const isMyTurn = players[room.current_player_index]?.id === localPlayer?.id;
+    if (!isMyTurn && !isHost) return;
+
     const isCorrect = answerIndex === correctAnswerIndex;
     const ptsToAward = room.current_task_state?.hyperdriveActive ? points * 2 : points;
     const activePlayer = players[room.current_player_index];
 
-    if (isCorrect && isMyTurn) {
+    if (isCorrect && activePlayer) {
       await addPlayerScore(
         room.id, 
         activePlayer, 
@@ -1454,6 +1486,17 @@ export default function App() {
       )
     ));
     await handleFinishTask();
+  };
+
+  const handleStartGroupTimer = async (duration = 45) => {
+    if (!room?.id || room.id === 'solo') return;
+    await updateRoomState(room.id, {
+      current_task_state: {
+        ...room.current_task_state,
+        timerStartedAt: new Date().toISOString(),
+        timerDuration: duration
+      }
+    });
   };
 
   const handleContinueStage = async () => {
@@ -1655,10 +1698,14 @@ export default function App() {
     const votes = room.current_task_state.votes || {};
     const activePlayer = players[room.current_player_index];
 
-    const diff = Math.abs(estimate - correct) / correct;
-    const pts = room.current_task_state?.hyperdriveActive ? 4 : 2;
-    if (diff <= 0.20) {
-      await addPlayerScore(room.id, activePlayer, pts, `Inschatting: dichtbij het juiste antwoord (${correct})`, 'knowledge');
+    const diffRatio = correct === 0 ? (estimate === 0 ? 0 : 1) : Math.abs(estimate - correct) / Math.abs(correct);
+    let estimatePts = 0;
+    if (diffRatio <= 0.20) estimatePts = 2;
+    else if (diffRatio <= 0.40) estimatePts = 1;
+
+    if (estimatePts > 0 && activePlayer) {
+      const pts = room.current_task_state?.hyperdriveActive ? estimatePts * 2 : estimatePts;
+      await addPlayerScore(room.id, activePlayer, pts, `Inschatting: eigen schatting dichtbij genoeg (${estimate} vs ${correct})`, 'knowledge');
     }
 
     const isHigher = correct > estimate;
@@ -1757,12 +1804,16 @@ export default function App() {
   const handleWhoamiAnswer = async (idx, t) => {
     if (room.current_task_state?.quizLocked) return;
 
+    const isHost = players[0]?.id === localPlayer?.id;
     const isMyTurn = players[room.current_player_index]?.id === localPlayer?.id;
+    if (!isMyTurn && !isHost) return;
+
     const correct = idx === t.correct;
-    if (correct && isMyTurn) {
+    const activePlayer = players[room.current_player_index];
+    if (correct && activePlayer) {
       const basePts = whoamiRevealed === 1 ? 3 : whoamiRevealed === 2 ? 2 : 1;
       const pts = room.current_task_state?.hyperdriveActive ? basePts * 2 : basePts;
-      await addPlayerScore(room.id, localPlayer, pts, `Hint Quest: correct geraden met ${whoamiRevealed} hint(s)`, 'knowledge');
+      await addPlayerScore(room.id, activePlayer, pts, `Hint Quest: correct geraden met ${whoamiRevealed} hint(s)`, 'knowledge');
     }
 
     await updateRoomState(room.id, {
@@ -1778,11 +1829,15 @@ export default function App() {
   const handleFactAnswer = async (isTrue, t) => {
     if (room.current_task_state?.quizLocked) return;
 
+    const isHost = players[0]?.id === localPlayer?.id;
     const isMyTurn = players[room.current_player_index]?.id === localPlayer?.id;
+    if (!isMyTurn && !isHost) return;
+
     const correct = isTrue === t.correct;
-    if (correct && isMyTurn) {
+    const activePlayer = players[room.current_player_index];
+    if (correct && activePlayer) {
       const pts = room.current_task_state?.hyperdriveActive ? 4 : 2;
-      await addPlayerScore(room.id, localPlayer, pts, `Feit of Fabel: stelling correct beoordeeld`, 'knowledge');
+      await addPlayerScore(room.id, activePlayer, pts, `Feit of Fabel: stelling correct beoordeeld`, 'knowledge');
     }
 
     await updateRoomState(room.id, {
@@ -1797,6 +1852,10 @@ export default function App() {
   // Emoji Quiz text submission
   const handleEmojiTextAnswer = async (t) => {
     if (quizLocked) return;
+    const isHost = players[0]?.id === localPlayer?.id;
+    const isMyTurn = players[room.current_player_index]?.id === localPlayer?.id;
+    if (!isMyTurn && !isHost) return;
+
     setQuizLocked(true);
     const typed = localEstimate.trim();
     setQuizSelectedAnswer(typed);
@@ -1804,8 +1863,17 @@ export default function App() {
     const isCorrect = match(typed, [t.movie_nl, t.movie_en, ...(t.movie_aliases || [])]);
     if (isCorrect) {
       const pts = room.current_task_state?.hyperdriveActive ? 4 : 2;
-      await addPlayerScore(room.id, localPlayer, pts, `Emoji Quiz: correct geraden`, 'knowledge');
+      const activePlayer = players[room.current_player_index] || localPlayer;
+      await addPlayerScore(room.id, activePlayer, pts, `Emoji Quiz: correct geraden`, 'knowledge');
     }
+
+    await updateRoomState(room.id, {
+      current_task_state: {
+        ...room.current_task_state,
+        quizLocked: true,
+        selectedAnswer: typed
+      }
+    });
   };
 
   // --- POWER CARDS PLAY LOGIC ---
@@ -1901,8 +1969,8 @@ export default function App() {
   };
 
   const handlePlayAttackCard = async (cardKey, targetPlayerId) => {
-    const hands = room.current_task_state.player_hands || {};
-    let myHand = hands[localPlayer.id] || [];
+    const hands = { ...(room.current_task_state.player_hands || {}) };
+    let myHand = [...(hands[localPlayer.id] || [])];
 
     const idx = myHand.indexOf(cardKey);
     if (idx !== -1) {
@@ -1940,8 +2008,8 @@ export default function App() {
   };
 
   const handleDefendShield = async () => {
-    const hands = room.current_task_state.player_hands || {};
-    let myHand = hands[localPlayer.id] || [];
+    const hands = { ...(room.current_task_state.player_hands || {}) };
+    let myHand = [...(hands[localPlayer.id] || [])];
 
     const idx = myHand.indexOf('shield');
     if (idx !== -1) {
@@ -1972,8 +2040,8 @@ export default function App() {
   };
 
   const handleDefendSpiegel = async () => {
-    const hands = room.current_task_state.player_hands || {};
-    let myHand = hands[localPlayer.id] || [];
+    const hands = { ...(room.current_task_state.player_hands || {}) };
+    let myHand = [...(hands[localPlayer.id] || [])];
 
     const idx = myHand.indexOf('spiegel');
     if (idx !== -1) {
@@ -2863,6 +2931,9 @@ export default function App() {
                       >
                         <span style={{ fontSize: '32px', marginBottom: '8px' }}>{game.icon}</span>
                         <strong style={{ fontSize: '15px', color: '#fff', marginBottom: '4px' }}>{game.name}</strong>
+                        <span style={{ fontSize: '10px', color: getArenaGame(game.id)?.maxPlayers === 4 ? 'var(--ok)' : 'var(--gold)', fontWeight: 'bold', marginBottom: '5px' }}>
+                          {getArenaGame(game.id)?.maxPlayers === 1 ? 'solo' : getArenaGame(game.id)?.maxPlayers === 4 ? 'max 4 spelers' : '2 spelers'}
+                        </span>
                         <span style={{ fontSize: '11px', color: 'var(--muted)', lineHeight: '1.3' }}>{game.desc}</span>
                       </div>
                     );
@@ -2888,6 +2959,13 @@ export default function App() {
                         keeropkeer: "Disney Keer op Keer"
                       }[selectedArcadeGame]
                     }</strong>
+                  </p>
+                  <p className="small" style={{ marginTop: '-8px', marginBottom: '15px', color: 'var(--gold)' }}>
+                    {getArenaGame(selectedArcadeGame)?.maxPlayers === 1
+                      ? 'Solo spel'
+                      : getArenaGame(selectedArcadeGame)?.maxPlayers === 4
+                        ? 'Deze Arena-kamer ondersteunt maximaal 4 spelers.'
+                        : 'Dit spel is ontworpen voor 2 spelers.'}
                   </p>
 
                   {selectedArcadeGame === 'colorlines' ? (
@@ -2952,6 +3030,11 @@ export default function App() {
                       {arcadePlayMode === 'duel' && (
                         <div className="animate-fade-in" style={{ background: '#07152c', padding: '16px', borderRadius: '12px', border: '1px solid var(--line)' }}>
                           <h3 style={{ margin: '0 0 12px 0', fontSize: '15px', color: 'var(--gold)' }}>⚔️ Duel Lobby</h3>
+                          <p className="small" style={{ marginTop: 0 }}>
+                            {getArenaGame(selectedArcadeGame)?.maxPlayers === 4
+                              ? 'Deze kamer laat maximaal 4 spelers toe.'
+                              : 'Dit spel is ontworpen als 1-tegen-1 en laat maximaal 2 spelers toe.'}
+                          </p>
                           <button
                             className="btn primary full"
                             onClick={() => handleCreateArcadeDuel(selectedArcadeGame)}
@@ -3308,6 +3391,12 @@ export default function App() {
 
               <section className="card">
                 <h2 className="sectiontitle">Deelnemers ({players.length})</h2>
+                {room?.game_mode?.startsWith('arcade-') && (
+                  <p className="small" style={{ marginTop: '-4px' }}>
+                    {getArenaGame(room.current_task_state?.arcadeGameId)?.name || 'Arena spel'}:
+                    {' '}maximaal {room.current_task_state?.arcadeMaxPlayers || 2} spelers.
+                  </p>
+                )}
                 <div className="players">
                   {players.map((p, idx) => (
                     <div key={p.id} className="playerline" style={{ padding: '10px', background: '#081a37', border: '1px solid var(--line)', borderRadius: '10px' }}>
@@ -3318,7 +3407,11 @@ export default function App() {
 
                 {players.length > 0 && players[0].id === localPlayer?.id ? (
                   <div className="btnrow one" style={{ marginTop: '20px' }}>
-                    <button className="btn primary" onClick={handleStartGame}>
+                    <button
+                      className="btn primary"
+                      disabled={room?.game_mode?.startsWith('arcade-') && room.current_task_state?.arcadeMaxPlayers && players.length > room.current_task_state.arcadeMaxPlayers}
+                      onClick={handleStartGame}
+                    >
                       Spel Starten ({players.length} spelers)
                     </button>
                   </div>
@@ -3402,6 +3495,8 @@ export default function App() {
                       const t = getCurrentTask();
                       const activePlayer = players[room.current_player_index];
                       const isMyTurn = activePlayer?.id === localPlayer?.id;
+                      const isHost = players[0]?.id === localPlayer?.id;
+                      const canControlTurnTask = isMyTurn || isHost;
                       const difficultyLabel = t.difficulty ? { easy: "Makkelijk", medium: "Medium", hard: "Moeilijk" }[t.difficulty] : "";
                       const pointsText = t.type === "quizChoice" ? "Kies je niveau" : `${t.points || 1} ster${(t.points || 1) > 1 ? "ren" : ""}`;
                       const badgeText = `${t.cat}${difficultyLabel ? " · " + difficultyLabel : ""} · ${pointsText}`;
@@ -3642,7 +3737,7 @@ export default function App() {
                             {/* 1. QUIZ LEVEL CHOICE */}
                             {t.type === "quizChoice" && (
                               <div>
-                                {isMyTurn ? (
+                                {canControlTurnTask ? (
                                   <div className="answers">
                                     <button className="answer" onClick={() => handleChooseDifficulty('easy')}>
                                       <strong>Makkelijk · 1 ster</strong><br />
@@ -3658,7 +3753,7 @@ export default function App() {
                                     </button>
                                   </div>
                                 ) : (
-                                  <div className="center">Wachten tot {activePlayer?.name} de moeilijkheidsgraad kiest...</div>
+                                  <div className="center">Wachten tot {activePlayer?.name} of de host de moeilijkheidsgraad kiest...</div>
                                 )}
                               </div>
                             )}
@@ -3683,7 +3778,7 @@ export default function App() {
                                       <button 
                                         key={idx}
                                         className={btnClass}
-                                        disabled={quizLocked || !isMyTurn}
+                                        disabled={quizLocked || !canControlTurnTask}
                                         onClick={() => handleAnswerQuiz(idx, t.correct, room.current_task_state.quizPoints || 1)}
                                       >
                                         {ans}
@@ -3691,7 +3786,7 @@ export default function App() {
                                     );
                                   })}
                                 </div>
-                                {quizLocked && isMyTurn && (
+                                {quizLocked && canControlTurnTask && (
                                   <div style={{ marginTop: '12px' }}>
                                     <button className="btn primary full" onClick={handleFinishTask}>
                                       Volgende opdracht
@@ -3919,6 +4014,10 @@ export default function App() {
                                         <div className="notice green">
                                           Jouw schatting: <strong>{estimate} {t.unit}</strong>.
                                         </div>
+                                        <div className="notice" style={{ background: '#0a2042' }}>
+                                          De schatter verdient 2 sterren binnen 20% van het juiste antwoord, of 1 ster binnen 40%.
+                                          De andere spelers verdienen 1 ster als zij hoger/lager goed raden.
+                                        </div>
                                         
                                         <div style={{ marginBottom: '14px' }}>
                                           <label>Hoger of Lager stemmen:</label>
@@ -4077,7 +4176,7 @@ export default function App() {
                                     <p>Jouw antwoord: <em>{quizSelectedAnswer || "Geen"}</em></p>
                                     <p style={{ marginTop: '10px' }}><strong>Oplossing:</strong> {t.movie_nl} / {t.movie_en}</p>
                                     
-                                    {isMyTurn && (
+                                    {canControlTurnTask && (
                                       <button className="btn primary full" style={{ marginTop: '14px' }} onClick={handleFinishTask}>
                                         Volgende opdracht
                                       </button>
@@ -4085,7 +4184,7 @@ export default function App() {
                                   </div>
                                 ) : (
                                   <div>
-                                    {isMyTurn ? (
+                                    {canControlTurnTask ? (
                                       <div>
                                         <div className="field">
                                           <label>Welke Disney film wordt hier uitgebeeld?</label>
@@ -4134,7 +4233,7 @@ export default function App() {
                                     )}
                                   </div>
 
-                                  {!whoamiLocked && isMyTurn && (
+                                  {!whoamiLocked && canControlTurnTask && (
                                     <div className="btnrow" style={{ marginBottom: '14px' }}>
                                       <button className="btn secondary mini" disabled={whoamiRevealed >= 2} onClick={() => setWhoamiRevealed(2)}>
                                         Onthul Hint 2
@@ -4156,7 +4255,7 @@ export default function App() {
                                         <button 
                                           key={idx}
                                           className={btnClass}
-                                          disabled={whoamiLocked || !isMyTurn}
+                                          disabled={whoamiLocked || !canControlTurnTask}
                                           onClick={() => handleWhoamiAnswer(idx, t)}
                                         >
                                           {ans}
@@ -4164,7 +4263,7 @@ export default function App() {
                                       );
                                     })}
                                   </div>
-                                  {whoamiLocked && isMyTurn && (
+                                  {whoamiLocked && canControlTurnTask && (
                                     <div style={{ marginTop: '12px' }}>
                                       <button className="btn primary full" onClick={handleFinishTask}>
                                         Volgende opdracht
@@ -4478,7 +4577,7 @@ export default function App() {
                                     </strong>
                                     <p style={{ margin: 0, fontSize: '15px', lineHeight: '1.4' }}>{t.explanation}</p>
                                     
-                                    {isMyTurn && (
+                                    {canControlTurnTask && (
                                       <button className="btn primary full" style={{ marginTop: '14px' }} onClick={handleFinishTask}>
                                         Volgende opdracht
                                       </button>
@@ -4486,10 +4585,10 @@ export default function App() {
                                   </div>
                                 ) : (
                                   <div className="btnrow">
-                                    <button className="btn ok" disabled={!isMyTurn} onClick={() => handleFactAnswer(true, t)}>
+                                    <button className="btn ok" disabled={!canControlTurnTask} onClick={() => handleFactAnswer(true, t)}>
                                       🟩 FEIT (Echt waar)
                                     </button>
-                                    <button className="btn danger" disabled={!isMyTurn} onClick={() => handleFactAnswer(false, t)}>
+                                    <button className="btn danger" disabled={!canControlTurnTask} onClick={() => handleFactAnswer(false, t)}>
                                       🟥 FABEL (Niet waar)
                                     </button>
                                   </div>
@@ -4503,10 +4602,13 @@ export default function App() {
                                 {t.seconds && (
                                   <div id="timerArea" style={{ textAlign: 'center', marginBottom: '12px' }}>
                                     <div className={`timer ${secondsLeft <= 10 ? 'low' : ''}`}>{secondsLeft || t.seconds}</div>
-                                    {!timerRunning && secondsLeft === 0 && (
+                                    {players[0]?.id === localPlayer?.id && !timerRunning && (
                                       <button className="btn secondary" onClick={() => handleStartGroupTimer(t.seconds)}>
-                                        Start timer
+                                        {room.current_task_state?.timerStartedAt ? 'Start timer opnieuw' : 'Start timer'}
                                       </button>
+                                    )}
+                                    {players[0]?.id !== localPlayer?.id && !timerRunning && (
+                                      <p className="small">De host kan de timer starten.</p>
                                     )}
                                   </div>
                                 )}

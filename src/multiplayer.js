@@ -79,6 +79,11 @@ export async function joinRoom(roomCode, playerName) {
     throw new Error("Deze naam is al in gebruik in deze kamer.");
   }
 
+  const maxPlayers = room.current_task_state?.arcadeMaxPlayers;
+  if (maxPlayers && existingPlayers?.length >= maxPlayers) {
+    throw new Error(`Deze kamer zit vol. Dit spel is geschikt voor maximaal ${maxPlayers} speler${maxPlayers === 1 ? '' : 's'}.`);
+  }
+
   // Insert the player
   const { data: player, error: playerError } = await supabase
     .from('players')
