@@ -60,7 +60,6 @@ const ARENA_GAMES = [
   { id: 'othello', name: "Othello / Reversi", icon: "\u26AA", desc: "Verover het bord door vijandelijke fiches in te sluiten.", maxPlayers: 2 },
   { id: 'dotsboxes', name: "Dots & Boxes", icon: "\u270F\uFE0F", desc: "Trek lijntjes en claim de meeste kamertjes.", maxPlayers: 4 },
   { id: 'colorlines', name: "Color Lines", icon: "\u{1F534}", desc: "Solo puzzel: maak rijen van 5 gelijke bollen.", maxPlayers: 1 },
-  { id: 'ricochet', name: "Ricochet Shot", icon: "\u{1F4AB}", desc: "Richt en kaats de bal langs muren om sterren te pakken.", maxPlayers: 4 },
   { id: 'curling', name: "Curling Duel", icon: "\u{1F94C}", desc: "Glijd stenen en stoot je tegenstander uit het huis.", maxPlayers: 2 },
   { id: 'abalone', name: "Marble Push (Abalone)", icon: "\u{1F41C}", desc: "Duw de bollen van de tegenstander uit het hex-raster.", maxPlayers: 2 },
   { id: 'piratesplank', name: "Pirates' Plank", icon: "\u2620\uFE0F", desc: "Raad Disney-woorden voordat de piraat van de plank loopt.", maxPlayers: 4 },
@@ -70,6 +69,47 @@ const ARENA_GAMES = [
 ];
 
 const getArenaGame = (gameId) => ARENA_GAMES.find(game => game.id === gameId);
+
+const COCO_BANK_KEY = 'disney_coco_coin_bank';
+
+function CocoCoinIcon({ size = 30 }) {
+  return (
+    <span
+      aria-hidden="true"
+      style={{
+        width: size,
+        height: size,
+        borderRadius: '50%',
+        display: 'inline-flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        position: 'relative',
+        flex: '0 0 auto',
+        background: 'radial-gradient(circle at 30% 25%, #fff1a8 0 13%, #ffcf3a 14% 36%, #ff8a1f 62%, #8b2f0a 100%)',
+        border: `${Math.max(2, Math.round(size / 12))}px solid #ffe27a`,
+        boxShadow: '0 0 12px rgba(255, 157, 46, 0.55), inset 0 -3px 8px rgba(93, 35, 5, 0.55)',
+        color: '#3a1605',
+        fontWeight: 900,
+        fontSize: Math.round(size * 0.48),
+        lineHeight: 1
+      }}
+    >
+      <span style={{ transform: 'translateY(-1px)', textShadow: '0 1px 0 rgba(255,255,255,0.35)' }}>*</span>
+      <span
+        style={{
+          position: 'absolute',
+          bottom: Math.max(2, Math.round(size / 13)),
+          right: Math.max(2, Math.round(size / 13)),
+          fontSize: Math.round(size * 0.22),
+          color: '#fff7c8',
+          textShadow: '0 1px 2px rgba(0,0,0,0.45)'
+        }}
+      >
+        CC
+      </span>
+    </span>
+  );
+}
 
 const assetPath = (path) => {
   if (location.hostname.includes('github.io')) {
@@ -396,7 +436,7 @@ export default function App() {
   const [players, setPlayers] = useState([]);
   const [scoreHistory, setScoreHistory] = useState([]);
   const [sound, setSound] = useState(true);
-  const [starBank, setStarBank] = useState(() => readJsonStorage('disney_star_bank', {}));
+  const [starBank, setStarBank] = useState(() => readJsonStorage(COCO_BANK_KEY, readJsonStorage('disney_star_bank', {})));
   const [collections, setCollections] = useState(() => readJsonStorage('disney_collections', {}));
   const [exclusiveClaims, setExclusiveClaims] = useState(() => readJsonStorage('disney_exclusive_claims', {}));
   const [shopPlayerName, setShopPlayerName] = useState(() => localStorage.getItem('disney_player_name') || 'Speler 1');
@@ -519,12 +559,12 @@ export default function App() {
   };
 
   const awardStarsToCollector = (name, amount) => {
-    const stars = Math.max(0, Number(amount) || 0);
-    if (stars <= 0) return;
+    const coins = Math.max(0, Number(amount) || 0);
+    if (coins <= 0) return;
     const key = getCollectorKey(name);
     setStarBank(prev => {
-      const next = { ...prev, [key]: (prev[key] || 0) + stars };
-      localStorage.setItem('disney_star_bank', JSON.stringify(next));
+      const next = { ...prev, [key]: (prev[key] || 0) + coins };
+      localStorage.setItem(COCO_BANK_KEY, JSON.stringify(next));
       return next;
     });
   };
@@ -547,7 +587,7 @@ export default function App() {
     setStarBank(nextBank);
     setCollections(nextCollections);
     setExclusiveClaims(nextClaims);
-    localStorage.setItem('disney_star_bank', JSON.stringify(nextBank));
+    localStorage.setItem(COCO_BANK_KEY, JSON.stringify(nextBank));
     localStorage.setItem('disney_collections', JSON.stringify(nextCollections));
     localStorage.setItem('disney_exclusive_claims', JSON.stringify(nextClaims));
   };
@@ -1014,7 +1054,6 @@ export default function App() {
         othello: "Othello / Reversi",
         dotsboxes: "Dots & Boxes",
         colorlines: "Color Lines",
-        ricochet: "Ricochet Shot",
         curling: "Curling Duel",
         abalone: "Marble Push (Abalone)",
         piratesplank: "Pirates' Plank",
@@ -1167,7 +1206,9 @@ export default function App() {
         timerStartedAt: null,
         timerDuration: null,
         quizLocked: false,
-        selectedAnswer: undefined
+        selectedAnswer: undefined,
+        quizAnswers: {},
+        quizAwarded: {}
       }
     });
   };
@@ -1319,38 +1360,53 @@ export default function App() {
         ...room.current_task_state,
         usedTasks: newUsed,
         quizPoints: points,
-        quizDifficulty: difficulty
+        quizDifficulty: difficulty,
+        quizLocked: false,
+        selectedAnswer: undefined,
+        quizAnswers: {},
+        quizAwarded: {}
       }
     });
   };
 
   const handleAnswerQuiz = async (answerIndex, correctAnswerIndex, points) => {
     if (room.current_task_state?.quizLocked) return;
+    if (!localPlayer?.id) return;
 
-    const isHost = players[0]?.id === localPlayer?.id;
-    const isMyTurn = players[room.current_player_index]?.id === localPlayer?.id;
-    if (!isMyTurn && !isHost) return;
+    const { room: freshRoom, players: freshPlayers } = await fetchRoomData(room.id);
+    const freshState = freshRoom.current_task_state || {};
+    if (freshState.quizLocked) return;
+
+    const quizAnswers = { ...(freshState.quizAnswers || {}) };
+    if (quizAnswers[localPlayer.id] !== undefined) return;
+
+    quizAnswers[localPlayer.id] = answerIndex;
 
     const isCorrect = answerIndex === correctAnswerIndex;
     const ptsToAward = room.current_task_state?.hyperdriveActive ? points * 2 : points;
-    const activePlayer = players[room.current_player_index];
+    const quizAwarded = { ...(freshState.quizAwarded || {}) };
 
-    if (isCorrect && activePlayer) {
+    if (isCorrect && !quizAwarded[localPlayer.id]) {
       await addPlayerScore(
         room.id, 
-        activePlayer, 
+        freshPlayers.find(p => p.id === localPlayer.id) || localPlayer, 
         ptsToAward, 
         `Quiz ${room.current_task_state.quizDifficulty || 'makkelijk'}: ${getCurrentTask()?.text}`,
         'knowledge',
         getCurrentTask()
       );
+      quizAwarded[localPlayer.id] = true;
     }
+
+    const allAnswered = freshPlayers.every(p => quizAnswers[p.id] !== undefined);
 
     await updateRoomState(room.id, {
       current_task_state: {
-        ...room.current_task_state,
-        quizLocked: true,
-        selectedAnswer: answerIndex
+        ...freshState,
+        quizAnswers,
+        quizAwarded,
+        quizLocked: allAnswered,
+        selectedAnswer: allAnswered ? answerIndex : undefined
       }
     });
   };
@@ -1379,7 +1435,29 @@ export default function App() {
       return;
     }
 
-    const wasGroup = getCurrentTask()?.type === "group";
+    const currentTask = getCurrentTask();
+
+    if (currentTask?.type === "quiz") {
+      await updateRoomState(room.id, {
+        current_task_state: {
+          ...room.current_task_state,
+          quizLocked: false,
+          selectedAnswer: undefined,
+          quizAnswers: {},
+          quizAwarded: {},
+          timerStartedAt: null,
+          timerDuration: null
+        }
+      });
+
+      const { room: r, players: p } = await fetchRoomData(room.id);
+      setRoom(r);
+      setPlayers(p);
+      await selectNextTask(r, p);
+      return;
+    }
+
+    const wasGroup = currentTask?.type === "group";
     const nextRound = (room.round || 0) + 1;
 
     if (nextRound >= room.total_rounds) {
@@ -1698,26 +1776,26 @@ export default function App() {
     const votes = room.current_task_state.votes || {};
     const activePlayer = players[room.current_player_index];
 
-    const diffRatio = correct === 0 ? (estimate === 0 ? 0 : 1) : Math.abs(estimate - correct) / Math.abs(correct);
-    let estimatePts = 0;
-    if (diffRatio <= 0.20) estimatePts = 2;
-    else if (diffRatio <= 0.40) estimatePts = 1;
-
-    if (estimatePts > 0 && activePlayer) {
-      const pts = room.current_task_state?.hyperdriveActive ? estimatePts * 2 : estimatePts;
-      await addPlayerScore(room.id, activePlayer, pts, `Inschatting: eigen schatting dichtbij genoeg (${estimate} vs ${correct})`, 'knowledge');
-    }
-
     const isHigher = correct > estimate;
-    await Promise.all(players.map(p => {
-      if (p.id === activePlayer.id) return Promise.resolve();
+    const otherPlayers = players.filter(p => p.id !== activePlayer?.id);
+    const wrongVotes = otherPlayers.filter(p => {
       const vote = votes[p.id];
       const voteCorrect = (vote === 'higher' && isHigher) || (vote === 'lower' && !isHigher);
-      if (voteCorrect) {
-        return addPlayerScore(room.id, p, 1, `Inschatting: correct geraden dat het hoger/lager was`, 'knowledge');
-      }
-      return Promise.resolve();
-    }));
+      return vote && !voteCorrect;
+    });
+
+    if (activePlayer && wrongVotes.length > 0) {
+      const bonus = wrongVotes.length === otherPlayers.length ? 1 : 0;
+      const basePts = wrongVotes.length + bonus;
+      const pts = room.current_task_state?.hyperdriveActive ? basePts * 2 : basePts;
+      await addPlayerScore(
+        room.id,
+        activePlayer,
+        pts,
+        `Inschatting: ${wrongVotes.length} speler(s) verkeerd gestuurd${bonus ? ' + bonus' : ''} (${correct})`,
+        'knowledge'
+      );
+    }
 
     await handleFinishTask();
   };
@@ -2751,7 +2829,7 @@ export default function App() {
                     <div className="portal-card-media" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'radial-gradient(circle, rgba(189, 83, 237, 0.15) 0%, transparent 75%)', height: '140px' }}>
                       <span style={{ fontSize: '64px', filter: 'drop-shadow(0 0 12px rgba(189, 83, 237, 0.6))', animation: 'bounce 3s infinite' }}>🏰</span>
                     </div>
-                    <span className="portal-card-badge arcade">10 Spellen</span>
+                    <span className="portal-card-badge arcade">9 Spellen</span>
                   </div>
                   <div className="portal-card-body">
                     <h3>Disney Duel Arena</h3>
@@ -2773,12 +2851,15 @@ export default function App() {
                   <section className="card" style={{ marginTop: '20px' }}>
                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '12px', marginBottom: '12px', flexWrap: 'wrap' }}>
                       <div>
-                        <h2 className="sectiontitle" style={{ margin: 0 }}>Disney Stars Shop</h2>
+                        <h2 className="sectiontitle" style={{ margin: 0 }}>Coco Coins Shop</h2>
                         <p style={{ margin: '5px 0 0', color: 'var(--muted)', fontSize: '12px' }}>
-                          Verdien sterren met Quest-, Arena- en solo-games. Spaar items in je Disney Collection.
+                          Verdien Coco Coins met Quest-, Arena- en solo-games. Spaar magische items in je Disney Collection.
                         </p>
                       </div>
-                      <div style={{ color: 'var(--gold)', fontWeight: 900, fontSize: '20px' }}>{balance} ★</div>
+                      <div style={{ color: 'var(--gold)', fontWeight: 900, fontSize: '20px', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                        <CocoCoinIcon size={34} />
+                        <span>{balance} Coco Coins</span>
+                      </div>
                     </div>
 
                     <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px', marginBottom: '12px' }}>
@@ -2825,7 +2906,7 @@ export default function App() {
                               <div style={{ minWidth: 0 }}>
                                 <strong style={{ display: 'block', fontSize: '13px' }}>{item.name}</strong>
                                 <span style={{ color: item.type === 'exclusive' ? 'var(--gold)' : 'var(--muted)', fontSize: '10px' }}>
-                                  {item.type === 'exclusive' ? 'Exclusief' : 'Voor iedereen'} · {item.cost} ★
+                                  {item.type === 'exclusive' ? 'Exclusief' : 'Voor iedereen'} · {item.cost} Coco Coins
                                 </span>
                               </div>
                             </div>
@@ -2836,7 +2917,7 @@ export default function App() {
                               onClick={() => handleBuyShopItem(item)}
                               style={{ width: '100%', padding: '7px 6px', fontSize: '11px' }}
                             >
-                              {itemOwned ? 'In Collection' : lockedByOther ? 'Al geclaimd' : balance < item.cost ? 'Te weinig sterren' : 'Kopen'}
+                              {itemOwned ? 'In Collection' : lockedByOther ? 'Al geclaimd' : balance < item.cost ? 'Te weinig Coco Coins' : 'Kopen'}
                             </button>
                           </div>
                         );
@@ -2846,7 +2927,7 @@ export default function App() {
                     <div style={{ marginTop: '12px', padding: '10px', background: '#061225', border: '1px solid var(--line)', borderRadius: '10px' }}>
                       <strong style={{ display: 'block', marginBottom: '6px', color: 'var(--gold)' }}>Disney Collection van {activeName}</strong>
                       {owned.length === 0 ? (
-                        <span style={{ color: 'var(--muted)', fontSize: '12px' }}>Nog leeg. Speel games om sterren te verdienen en koop je eerste item.</span>
+                        <span style={{ color: 'var(--muted)', fontSize: '12px' }}>Nog leeg. Speel games om Coco Coins te verdienen en koop je eerste item.</span>
                       ) : (
                         <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px' }}>
                           {owned.map(itemId => {
@@ -2899,7 +2980,6 @@ export default function App() {
                     { id: 'othello', name: "Othello / Reversi", icon: "⚪", desc: "Verover het bord door vijandelijke fiches in te sluiten." },
                     { id: 'dotsboxes', name: "Dots & Boxes", icon: "✏️", desc: "Trek lijntjes en claim de meeste kamertjes." },
                     { id: 'colorlines', name: "Color Lines", icon: "🔴", desc: "Solo puzzel: maak rijen van 5 gelijke bollen." },
-                    { id: 'ricochet', name: "Ricochet Shot", icon: "💫", desc: "Richt en kaats de bal langs muren om sterren te pakken." },
                     { id: 'curling', name: "Curling Duel", icon: "🥌", desc: "Glijd stenen en stoot je tegenstander uit het huis." },
                     { id: 'abalone', name: "Marble Push (Abalone)", icon: "🐜", desc: "Duw de bollen van de tegenstander uit het hex-raster." },
                     { id: 'piratesplank', name: "Pirates' Plank", icon: "☠️", desc: "Raad Disney-woorden voordat de piraat van de plank loopt." },
@@ -2950,7 +3030,6 @@ export default function App() {
                         othello: "Othello / Reversi",
                         dotsboxes: "Dots & Boxes",
                         colorlines: "Color Lines",
-                        ricochet: "Ricochet Shot",
                         curling: "Curling Duel",
                         abalone: "Marble Push (Abalone)",
                         piratesplank: "Pirates' Plank",
@@ -3760,40 +3839,58 @@ export default function App() {
 
                             {/* 2. TRADITIONAL QUIZ */}
                             {t.type === "quiz" && (
-                              <div>
-                                <div className="answers">
-                                  {t.answers.map((ans, idx) => {
-                                    const isTinkActive = room.current_task_state?.tinkActive;
-                                    const isIncorrectOption = idx !== t.correct;
-                                    const shouldHide = isTinkActive && isIncorrectOption && (idx === (t.correct + 1) % 4 || idx === (t.correct + 2) % 4);
+                              (() => {
+                                const quizAnswers = room.current_task_state?.quizAnswers || {};
+                                const myQuizAnswer = quizAnswers[localPlayer?.id];
+                                const answeredCount = players.filter(p => quizAnswers[p.id] !== undefined).length;
+                                const allAnswered = players.length > 0 && answeredCount >= players.length;
 
-                                    if (shouldHide) return null;
+                                return (
+                                  <div>
+                                    <div className="notice" style={{ background: '#0a2042', marginBottom: '12px' }}>
+                                      Groepsquiz: iedereen antwoordt zelf. Deze vraag telt niet als beurt.
+                                      <strong style={{ display: 'block', marginTop: '4px' }}>{answeredCount}/{players.length} spelers hebben geantwoord.</strong>
+                                    </div>
+                                    <div className="answers">
+                                      {t.answers.map((ans, idx) => {
+                                        const isTinkActive = room.current_task_state?.tinkActive;
+                                        const isIncorrectOption = idx !== t.correct;
+                                        const shouldHide = isTinkActive && isIncorrectOption && (idx === (t.correct + 1) % 4 || idx === (t.correct + 2) % 4);
 
-                                    let btnClass = "answer";
-                                    if (quizLocked) {
-                                      if (idx === t.correct) btnClass += " correct";
-                                      else if (idx === quizSelectedAnswer) btnClass += " wrong";
-                                    }
-                                    return (
-                                      <button 
-                                        key={idx}
-                                        className={btnClass}
-                                        disabled={quizLocked || !canControlTurnTask}
-                                        onClick={() => handleAnswerQuiz(idx, t.correct, room.current_task_state.quizPoints || 1)}
-                                      >
-                                        {ans}
-                                      </button>
-                                    );
-                                  })}
-                                </div>
-                                {quizLocked && canControlTurnTask && (
-                                  <div style={{ marginTop: '12px' }}>
-                                    <button className="btn primary full" onClick={handleFinishTask}>
-                                      Volgende opdracht
-                                    </button>
+                                        if (shouldHide) return null;
+
+                                        let btnClass = "answer";
+                                        if (quizLocked || allAnswered) {
+                                          if (idx === t.correct) btnClass += " correct";
+                                          else if (idx === myQuizAnswer) btnClass += " wrong";
+                                        }
+                                        return (
+                                          <button
+                                            key={idx}
+                                            className={btnClass}
+                                            disabled={quizLocked || myQuizAnswer !== undefined}
+                                            onClick={() => handleAnswerQuiz(idx, t.correct, room.current_task_state.quizPoints || 1)}
+                                          >
+                                            {ans}
+                                          </button>
+                                        );
+                                      })}
+                                    </div>
+                                    {myQuizAnswer !== undefined && !quizLocked && (
+                                      <div className="notice green" style={{ marginTop: '12px' }}>
+                                        Antwoord opgeslagen. Wachten op de rest...
+                                      </div>
+                                    )}
+                                    {quizLocked && players[0]?.id === localPlayer?.id && (
+                                      <div style={{ marginTop: '12px' }}>
+                                        <button className="btn primary full" onClick={handleFinishTask}>
+                                          Volgende opdracht
+                                        </button>
+                                      </div>
+                                    )}
                                   </div>
-                                )}
-                              </div>
+                                );
+                              })()
                             )}
 
                             {/* 3. DISNEY DAGBOEK */}
@@ -4015,8 +4112,8 @@ export default function App() {
                                           Jouw schatting: <strong>{estimate} {t.unit}</strong>.
                                         </div>
                                         <div className="notice" style={{ background: '#0a2042' }}>
-                                          De schatter verdient 2 sterren binnen 20% van het juiste antwoord, of 1 ster binnen 40%.
-                                          De andere spelers verdienen 1 ster als zij hoger/lager goed raden.
+                                          Jij krijgt 1 ster voor elke medespeler die hoger/lager verkeerd kiest.
+                                          Kiest iedereen verkeerd, dan krijg je 1 bonusster.
                                         </div>
                                         
                                         <div style={{ marginBottom: '14px' }}>

@@ -1401,6 +1401,8 @@ export function CurlingGame({ mode, room, localPlayer, players, updateRoomState,
 
   const taskState = room.current_task_state || {};
   const stones = taskState.stones || [];
+  const shooter = { x: 150, y: 268 };
+  const stonesMoving = stones.some(s => Math.hypot(s.vx, s.vy) > 0.05);
 
   const [dragStart, setDragStart] = useState(null);
   const [dragCurrent, setDragCurrent] = useState(null);
@@ -1419,16 +1421,22 @@ export function CurlingGame({ mode, room, localPlayer, players, updateRoomState,
     }
   }, []);
 
+  const getBoardPoint = (e) => {
+    const rect = e.currentTarget.getBoundingClientRect();
+    return {
+      x: ((e.clientX - rect.left) / rect.width) * 300,
+      y: ((e.clientY - rect.top) / rect.height) * 300
+    };
+  };
+
   const handlePointerDown = (e) => {
-    if (!myTurn || isSolo && activeIndex === 1) return;
+    if (!myTurn || stonesMoving || isSolo && activeIndex === 1) return;
     e.preventDefault();
     e.currentTarget.setPointerCapture?.(e.pointerId);
-    const rect = e.currentTarget.getBoundingClientRect();
-    const x = e.clientX - rect.left;
-    const y = e.clientY - rect.top;
+    const { x, y } = getBoardPoint(e);
     
-    if (y > 200) {
-      setDragStart({ x: 150, y: 280 });
+    if (y > 205 || Math.hypot(x - shooter.x, y - shooter.y) < 42) {
+      setDragStart(shooter);
       setDragCurrent({ x, y });
     }
   };
@@ -1436,10 +1444,7 @@ export function CurlingGame({ mode, room, localPlayer, players, updateRoomState,
   const handlePointerMove = (e) => {
     if (!dragStart) return;
     e.preventDefault();
-    const rect = e.currentTarget.getBoundingClientRect();
-    const x = e.clientX - rect.left;
-    const y = e.clientY - rect.top;
-    setDragCurrent({ x, y });
+    setDragCurrent(getBoardPoint(e));
   };
 
   const handlePointerUp = () => {
@@ -1449,10 +1454,10 @@ export function CurlingGame({ mode, room, localPlayer, players, updateRoomState,
     const dy = dragStart.y - dragCurrent.y;
 
     const newStone = {
-      x: 150,
-      y: 280,
-      vx: dx * 0.08,
-      vy: Math.min(-2, dy * 0.08),
+      x: shooter.x,
+      y: shooter.y,
+      vx: dx * 0.09,
+      vy: Math.min(-2.8, dy * 0.09),
       colorIdx: activeIndex
     };
 
@@ -1624,7 +1629,7 @@ export function CurlingGame({ mode, room, localPlayer, players, updateRoomState,
         {isGameOver ? (
           <button className="btn primary" onClick={handleEndGame}>Voltooien & Score bepalen</button>
         ) : myTurn ? (
-          <span style={{ color: 'var(--gold)', fontWeight: 'bold' }}>Jouw beurt! Sleep onderin de ijsbaan om een steen te schuiven.</span>
+          <span style={{ color: 'var(--gold)', fontWeight: 'bold' }}>Jouw beurt! Sleep de zichtbare puck onderin naar achteren en laat los.</span>
         ) : (
           <span>Wachten op tegenstander...</span>
         )}
@@ -1668,19 +1673,38 @@ export function CurlingGame({ mode, room, localPlayer, players, updateRoomState,
           </g>
         ))}
 
-        {dragStart && dragCurrent && (
-          <line
-            x1="150"
-            y1="280"
-            x2={150 + (dragStart.x - dragCurrent.x) * 1.5}
-            y2={280 + (dragStart.y - dragCurrent.y) * 1.5}
-            stroke="var(--gold)"
-            strokeWidth="2"
-            strokeDasharray="4,4"
-          />
+        {!isGameOver && myTurn && !stonesMoving && (
+          <g style={{ pointerEvents: 'none' }}>
+            <circle cx={shooter.x} cy={shooter.y} r="21" fill="rgba(255, 212, 92, 0.18)" stroke="#ffd45c" strokeWidth="2" strokeDasharray="4,4" />
+            <circle cx={shooter.x} cy={shooter.y} r="15" fill={playerColors[activeIndex]} stroke="#ffffff" strokeWidth="2.5" />
+            <circle cx={shooter.x} cy={shooter.y} r="6" fill="none" stroke="rgba(255,255,255,0.75)" strokeWidth="2" />
+          </g>
         )}
 
-        <circle cx="150" cy="280" r="10" fill="none" stroke="var(--gold)" strokeDasharray="3,3" opacity="0.5" />
+        {dragStart && dragCurrent && (
+          <g style={{ pointerEvents: 'none' }}>
+            <line
+              x1={shooter.x}
+              y1={shooter.y}
+              x2={shooter.x + (dragStart.x - dragCurrent.x) * 1.6}
+              y2={shooter.y + (dragStart.y - dragCurrent.y) * 1.6}
+              stroke="#ffd45c"
+              strokeWidth="3"
+              strokeDasharray="5,4"
+            />
+            <line
+              x1={shooter.x}
+              y1={shooter.y}
+              x2={dragCurrent.x}
+              y2={dragCurrent.y}
+              stroke="rgba(20,45,90,0.35)"
+              strokeWidth="5"
+              strokeLinecap="round"
+            />
+          </g>
+        )}
+
+        <circle cx={shooter.x} cy={shooter.y} r="24" fill="none" stroke="var(--gold)" strokeDasharray="3,3" opacity="0.45" />
       </svg>
     </div>
   );
@@ -3588,7 +3612,7 @@ const MINI_GAME_RULES = {
     title: "Curling Duel",
     intro: "Schuif stenen over het ijs en eindig zo dicht mogelijk bij het midden.",
     rules: [
-      "Sleep onderin de ijsbaan om richting en kracht te bepalen.",
+      "Sleep de zichtbare puck onderin naar achteren om richting en kracht te bepalen.",
       "Laat los om een steen te schuiven.",
       "Stenen kunnen botsen en elkaar verplaatsen.",
       "Spelers schieten om de beurt.",
