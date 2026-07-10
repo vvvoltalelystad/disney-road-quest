@@ -92,6 +92,7 @@ export function OthelloGame({ mode, room, localPlayer, players, updateRoomState,
   const myColor = isP1 ? 'blue' : 'red';
 
   const taskState = room.current_task_state || {};
+  const aiLevel = taskState.aiLevel || 'normal';
   const board = taskState.othelloBoard || [
     [null, null, null, null, null, null, null, null],
     [null, null, null, null, null, null, null, null],
@@ -139,14 +140,29 @@ export function OthelloGame({ mode, room, localPlayer, players, updateRoomState,
       const timer = setTimeout(() => {
         const aiMoves = getOthelloValidMoves(board, 'red');
         if (aiMoves.length > 0) {
-          // Greedy AI: choose move with most flips
+          if (aiLevel === 'easy') {
+            const randomMove = aiMoves[Math.floor(Math.random() * aiMoves.length)];
+            const nextBoard = makeOthelloMove(board, randomMove.r, randomMove.c, 'red');
+            const nextOpponentMoves = getOthelloValidMoves(nextBoard, 'blue');
+            updateRoomState(room.id, {
+              current_task_state: {
+                ...taskState,
+                othelloBoard: nextBoard,
+                othelloTurn: nextOpponentMoves.length > 0 ? 'blue' : 'red'
+              }
+            });
+            return;
+          }
+
           let bestMove = aiMoves[0];
           let maxFlips = -1;
           for (const m of aiMoves) {
             const tempBoard = makeOthelloMove(board, m.r, m.c, 'red');
             const flips = tempBoard.flat().filter(c => c === 'red').length - board.flat().filter(c => c === 'red').length;
-            if (flips > maxFlips) {
-              maxFlips = flips;
+            const isCorner = (m.r === 0 || m.r === 7) && (m.c === 0 || m.c === 7);
+            const score = flips + (aiLevel === 'hard' && isCorner ? 20 : 0);
+            if (score > maxFlips) {
+              maxFlips = score;
               bestMove = m;
             }
           }
@@ -955,7 +971,41 @@ const RICOCHET_LEVELS = [
   }
 ];
 
-const createRicochetStars = (level = 0) => RICOCHET_LEVELS[level].stars.map(star => ({ ...star, collected: false }));
+const generateRicochetLevel = (level = 0) => {
+  if (RICOCHET_LEVELS[level]) return RICOCHET_LEVELS[level];
+
+  const seed = level + 1;
+  const stars = Array.from({ length: 5 }, (_, idx) => ({
+    x: 48 + ((seed * 53 + idx * 71) % 204),
+    y: 50 + ((seed * 79 + idx * 47) % 178)
+  }));
+
+  const walls = [
+    { x1: 0, y1: 0, x2: 300, y2: 0 },
+    { x1: 0, y1: 0, x2: 0, y2: 300 },
+    { x1: 300, y1: 0, x2: 300, y2: 300 },
+    { x1: 0, y1: 300, x2: 300, y2: 300 }
+  ];
+
+  for (let i = 0; i < 4 + (level % 3); i++) {
+    const horizontal = (seed + i) % 2 === 0;
+    const baseX = 45 + ((seed * 31 + i * 57) % 190);
+    const baseY = 70 + ((seed * 43 + i * 41) % 170);
+    const length = 54 + ((seed * 17 + i * 19) % 72);
+    walls.push(horizontal
+      ? { x1: Math.max(20, baseX - length / 2), y1: baseY, x2: Math.min(280, baseX + length / 2), y2: baseY }
+      : { x1: baseX, y1: Math.max(25, baseY - length / 2), x2: baseX, y2: Math.min(250, baseY + length / 2) }
+    );
+  }
+
+  return {
+    name: `Magisch Labyrint ${level + 1}`,
+    stars,
+    walls
+  };
+};
+
+const createRicochetStars = (level = 0) => generateRicochetLevel(level).stars.map(star => ({ ...star, collected: false }));
 
 const createRicochetBall = () => ({ x: 150, y: 270, vx: 0, vy: 0, isMoving: false });
 
@@ -985,7 +1035,8 @@ export function RicochetShotGame({ mode, room, localPlayer, players, updateRoomS
 
   const stars = isSolo ? localStars : syncedStars;
   const ball = isSolo ? localBall : syncedBall;
-  const walls = RICOCHET_LEVELS[level].walls;
+  const currentLevel = generateRicochetLevel(level);
+  const walls = currentLevel.walls;
   const myTurn = isSolo || activeIndex === myIndex;
   const hasPlayedDuelShot = !isSolo && syncedScores[myIndex] !== undefined;
   const canShoot = myTurn && !ball.isMoving && !duelFinished && !hasPlayedDuelShot;
@@ -1225,7 +1276,9 @@ export function RicochetShotGame({ mode, room, localPlayer, players, updateRoomS
     <div style={{ textAlign: 'center' }}>
       <div style={{ margin: '8px 0 12px', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px', flexWrap: 'wrap' }}>
         <span style={{ fontSize: '12px', color: 'var(--muted)', fontWeight: 'bold' }}>Level:</span>
-        {RICOCHET_LEVELS.map((item, idx) => (
+        {Array.from({ length: Math.max(6, level + 2) }).map((_, idx) => {
+          const item = generateRicochetLevel(idx);
+          return (
           <button
             key={item.name}
             type="button"
@@ -1237,7 +1290,8 @@ export function RicochetShotGame({ mode, room, localPlayer, players, updateRoomS
           >
             {idx + 1}
           </button>
-        ))}
+          );
+        })}
       </div>
       <div style={{ display: 'flex', justifyContent: 'space-between', gap: '8px', margin: '10px 20px', flexWrap: 'wrap' }}>
         <div style={{ color: 'var(--gold)', fontWeight: 'bold' }}>Sterren: {collectedCount}/5</div>
@@ -1295,9 +1349,25 @@ export function RicochetShotGame({ mode, room, localPlayer, players, updateRoomS
           <line key={i} x1={w.x1} y1={w.y1} x2={w.x2} y2={w.y2} stroke="#3b5e9a" strokeWidth="6" strokeLinecap="round" />
         ))}
 
+        <text x="150" y="24" textAnchor="middle" fill="#9fb8df" fontSize="11" fontWeight="800">
+          {currentLevel.name}
+        </text>
+
         {stars.map((star, i) => (
-          <g key={i} opacity={star.collected ? 0.2 : 1}>
-            <text x={star.x - 10} y={star.y + 8} fontSize="20">*</text>
+          <g key={i} opacity={star.collected ? 0.25 : 1}>
+            <circle cx={star.x} cy={star.y} r="16" fill="rgba(255,212,92,0.18)" stroke="#ffd45c" strokeWidth="1.5" />
+            <text
+              x={star.x}
+              y={star.y + 7}
+              textAnchor="middle"
+              fontSize="24"
+              fill="#ffd45c"
+              stroke="#2a1800"
+              strokeWidth="0.8"
+              style={{ pointerEvents: 'none' }}
+            >
+              ★
+            </text>
           </g>
         ))}
 
@@ -1890,26 +1960,26 @@ export function AbaloneGame({ mode, room, localPlayer, players, updateRoomState,
 }
 
 const PIRATES_PLANK_WORDS = [
-  { word: "JACK SPARROW", hint: "Kapitein met kompasproblemen" },
-  { word: "DAVY JONES", hint: "Kapitein van de Flying Dutchman" },
-  { word: "BLACK PEARL", hint: "Beroemd piratenschip" },
-  { word: "ELSA", hint: "Laat het los" },
-  { word: "SIMBA", hint: "Koning van de savanne" },
-  { word: "MULAN", hint: "Strijder met veel moed" },
-  { word: "STITCH", hint: "Experiment 626" },
-  { word: "RAPUNZEL", hint: "Magisch lang haar" },
-  { word: "WOODY", hint: "Sheriff uit de speelgoedkist" },
-  { word: "BUZZ LIGHTYEAR", hint: "Tot voorbij de sterren" },
-  { word: "MIGUEL", hint: "Muziek en familie" },
-  { word: "MOANA", hint: "De oceaan roept" },
-  { word: "OLAF", hint: "Houdt van warme knuffels" },
-  { word: "GENIE", hint: "Drie wensen" },
-  { word: "ARIEL", hint: "Droomt van benen" },
-  { word: "BAYMAX", hint: "Persoonlijke zorgrobot" },
-  { word: "RATATOUILLE", hint: "Koken in Parijs" },
-  { word: "ENCANTO", hint: "Een magisch huis vol familie" },
-  { word: "COCO", hint: "Muziek op Dia de los Muertos" },
-  { word: "NEMO", hint: "Kleine vis, grote zoektocht" }
+  { word: "PHANTOM MANOR" },
+  { word: "THUNDER MESA" },
+  { word: "CASEY JR CIRCUS TRAIN" },
+  { word: "NAUTILUS" },
+  { word: "DISCOVERYLAND" },
+  { word: "SKULL ROCK" },
+  { word: "ADMIRAL BOOM" },
+  { word: "CLARABELLE COW" },
+  { word: "PROFESSOR PORTER" },
+  { word: "KRONKS SPINACH PUFFS" },
+  { word: "MAURICES INVENTION" },
+  { word: "YEN SID" },
+  { word: "GREAT MOUSE DETECTIVE" },
+  { word: "SILVERMIST" },
+  { word: "MADAME MEDUSA" },
+  { word: "ROBIN HOOD AND LITTLE JOHN" },
+  { word: "THE RESCUERS DOWN UNDER" },
+  { word: "WALT DISNEY STUDIOS PARK" },
+  { word: "AVENGERS ASSEMBLE FLIGHT FORCE" },
+  { word: "LE PAYS DES CONTES DE FEES" }
 ];
 
 const PLANK_LETTERS = "ABCDEFGHIJKLMNOPQRSTUVWXYZ".split("");
@@ -1918,7 +1988,7 @@ function createPiratesPlankState() {
   const entry = PIRATES_PLANK_WORDS[Math.floor(Math.random() * PIRATES_PLANK_WORDS.length)];
   return {
     plankWord: entry.word,
-    plankHint: entry.hint,
+    plankHint: "",
     plankGuesses: [],
     plankWrong: 0,
     plankWinnerId: null,
@@ -1928,14 +1998,13 @@ function createPiratesPlankState() {
 
 export function PiratesPlankGame({ mode, room, localPlayer, players, updateRoomState, onFinish }) {
   const isSolo = mode === 'solo' || room.id === 'solo';
-  const maxWrong = 7;
+  const maxWrong = 6;
   const taskState = room.current_task_state || {};
   const activeIndex = room.current_player_index || 0;
   const myIndex = Math.max(0, players.findIndex(p => p.id === localPlayer.id));
   const myTurn = isSolo || activeIndex === myIndex;
 
   const word = taskState.plankWord || "";
-  const hint = taskState.plankHint || "";
   const guesses = taskState.plankGuesses || [];
   const wrong = taskState.plankWrong || 0;
   const winnerId = taskState.plankWinnerId || null;
@@ -2006,7 +2075,7 @@ export function PiratesPlankGame({ mode, room, localPlayer, players, updateRoomS
         <div style={{ width: '100%', maxWidth: '340px', height: '12px', background: '#061225', borderRadius: '999px', border: '1px solid var(--line)', overflow: 'hidden' }}>
           <div style={{ width: `${Math.min(100, (wrong / maxWrong) * 100)}%`, height: '100%', background: 'linear-gradient(90deg, #ffd45c, #ff3b30)' }} />
         </div>
-        <div style={{ color: 'var(--muted)', fontSize: '13px' }}>Hint: {hint || "De flespost wordt geopend..."}</div>
+        <div style={{ color: 'var(--muted)', fontSize: '13px' }}>Geen hint. Alleen de plank, de letters en je Disney-geheugen.</div>
       </div>
 
       <div style={{
@@ -2099,6 +2168,11 @@ const YAHTZEE_CATEGORIES = [
   { id: "chance", name: "Chance", hint: "Alle ogen samen" }
 ];
 
+const YAHTZEE_UPPER_IDS = ["ones", "twos", "threes", "fours", "fives", "sixes"];
+const YAHTZEE_LOWER_IDS = YAHTZEE_CATEGORIES.filter(category => !YAHTZEE_UPPER_IDS.includes(category.id)).map(category => category.id);
+const YAHTZEE_BONUS_THRESHOLD = 63;
+const YAHTZEE_BONUS_POINTS = 35;
+
 function rollYahtzeeDie() {
   return Math.floor(Math.random() * 6) + 1;
 }
@@ -2151,7 +2225,13 @@ function scoreYahtzeeCategory(categoryId, dice) {
 }
 
 function getYahtzeeTotal(scoreCard = {}) {
-  return Object.values(scoreCard).reduce((sum, value) => sum + (Number(value) || 0), 0);
+  const rawTotal = Object.values(scoreCard).reduce((sum, value) => sum + (Number(value) || 0), 0);
+  const upperTotal = YAHTZEE_UPPER_IDS.reduce((sum, id) => sum + (Number(scoreCard[id]) || 0), 0);
+  return rawTotal + (upperTotal >= YAHTZEE_BONUS_THRESHOLD ? YAHTZEE_BONUS_POINTS : 0);
+}
+
+function getYahtzeeUpperTotal(scoreCard = {}) {
+  return YAHTZEE_UPPER_IDS.reduce((sum, id) => sum + (Number(scoreCard[id]) || 0), 0);
 }
 
 function isYahtzeeComplete(scores) {
@@ -2165,16 +2245,35 @@ function chooseYahtzeeAiCategory(dice, scoreCard = {}) {
     .sort((a, b) => b.score - a.score)[0];
 }
 
+function chooseYahtzeeAiCategoryByLevel(dice, scoreCard = {}, aiLevel = 'normal') {
+  const openCategories = YAHTZEE_CATEGORIES.filter(category => scoreCard[category.id] === undefined);
+  if (aiLevel === 'easy') {
+    return openCategories[Math.floor(Math.random() * openCategories.length)];
+  }
+  if (aiLevel === 'hard') {
+    return openCategories
+      .map(category => {
+        const score = scoreYahtzeeCategory(category.id, dice);
+        const upperPotential = category.upperValue ? Math.max(0, YAHTZEE_BONUS_THRESHOLD - getYahtzeeUpperTotal(scoreCard)) : 0;
+        return { ...category, score, priority: score + (category.upperValue && score >= upperPotential ? 10 : 0) };
+      })
+      .sort((a, b) => b.priority - a.priority)[0];
+  }
+  return chooseYahtzeeAiCategory(dice, scoreCard);
+}
+
 export function DisneyYahtzeeGame({ mode, room, localPlayer, players, updateRoomState, onFinish }) {
   const isSolo = mode === 'solo' || room.id === 'solo';
   const taskState = room.current_task_state || {};
+  const aiLevel = taskState.aiLevel || 'normal';
   const activeIndex = room.current_player_index || 0;
   const myIndex = Math.max(0, players.findIndex(p => p.id === localPlayer.id));
   const playerNames = [
     isSolo ? "Jij" : (players[0]?.name || "Speler 1"),
     isSolo ? "Computer" : (players[1]?.name || "Speler 2")
   ];
-  const playerColors = ["#5bbcff", "#ff5b5b"];
+  const playerColors = ["#5bbcff", "#ff5b5b", "#ffd45c", "#32d583"];
+  const [viewedScoreIndex, setViewedScoreIndex] = useState(myIndex);
 
   const scores = Array.isArray(taskState.yahtzeeScores) ? taskState.yahtzeeScores : makeYahtzeeScores();
   const dice = Array.isArray(taskState.yahtzeeDice) ? taskState.yahtzeeDice : [null, null, null, null, null];
@@ -2210,12 +2309,13 @@ export function DisneyYahtzeeGame({ mode, room, localPlayer, players, updateRoom
 
     const timer = setTimeout(() => {
       const aiDice = Array.from({ length: 5 }, rollYahtzeeDie);
-      const aiChoice = chooseYahtzeeAiCategory(aiDice, scores[1] || {});
+      const aiChoice = chooseYahtzeeAiCategoryByLevel(aiDice, scores[1] || {}, aiLevel);
       if (!aiChoice) return;
+      const aiScore = scoreYahtzeeCategory(aiChoice.id, aiDice);
 
       const nextScores = [
         { ...(scores[0] || {}) },
-        { ...(scores[1] || {}), [aiChoice.id]: aiChoice.score }
+        { ...(scores[1] || {}), [aiChoice.id]: aiScore }
       ];
       const nextComplete = isYahtzeeComplete(nextScores);
 
@@ -2228,7 +2328,7 @@ export function DisneyYahtzeeGame({ mode, room, localPlayer, players, updateRoom
           yahtzeeHeld: [false, false, false, false, false],
           yahtzeeRolls: 0,
           yahtzeeComplete: nextComplete,
-          yahtzeeLastMove: `Computer koos ${aiChoice.name} voor ${aiChoice.score} punten.`
+          yahtzeeLastMove: `Computer (${aiLevel}) koos ${aiChoice.name} voor ${aiScore} punten.`
         }
       });
     }, 900);
@@ -2306,23 +2406,71 @@ export function DisneyYahtzeeGame({ mode, room, localPlayer, players, updateRoom
   const winnerText = totals[0] === totals[1]
     ? "Gelijkspel"
     : `${playerNames[totals[0] > totals[1] ? 0 : 1]} wint!`;
+  const viewedScore = scores[viewedScoreIndex] || {};
+  const viewedUpperTotal = getYahtzeeUpperTotal(viewedScore);
+  const viewedUpperBonus = viewedUpperTotal >= YAHTZEE_BONUS_THRESHOLD ? YAHTZEE_BONUS_POINTS : 0;
+  const renderYahtzeeScoreRows = (categoryIds) => categoryIds.map(categoryId => {
+    const category = YAHTZEE_CATEGORIES.find(item => item.id === categoryId);
+    const savedScore = viewedScore[categoryId];
+    const isActiveCard = viewedScoreIndex === activeIndex;
+    const isUsed = savedScore !== undefined;
+    const preview = rolls > 0 ? scoreYahtzeeCategory(categoryId, dice) : null;
+    return (
+      <button
+        key={categoryId}
+        type="button"
+        className="btn mini"
+        disabled={!myTurn || !isActiveCard || rolls === 0 || isUsed || isComplete}
+        onClick={() => handleScoreCategory(categoryId)}
+        style={{
+          display: 'grid',
+          gridTemplateColumns: '1fr auto',
+          alignItems: 'center',
+          gap: '6px',
+          width: '100%',
+          padding: '7px 8px',
+          borderRadius: '8px',
+          background: isUsed ? '#10264c' : '#07152c',
+          border: isActiveCard && !isUsed && rolls > 0 ? `1px solid ${playerColors[viewedScoreIndex]}` : '1px solid var(--line)',
+          color: '#fff',
+          textAlign: 'left',
+          fontSize: '12px'
+        }}
+      >
+        <span>
+          <strong>{category?.name}</strong>
+          <span style={{ display: 'block', color: 'var(--muted)', fontSize: '10px' }}>{category?.hint}</span>
+        </span>
+        <strong style={{ color: isUsed ? 'var(--gold)' : playerColors[viewedScoreIndex] }}>
+          {isUsed ? savedScore : preview === null ? "-" : `+${preview}`}
+        </strong>
+      </button>
+    );
+  });
 
   return (
     <div style={{ textAlign: 'center' }}>
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px', marginBottom: '12px' }}>
         {[0, 1].map(index => (
-          <div
+          <button
             key={index}
+            type="button"
+            onClick={() => setViewedScoreIndex(index)}
+            className="btn mini"
             style={{
               padding: '10px',
               borderRadius: '12px',
-              background: activeIndex === index && !isComplete ? '#10264c' : '#07152c',
-              border: activeIndex === index && !isComplete ? '2px solid var(--gold)' : '1px solid var(--line)'
+              background: viewedScoreIndex === index ? '#10264c' : '#07152c',
+              border: viewedScoreIndex === index ? `2px solid ${playerColors[index]}` : '1px solid var(--line)',
+              textAlign: 'center'
             }}
           >
             <div style={{ color: playerColors[index], fontWeight: 800, fontSize: '13px' }}>{playerNames[index]}</div>
             <div style={{ fontSize: '24px', fontWeight: 900 }}>{totals[index]}</div>
-          </div>
+            <div style={{ color: activeIndex === index && !isComplete ? 'var(--gold)' : 'var(--muted)', fontSize: '10px' }}>
+              {activeIndex === index && !isComplete ? "Aan zet" : "Scorekaart"}
+            </div>
+          </button>
         ))}
       </div>
 
@@ -2377,45 +2525,26 @@ export function DisneyYahtzeeGame({ mode, room, localPlayer, players, updateRoom
         {rolls === 0 ? "Gooi dobbelstenen" : rolls < 3 ? "Gooi opnieuw" : "Kies een score"}
       </button>
 
-      <div style={{ display: 'grid', gap: '6px', marginTop: '8px' }}>
-        {YAHTZEE_CATEGORIES.map(category => {
-          const p1Score = scores[0]?.[category.id];
-          const p2Score = scores[1]?.[category.id];
-          const isUsed = scores[activeIndex]?.[category.id] !== undefined;
-          const preview = rolls > 0 ? scoreYahtzeeCategory(category.id, dice) : null;
-          return (
-            <div
-              key={category.id}
-              style={{
-                display: 'grid',
-                gridTemplateColumns: '1.2fr 44px 44px 82px',
-                alignItems: 'center',
-                gap: '6px',
-                padding: '8px',
-                borderRadius: '10px',
-                background: '#07152c',
-                border: '1px solid var(--line)',
-                textAlign: 'left'
-              }}
-            >
-              <div>
-                <strong style={{ fontSize: '13px' }}>{category.name}</strong>
-                <div style={{ fontSize: '10px', color: 'var(--muted)' }}>{category.hint}</div>
-              </div>
-              <div style={{ textAlign: 'center', color: playerColors[0], fontWeight: 800 }}>{p1Score ?? "-"}</div>
-              <div style={{ textAlign: 'center', color: playerColors[1], fontWeight: 800 }}>{p2Score ?? "-"}</div>
-              <button
-                type="button"
-                className="btn mini secondary"
-                disabled={!myTurn || rolls === 0 || isUsed || isComplete}
-                onClick={() => handleScoreCategory(category.id)}
-                style={{ padding: '6px 4px', fontSize: '11px' }}
-              >
-                {isUsed ? "Gekozen" : preview === null ? "Kies" : `+${preview}`}
-              </button>
-            </div>
-          );
-        })}
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px', alignItems: 'start', marginTop: '8px' }}>
+        <div style={{ background: '#061225', border: '1px solid var(--line)', borderRadius: '12px', padding: '8px' }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '6px', fontSize: '12px' }}>
+            <strong style={{ color: playerColors[viewedScoreIndex] }}>Boven</strong>
+            <span style={{ color: 'var(--muted)' }}>{viewedUpperTotal}/63 · bonus {viewedUpperBonus}</span>
+          </div>
+          <div style={{ display: 'grid', gap: '5px' }}>
+            {renderYahtzeeScoreRows(YAHTZEE_UPPER_IDS)}
+          </div>
+        </div>
+
+        <div style={{ background: '#061225', border: '1px solid var(--line)', borderRadius: '12px', padding: '8px' }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '6px', fontSize: '12px' }}>
+            <strong style={{ color: playerColors[viewedScoreIndex] }}>Onder</strong>
+            <span style={{ color: 'var(--muted)' }}>Totaal {getYahtzeeTotal(viewedScore)}</span>
+          </div>
+          <div style={{ display: 'grid', gap: '5px' }}>
+            {renderYahtzeeScoreRows(YAHTZEE_LOWER_IDS)}
+          </div>
+        </div>
       </div>
 
       {isComplete && (
@@ -2494,9 +2623,17 @@ function isQwixxComplete(nextState) {
     || (nextState.qwixxRound || 1) > 16;
 }
 
+function getQwixxEndReason(nextState) {
+  if ((nextState.qwixxLockedRows || []).length >= 2) return "Er zijn twee kleurrijen gesloten.";
+  if ((nextState.qwixxPenalties || []).some(value => value >= 4)) return "Een speler heeft vier strafvakjes.";
+  if ((nextState.qwixxRound || 1) > 16) return "De ronde-limiet is bereikt.";
+  return "";
+}
+
 export function DisneyQwixxGame({ mode, room, localPlayer, players, updateRoomState, onFinish }) {
   const isSolo = mode === 'solo' || room.id === 'solo';
   const taskState = room.current_task_state || {};
+  const aiLevel = taskState.aiLevel || 'normal';
   const activeIndex = room.current_player_index || 0;
   const myIndex = Math.max(0, players.findIndex(p => p.id === localPlayer.id));
   const playerNames = [
@@ -2511,6 +2648,7 @@ export function DisneyQwixxGame({ mode, room, localPlayer, players, updateRoomSt
   const round = taskState.qwixxRound || 1;
   const lockedRows = taskState.qwixxLockedRows || [];
   const complete = Boolean(taskState.qwixxComplete);
+  const endReason = taskState.qwixxEndReason || "";
   const myTurn = activeIndex === myIndex && !complete;
   const aiTurnRef = useRef("");
 
@@ -2553,7 +2691,8 @@ export function DisneyQwixxGame({ mode, room, localPlayer, players, updateRoomSt
       current_player_index: nextComplete ? activeIndex : (activeIndex + 1) % 2,
       current_task_state: {
         ...nextState,
-        qwixxComplete: nextComplete
+        qwixxComplete: nextComplete,
+        qwixxEndReason: nextComplete ? getQwixxEndReason(nextState) : ""
       }
     });
   };
@@ -2643,16 +2782,20 @@ export function DisneyQwixxGame({ mode, room, localPlayer, players, updateRoomSt
       }
 
       const aiOptions = getQwixxOptions(dice, marks[1] || createQwixxMarks(), lockedRows);
-      const bestOption = aiOptions
+      const scoredAiOptions = aiOptions
         .map(option => {
           const row = QWIXX_ROWS.find(item => item.id === option.rowId);
           return {
             ...option,
             row,
-            priority: row.values.indexOf(option.value) + (row.values.indexOf(option.value) === row.values.length - 1 ? 4 : 0)
+            priority: row.values.indexOf(option.value)
+              + (row.values.indexOf(option.value) === row.values.length - 1 ? (aiLevel === 'hard' ? 8 : 4) : 0)
+              + (aiLevel === 'hard' && (marks[1]?.[option.rowId] || []).length >= 4 ? 3 : 0)
           };
-        })
-        .sort((a, b) => b.priority - a.priority)[0];
+        });
+      const bestOption = aiLevel === 'easy'
+        ? scoredAiOptions[Math.floor(Math.random() * scoredAiOptions.length)]
+        : scoredAiOptions.sort((a, b) => b.priority - a.priority)[0];
 
       if (!bestOption) {
         const nextPenalties = penalties.map((value, index) => index === 1 ? value + 1 : value);
@@ -2729,7 +2872,12 @@ export function DisneyQwixxGame({ mode, room, localPlayer, players, updateRoomSt
 
       <div style={{ margin: '8px 0 12px', minHeight: '22px', color: 'var(--muted)', fontSize: '13px' }}>
         {complete
-          ? <strong style={{ color: 'var(--gold)' }}>{winnerText}</strong>
+          ? (
+            <span>
+              <strong style={{ color: 'var(--gold)' }}>{winnerText}</strong>
+              {endReason && <span style={{ display: 'block', marginTop: '3px' }}>Einde spel: {endReason}</span>}
+            </span>
+          )
           : activeIndex === 1 && isSolo
             ? "Computer speelt..."
             : myTurn

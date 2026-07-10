@@ -63,6 +63,23 @@ const assetPath = (path) => {
   return '/' + path;
 };
 
+const DISNEY_SHOP_ITEMS = [
+  { id: 'mickey-sticker', name: 'Mickey Sticker', icon: '🔴', cost: 1, type: 'everyone', desc: 'Een vrolijke startbadge voor elke speler.' },
+  { id: 'castle-pin', name: 'Kasteel Pin', icon: '🏰', cost: 1, type: 'everyone', desc: 'Voor in je Disney Collection.' },
+  { id: 'pixie-dust', name: 'Tinkelstof Zakje', icon: '✨', cost: 1, type: 'everyone', desc: 'Een klein beetje magie voor onderweg.' },
+  { id: 'golden-fastpass', name: 'Gouden FastPass', icon: '🎫', cost: 5, type: 'exclusive', desc: 'Exclusief: maar een speler kan deze claimen.' },
+  { id: 'captains-compass', name: 'Kapiteinskompas', icon: '🧭', cost: 7, type: 'exclusive', desc: 'Exclusief verzamelitem voor de snelste avonturier.' },
+  { id: 'crystal-castle', name: 'Kristallen Kasteel', icon: '💎', cost: 10, type: 'exclusive', desc: 'Zeldzaam pronkstuk voor de Collection.' }
+];
+
+const readJsonStorage = (key, fallback) => {
+  try {
+    return JSON.parse(localStorage.getItem(key) || JSON.stringify(fallback));
+  } catch {
+    return fallback;
+  }
+};
+
 // Helper for fuzzy string matching (synonyms and spelling typos)
 const norm = (str) => {
   if (!str) return "";
@@ -364,6 +381,11 @@ export default function App() {
   const [players, setPlayers] = useState([]);
   const [scoreHistory, setScoreHistory] = useState([]);
   const [sound, setSound] = useState(true);
+  const [starBank, setStarBank] = useState(() => readJsonStorage('disney_star_bank', {}));
+  const [collections, setCollections] = useState(() => readJsonStorage('disney_collections', {}));
+  const [exclusiveClaims, setExclusiveClaims] = useState(() => readJsonStorage('disney_exclusive_claims', {}));
+  const [shopPlayerName, setShopPlayerName] = useState(() => localStorage.getItem('disney_player_name') || 'Speler 1');
+  const [aiLevel, setAiLevel] = useState(() => localStorage.getItem('disney_ai_level') || 'normal');
 
   // Solo mode states and history
   const [soloHistory, setSoloHistory] = useState(() => JSON.parse(localStorage.getItem('disney_solo_history') || '[]'));
@@ -468,6 +490,53 @@ export default function App() {
     setSudokuSolvedStats(null);
   };
 
+  const getCollectorKey = (name) => norm(name || 'speler') || 'speler';
+
+  const getDisplayShopPlayers = () => {
+    const names = [
+      shopPlayerName,
+      playerNameInput,
+      localStorage.getItem('disney_player_name'),
+      ...playerNames,
+      ...players.map(p => p.name)
+    ].filter(Boolean).map(name => String(name).trim()).filter(Boolean);
+    return [...new Set(names)].slice(0, 8);
+  };
+
+  const awardStarsToCollector = (name, amount) => {
+    const stars = Math.max(0, Number(amount) || 0);
+    if (stars <= 0) return;
+    const key = getCollectorKey(name);
+    setStarBank(prev => {
+      const next = { ...prev, [key]: (prev[key] || 0) + stars };
+      localStorage.setItem('disney_star_bank', JSON.stringify(next));
+      return next;
+    });
+  };
+
+  const handleBuyShopItem = (item) => {
+    const name = shopPlayerName.trim() || playerNameInput.trim() || 'Speler 1';
+    const key = getCollectorKey(name);
+    const balance = starBank[key] || 0;
+    const owned = collections[key] || [];
+    const exclusiveOwner = exclusiveClaims[item.id];
+
+    if (owned.includes(item.id)) return;
+    if (item.type === 'exclusive' && exclusiveOwner && exclusiveOwner !== key) return;
+    if (balance < item.cost) return;
+
+    const nextBank = { ...starBank, [key]: balance - item.cost };
+    const nextCollections = { ...collections, [key]: [...owned, item.id] };
+    const nextClaims = item.type === 'exclusive' ? { ...exclusiveClaims, [item.id]: key } : exclusiveClaims;
+
+    setStarBank(nextBank);
+    setCollections(nextCollections);
+    setExclusiveClaims(nextClaims);
+    localStorage.setItem('disney_star_bank', JSON.stringify(nextBank));
+    localStorage.setItem('disney_collections', JSON.stringify(nextCollections));
+    localStorage.setItem('disney_exclusive_claims', JSON.stringify(nextClaims));
+  };
+
   const logSoloAttempt = (points = 0, customReason = null) => {
     const currentTask = getCurrentTask();
     if (!currentTask) return;
@@ -497,6 +566,7 @@ export default function App() {
       localStorage.setItem('disney_solo_history', JSON.stringify(updated));
       return updated;
     });
+    awardStarsToCollector(localPlayer?.name || playerNameInput || shopPlayerName, points);
   };
 
   const isArenaHistoryItem = (item) => {
@@ -533,6 +603,7 @@ export default function App() {
       }
       return;
     }
+    awardStarsToCollector(player?.name, delta);
     await dbAddPlayerScore(roomId, player, delta, reason, bucket, taskObj);
   };
 
@@ -582,6 +653,7 @@ export default function App() {
   const handleStartArcadeSolo = (gameId) => {
     const name = playerNameInput.trim() || localStorage.getItem('disney_player_name') || 'Solo Speler';
     localStorage.setItem('disney_player_name', name);
+    localStorage.setItem('disney_ai_level', aiLevel);
     const p = { id: 'solo-player', name, score: 0 };
     
     setLocalPlayer(p);
@@ -592,7 +664,7 @@ export default function App() {
       game_mode: 'arcade-' + gameId,
       current_task_id: 'solo-arcade-' + gameId,
       current_player_index: 0,
-      current_task_state: {}
+      current_task_state: { aiLevel }
     });
     soloLoggedRef.current = false;
     setScreen('game');
@@ -611,7 +683,8 @@ export default function App() {
       const updates = { 
         game_mode: 'arcade-' + gameId, 
         current_task_id: 'duel-arcade-' + gameId,
-        status: 'lobby'
+        status: 'lobby',
+        current_task_state: { aiLevel }
       };
       await dbUpdateRoomState(r.id, updates);
       
@@ -663,6 +736,7 @@ export default function App() {
   const [mmPointsEarned, setMmPointsEarned] = useState(0);
   const [mmGameStarted, setMmGameStarted] = useState(false);
   const [mmCodeLength, setMmCodeLength] = useState(5);
+  const [mmColorCount, setMmColorCount] = useState(6);
   const [mmMaxTurns, setMmMaxTurns] = useState(10);
   const [mmActiveSlot, setMmActiveSlot] = useState(0);
 
@@ -2621,6 +2695,107 @@ export default function App() {
                 </div>
               </div>
 
+              {(() => {
+                const shopNames = getDisplayShopPlayers();
+                const activeName = shopPlayerName.trim() || shopNames[0] || 'Speler 1';
+                const activeKey = getCollectorKey(activeName);
+                const balance = starBank[activeKey] || 0;
+                const owned = collections[activeKey] || [];
+                return (
+                  <section className="card" style={{ marginTop: '20px' }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '12px', marginBottom: '12px', flexWrap: 'wrap' }}>
+                      <div>
+                        <h2 className="sectiontitle" style={{ margin: 0 }}>Disney Stars Shop</h2>
+                        <p style={{ margin: '5px 0 0', color: 'var(--muted)', fontSize: '12px' }}>
+                          Verdien sterren met Quest-, Arena- en solo-games. Spaar items in je Disney Collection.
+                        </p>
+                      </div>
+                      <div style={{ color: 'var(--gold)', fontWeight: 900, fontSize: '20px' }}>{balance} ★</div>
+                    </div>
+
+                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px', marginBottom: '12px' }}>
+                      <div>
+                        <label style={{ display: 'block', marginBottom: '6px', fontSize: '12px', fontWeight: 'bold' }}>Wie speelt er mee?</label>
+                        <select
+                          value={activeName}
+                          onChange={(e) => {
+                            setShopPlayerName(e.target.value);
+                            localStorage.setItem('disney_player_name', e.target.value);
+                          }}
+                          style={{ width: '100%', boxSizing: 'border-box' }}
+                        >
+                          {shopNames.map(name => (
+                            <option key={name} value={name}>{name}</option>
+                          ))}
+                        </select>
+                      </div>
+                      <div>
+                        <label style={{ display: 'block', marginBottom: '6px', fontSize: '12px', fontWeight: 'bold' }}>Nieuwe speler</label>
+                        <input
+                          type="text"
+                          placeholder="Naam toevoegen..."
+                          value={shopPlayerName}
+                          onChange={(e) => setShopPlayerName(e.target.value)}
+                          onBlur={(e) => {
+                            if (e.target.value.trim()) localStorage.setItem('disney_player_name', e.target.value.trim());
+                          }}
+                          style={{ width: '100%', boxSizing: 'border-box' }}
+                        />
+                      </div>
+                    </div>
+
+                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '8px' }}>
+                      {DISNEY_SHOP_ITEMS.map(item => {
+                        const itemOwned = owned.includes(item.id);
+                        const exclusiveOwner = exclusiveClaims[item.id];
+                        const lockedByOther = item.type === 'exclusive' && exclusiveOwner && exclusiveOwner !== activeKey;
+                        const canBuy = !itemOwned && !lockedByOther && balance >= item.cost;
+                        return (
+                          <div key={item.id} style={{ background: '#07152c', border: '1px solid var(--line)', borderRadius: '10px', padding: '10px' }}>
+                            <div style={{ display: 'flex', gap: '8px', alignItems: 'center', marginBottom: '6px' }}>
+                              <span style={{ fontSize: '24px' }}>{item.icon}</span>
+                              <div style={{ minWidth: 0 }}>
+                                <strong style={{ display: 'block', fontSize: '13px' }}>{item.name}</strong>
+                                <span style={{ color: item.type === 'exclusive' ? 'var(--gold)' : 'var(--muted)', fontSize: '10px' }}>
+                                  {item.type === 'exclusive' ? 'Exclusief' : 'Voor iedereen'} · {item.cost} ★
+                                </span>
+                              </div>
+                            </div>
+                            <p style={{ color: 'var(--muted)', fontSize: '11px', minHeight: '30px', margin: '0 0 8px' }}>{item.desc}</p>
+                            <button
+                              className={`btn mini ${canBuy ? 'primary' : 'secondary'}`}
+                              disabled={!canBuy}
+                              onClick={() => handleBuyShopItem(item)}
+                              style={{ width: '100%', padding: '7px 6px', fontSize: '11px' }}
+                            >
+                              {itemOwned ? 'In Collection' : lockedByOther ? 'Al geclaimd' : balance < item.cost ? 'Te weinig sterren' : 'Kopen'}
+                            </button>
+                          </div>
+                        );
+                      })}
+                    </div>
+
+                    <div style={{ marginTop: '12px', padding: '10px', background: '#061225', border: '1px solid var(--line)', borderRadius: '10px' }}>
+                      <strong style={{ display: 'block', marginBottom: '6px', color: 'var(--gold)' }}>Disney Collection van {activeName}</strong>
+                      {owned.length === 0 ? (
+                        <span style={{ color: 'var(--muted)', fontSize: '12px' }}>Nog leeg. Speel games om sterren te verdienen en koop je eerste item.</span>
+                      ) : (
+                        <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px' }}>
+                          {owned.map(itemId => {
+                            const item = DISNEY_SHOP_ITEMS.find(shopItem => shopItem.id === itemId);
+                            return item ? (
+                              <span key={item.id} className="badge" style={{ background: '#10264c', color: '#fff' }}>
+                                {item.icon} {item.name}
+                              </span>
+                            ) : null;
+                          })}
+                        </div>
+                      )}
+                    </div>
+                  </section>
+                );
+              })()}
+
               <div className="portal-info-box">
                 <div className="info-icon">ℹ️</div>
                 <div className="info-text">
@@ -2740,12 +2915,38 @@ export default function App() {
                       </div>
 
                       {arcadePlayMode === 'solo' && (
-                        <button
-                          className="btn primary full animate-fade-in"
-                          onClick={() => handleStartArcadeSolo(selectedArcadeGame)}
-                        >
-                          Start Solo Game
-                        </button>
+                        <div className="animate-fade-in">
+                          {selectedArcadeGame !== 'colorlines' && (
+                            <div style={{ background: '#07152c', border: '1px solid var(--line)', borderRadius: '12px', padding: '12px', marginBottom: '12px' }}>
+                              <label style={{ display: 'block', marginBottom: '8px', fontSize: '13px', fontWeight: 'bold', color: 'var(--gold)' }}>AI-niveau tegenstander</label>
+                              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '8px' }}>
+                                {[
+                                  { id: 'easy', label: 'Rustig' },
+                                  { id: 'normal', label: 'Normaal' },
+                                  { id: 'hard', label: 'Slim' }
+                                ].map(level => (
+                                  <button
+                                    key={level.id}
+                                    className={`btn mini ${aiLevel === level.id ? 'primary' : 'secondary'}`}
+                                    onClick={() => {
+                                      setAiLevel(level.id);
+                                      localStorage.setItem('disney_ai_level', level.id);
+                                    }}
+                                    style={{ padding: '9px 6px', fontSize: '12px' }}
+                                  >
+                                    {level.label}
+                                  </button>
+                                ))}
+                              </div>
+                            </div>
+                          )}
+                          <button
+                            className="btn primary full"
+                            onClick={() => handleStartArcadeSolo(selectedArcadeGame)}
+                          >
+                            Start Solo Game
+                          </button>
+                        </div>
                       )}
 
                       {arcadePlayMode === 'duel' && (
@@ -3976,16 +4177,18 @@ export default function App() {
 
                             {/* 9. DISNEY MASTERMIND (Code Breaker) */}
                             {t.type === "mastermind" && (() => {
-                              const colors = [
-                                { label: 'Mickey', emoji: '🔴', color: '#ff7b8b' },
-                                { label: 'Simba', emoji: '🦁', color: '#ffd45c' },
-                                { label: 'Stitch', emoji: '🔵', color: '#74d7ff' },
-                                { label: 'Buzz', emoji: '🟢', color: '#65d9a3' },
-                                { label: 'Winnie', emoji: '🟡', color: '#ffe680' },
-                                { label: 'Ursula', emoji: '🟣', color: '#bd53ed' },
-                                { label: 'Ariel', emoji: '🐚', color: '#65d9c7' },
-                                { label: 'Elsa', emoji: '❄️', color: '#ffffff' }
+                              const allColors = [
+                                { label: 'Mickey', emoji: 'R', color: '#e60012', text: '#fff' },
+                                { label: 'Stitch', emoji: 'B', color: '#0066ff', text: '#fff' },
+                                { label: 'Simba', emoji: 'G', color: '#ffd400', text: '#111' },
+                                { label: 'Buzz', emoji: 'Gr', color: '#00a650', text: '#fff' },
+                                { label: 'Ursula', emoji: 'P', color: '#7d2cff', text: '#fff' },
+                                { label: 'Tigger', emoji: 'O', color: '#ff7a00', text: '#111' },
+                                { label: 'Ariel', emoji: 'C', color: '#00c2d1', text: '#111' },
+                                { label: 'Elsa', emoji: 'W', color: '#ffffff', text: '#111' }
                               ];
+                              const colors = allColors.slice(0, mmColorCount);
+                              const paletteColumns = mmColorCount === 4 ? 4 : mmColorCount === 5 ? 3 : mmColorCount === 6 ? 3 : 4;
 
                               const isMyTurn = room?.current_player_index === players.findIndex(p => p.id === localPlayer.id);
 
@@ -4019,6 +4222,22 @@ export default function App() {
                                             onClick={() => setMmCodeLength(len)}
                                           >
                                             {len} Stippen
+                                          </button>
+                                        ))}
+                                      </div>
+                                    </div>
+
+                                    <div style={{ marginBottom: '20px' }}>
+                                      <label style={{ display: 'block', marginBottom: '8px', fontSize: '15px', fontWeight: 'bold' }}>Aantal kleuren:</label>
+                                      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(5, 1fr)', gap: '8px' }}>
+                                        {[4, 5, 6, 7, 8].map(count => (
+                                          <button
+                                            key={count}
+                                            className={`btn ${mmColorCount === count ? 'primary' : 'secondary'}`}
+                                            style={{ padding: '10px 6px', fontSize: '14px' }}
+                                            onClick={() => setMmColorCount(count)}
+                                          >
+                                            {count}
                                           </button>
                                         ))}
                                       </div>
@@ -4060,7 +4279,8 @@ export default function App() {
                                         await updateRoomState(room.id, {
                                           current_task_state: {
                                             ...room.current_task_state,
-                                            codeLength: mmCodeLength
+                                            codeLength: mmCodeLength,
+                                            colorCount: mmColorCount
                                           }
                                         });
                                       }}
@@ -4189,7 +4409,7 @@ export default function App() {
                                         <div style={{ fontSize: '13px', fontWeight: 'bold', marginBottom: '12px', textAlign: 'center', color: 'var(--muted)' }}>
                                           TIK EEN FIGUUR OM IN TE VULLEN
                                         </div>
-                                        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '10px' }}>
+                                        <div style={{ display: 'grid', gridTemplateColumns: `repeat(${paletteColumns}, 1fr)`, gap: '10px' }}>
                                           {colors.map((c, i) => (
                                             <button
                                               key={i}
@@ -4207,15 +4427,16 @@ export default function App() {
                                                 justifyContent: 'center',
                                                 padding: '10px 4px',
                                                 borderRadius: '12px',
-                                                background: '#10274f',
-                                                border: '1px solid var(--line)',
+                                                background: c.color,
+                                                color: c.text,
+                                                border: '2px solid rgba(255,255,255,0.55)',
                                                 cursor: 'pointer',
                                                 transition: 'all 0.15s ease'
                                               }}
                                               className="color-btn"
                                             >
-                                              <span style={{ fontSize: '24px', marginBottom: '4px' }}>{c.emoji}</span>
-                                              <span style={{ fontSize: '11px', color: '#fff', fontWeight: 'bold', opacity: 0.9 }}>{c.label}</span>
+                                              <span style={{ fontSize: '18px', marginBottom: '4px', fontWeight: 900 }}>{c.emoji}</span>
+                                              <span style={{ fontSize: '11px', color: c.text, fontWeight: 'bold', opacity: 0.95 }}>{c.label}</span>
                                             </button>
                                           ))}
                                         </div>
