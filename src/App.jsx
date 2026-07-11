@@ -125,6 +125,8 @@ const DISNEY_SHOP_ITEMS = [
   { id: 'crystal-castle', name: 'Kristallen Kasteel', icon: '💎', cost: 10, type: 'exclusive', desc: 'Zeldzaam pronkstuk voor de Collection.' }
 ];
 
+const formatCocoCoins = (amount) => `${amount} Coco Coin${Number(amount) === 1 ? '' : 's'}`;
+
 const readJsonStorage = (key, fallback) => {
   try {
     return JSON.parse(localStorage.getItem(key) || JSON.stringify(fallback));
@@ -438,6 +440,8 @@ export default function App() {
   const [collections, setCollections] = useState(() => readJsonStorage('disney_collections', {}));
   const [exclusiveClaims, setExclusiveClaims] = useState(() => readJsonStorage('disney_exclusive_claims', {}));
   const [shopPlayerName, setShopPlayerName] = useState(() => localStorage.getItem('disney_player_name') || 'Speler 1');
+  const [newShopPlayerName, setNewShopPlayerName] = useState('');
+  const [selectedCollectionItem, setSelectedCollectionItem] = useState(null);
   const [aiLevel, setAiLevel] = useState(() => localStorage.getItem('disney_ai_level') || 'normal');
 
   // Solo mode states and history
@@ -588,6 +592,15 @@ export default function App() {
     localStorage.setItem(COCO_BANK_KEY, JSON.stringify(nextBank));
     localStorage.setItem('disney_collections', JSON.stringify(nextCollections));
     localStorage.setItem('disney_exclusive_claims', JSON.stringify(nextClaims));
+    setSelectedCollectionItem(item);
+  };
+
+  const handleAddShopPlayer = () => {
+    const name = newShopPlayerName.trim();
+    if (!name) return;
+    setShopPlayerName(name);
+    localStorage.setItem('disney_player_name', name);
+    setNewShopPlayerName('');
   };
 
   const logSoloAttempt = (points = 0, customReason = null) => {
@@ -2787,6 +2800,35 @@ export default function App() {
 
       {!loading && (
         <>
+          {selectedCollectionItem && (
+            <div
+              className="collection-popup-backdrop"
+              onClick={() => setSelectedCollectionItem(null)}
+            >
+              <div className="collection-popup-card" onClick={(e) => e.stopPropagation()}>
+                <button
+                  className="collection-popup-close"
+                  onClick={() => setSelectedCollectionItem(null)}
+                  aria-label="Sluiten"
+                >
+                  ×
+                </button>
+                <div className="collection-popup-visual">
+                  <span>{selectedCollectionItem.icon}</span>
+                </div>
+                <div className="badge" style={{ alignSelf: 'center', marginBottom: '8px' }}>
+                  Disney Collection
+                </div>
+                <h2>{selectedCollectionItem.name}</h2>
+                <p>{selectedCollectionItem.desc}</p>
+                <div className="collection-popup-price">
+                  <CocoCoinIcon size={28} />
+                  <span>{formatCocoCoins(selectedCollectionItem.cost)}</span>
+                </div>
+              </div>
+            </div>
+          )}
+
           {/* SCREEN: PORTAL */}
           {screen === 'portal' && (
             <div className="portal-container">
@@ -2801,7 +2843,7 @@ export default function App() {
                 {/* Game 1: Disney Road Quest */}
                 <div className="portal-card road-quest-card" onClick={() => setScreen('home')} role="button" tabIndex={0}>
                   <div className="portal-card-header">
-                    <div className="portal-card-media">
+                    <div className="portal-card-media portal-glow-quest">
                       <img src={assetPath("portal/car.png")} onLoad={removeBg} className="portal-media-img" alt="Road Quest Car" />
                     </div>
                     <span className="portal-card-badge">Aanbevolen</span>
@@ -2821,7 +2863,7 @@ export default function App() {
                   className="portal-card music-quiz-card"
                 >
                   <div className="portal-card-header">
-                    <div className="portal-card-media">
+                    <div className="portal-card-media portal-glow-music">
                       <img src={assetPath("portal/mickey_singing.png")} onLoad={removeBg} className="portal-media-img" alt="Mickey Singing" />
                     </div>
                     <span className="portal-card-badge music">Hitster Editie</span>
@@ -2838,8 +2880,8 @@ export default function App() {
                 {/* Game 3: Disney Duel Arena */}
                 <div className="portal-card duel-arena-card" onClick={() => setScreen('arcade_select')} role="button" tabIndex={0}>
                   <div className="portal-card-header">
-                    <div className="portal-card-media" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'radial-gradient(circle, rgba(189, 83, 237, 0.15) 0%, transparent 75%)', height: '140px' }}>
-                      <span style={{ fontSize: '64px', filter: 'drop-shadow(0 0 12px rgba(189, 83, 237, 0.6))', animation: 'bounce 3s infinite' }}>🏰</span>
+                    <div className="portal-card-media portal-glow-duel">
+                      <img src={assetPath("portal/kasteel.png")} onLoad={removeBg} className="portal-media-img" alt="Disney Castle" />
                     </div>
                     <span className="portal-card-badge arcade">7 Spellen</span>
                   </div>
@@ -2870,7 +2912,7 @@ export default function App() {
                       </div>
                       <div style={{ color: 'var(--gold)', fontWeight: 900, fontSize: '20px', display: 'flex', alignItems: 'center', gap: '8px' }}>
                         <CocoCoinIcon size={34} />
-                        <span>{balance} Coco Coins</span>
+                        <span>{formatCocoCoins(balance)}</span>
                       </div>
                     </div>
 
@@ -2891,17 +2933,21 @@ export default function App() {
                         </select>
                       </div>
                       <div>
-                        <label style={{ display: 'block', marginBottom: '6px', fontSize: '12px', fontWeight: 'bold' }}>Nieuwe speler</label>
+                        <label style={{ display: 'block', marginBottom: '6px', fontSize: '12px', fontWeight: 'bold' }}>Nieuwe speler toevoegen</label>
                         <input
                           type="text"
-                          placeholder="Naam toevoegen..."
-                          value={shopPlayerName}
-                          onChange={(e) => setShopPlayerName(e.target.value)}
-                          onBlur={(e) => {
-                            if (e.target.value.trim()) localStorage.setItem('disney_player_name', e.target.value.trim());
+                          placeholder="Bijv. Esmikka"
+                          value={newShopPlayerName}
+                          onChange={(e) => setNewShopPlayerName(e.target.value)}
+                          onBlur={handleAddShopPlayer}
+                          onKeyDown={(e) => {
+                            if (e.key === 'Enter') handleAddShopPlayer();
                           }}
                           style={{ width: '100%', boxSizing: 'border-box' }}
                         />
+                        <span style={{ display: 'block', marginTop: '5px', color: 'var(--muted)', fontSize: '10px', lineHeight: 1.3 }}>
+                          Voeg hier iemand toe om apart Coco Coins en Collection-items bij te houden.
+                        </span>
                       </div>
                     </div>
 
@@ -2918,7 +2964,7 @@ export default function App() {
                               <div style={{ minWidth: 0 }}>
                                 <strong style={{ display: 'block', fontSize: '13px' }}>{item.name}</strong>
                                 <span style={{ color: item.type === 'exclusive' ? 'var(--gold)' : 'var(--muted)', fontSize: '10px' }}>
-                                  {item.type === 'exclusive' ? 'Exclusief' : 'Voor iedereen'} · {item.cost} Coco Coins
+                                  {item.type === 'exclusive' ? 'Exclusief' : 'Voor iedereen'} · {formatCocoCoins(item.cost)}
                                 </span>
                               </div>
                             </div>
@@ -2945,9 +2991,15 @@ export default function App() {
                           {owned.map(itemId => {
                             const item = DISNEY_SHOP_ITEMS.find(shopItem => shopItem.id === itemId);
                             return item ? (
-                              <span key={item.id} className="badge" style={{ background: '#10264c', color: '#fff' }}>
+                              <button
+                                key={item.id}
+                                type="button"
+                                className="badge collection-item-button"
+                                onClick={() => setSelectedCollectionItem(item)}
+                                style={{ background: '#10264c', color: '#fff' }}
+                              >
                                 {item.icon} {item.name}
-                              </span>
+                              </button>
                             ) : null;
                           })}
                         </div>
