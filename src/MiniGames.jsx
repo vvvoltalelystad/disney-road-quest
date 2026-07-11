@@ -262,11 +262,13 @@ export function OthelloGame({ mode, room, localPlayer, players, updateRoomState,
   const isGameOver = taskState.othelloGameOver || (getOthelloValidMoves(board, 'blue').length === 0 && getOthelloValidMoves(board, 'red').length === 0);
   const finalBlue = othelloFinal?.blue ?? blue;
   const finalRed = othelloFinal?.red ?? red;
+  const blueName = players[0]?.name || (isSolo ? "Jij" : "Speler 1");
+  const redName = isSolo ? "Computer" : (players[1]?.name || "Speler 2");
   const winnerText = finalBlue === finalRed
     ? "Gelijkspel"
     : finalBlue > finalRed
-      ? `${isP1 ? "Jij" : (players[0]?.name || "Speler 1")} wint`
-      : `${!isP1 ? "Jij" : (isSolo ? "Computer" : (players[1]?.name || "Speler 2"))} wint`;
+      ? `${blueName} wint`
+      : `${redName} wint`;
 
   return (
     <div style={{ textAlign: 'center' }}>
@@ -2438,7 +2440,7 @@ export function DisneyYahtzeeGame({ mode, room, localPlayer, players, updateRoom
     const savedScore = viewedScore[categoryId];
     const isActiveCard = viewedScoreIndex === activeIndex;
     const isUsed = savedScore !== undefined;
-    const preview = rolls > 0 ? scoreYahtzeeCategory(categoryId, dice) : null;
+    const preview = isActiveCard && rolls > 0 ? scoreYahtzeeCategory(categoryId, dice) : null;
     return (
       <button
         key={categoryId}
@@ -2541,10 +2543,10 @@ export function DisneyYahtzeeGame({ mode, room, localPlayer, players, updateRoom
       </div>
 
       <button
-        className="btn primary full"
+        className={`btn ${(!myTurn || rolls >= 3 || isComplete) ? 'secondary' : 'primary'} full`}
         onClick={handleRoll}
         disabled={!myTurn || rolls >= 3 || isComplete}
-        style={{ marginBottom: '12px' }}
+        style={{ marginBottom: '12px', opacity: (!myTurn || rolls >= 3 || isComplete) ? 0.55 : 1 }}
       >
         {rolls === 0 ? "Gooi dobbelstenen" : rolls < 3 ? "Gooi opnieuw" : "Kies een score"}
       </button>

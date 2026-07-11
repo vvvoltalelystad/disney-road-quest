@@ -63,7 +63,10 @@ const ARENA_GAMES = [
   { id: 'abalone', name: "Marble Push (Abalone)", icon: "\u{1F41C}", desc: "Duw de bollen van de tegenstander uit het hex-raster.", maxPlayers: 2 },
   { id: 'piratesplank', name: "Pirates' Plank", icon: "\u2620\uFE0F", desc: "Raad Disney-woorden voordat de piraat van de plank loopt.", maxPlayers: 4 },
   { id: 'yahtzee', name: "Disney Yahtzee", icon: "\u{1F3B2}", desc: "Gooi, houd dobbelstenen vast en vul je magische scorekaart.", maxPlayers: 2 },
-  { id: 'qwixx', name: "Disney Qwixx", icon: "\u270F\uFE0F", desc: "Streep gekleurde rijen af en ontwijk strafvakjes.", maxPlayers: 2 }
+  { id: 'qwixx', name: "Disney Qwixx", icon: "\u270F\uFE0F", desc: "Streep gekleurde rijen af en ontwijk strafvakjes.", maxPlayers: 2 },
+  { id: 'mastermind', name: "Disney Mastermind", icon: "\u{1F9E0}", desc: "Solo puzzel: kraak de geheime Disney-kleurcode.", maxPlayers: 1 },
+  { id: 'sudoku6', name: "Mickey Sudoku (6x6)", icon: "\u2728", desc: "Solo puzzel: uniek 6x6 Sudoku-raster met Disney-symbolen.", maxPlayers: 1 },
+  { id: 'sudoku9', name: "Kasteel Sudoku (9x9)", icon: "\u{1F3F0}", desc: "Solo puzzel: klassiek 9x9 Sudoku-raster met Disney-symbolen.", maxPlayers: 1 }
 ];
 
 const getArenaGame = (gameId) => ARENA_GAMES.find(game => game.id === gameId);
@@ -443,7 +446,7 @@ export default function App() {
   const [playerNames, setPlayerNames] = useState(['Speler 1', 'Speler 2', 'Speler 3', 'Speler 4']);
 
   // New Category setup choice checklist
-  const [selectedCats, setSelectedCats] = useState(["Disney Dagboek", "Pictionary", "Inschattingsvragen", "Dilemma", "Emoji Quiz", "Wie ben ik?", "Disney Mastermind", "Feit of Fabel", "Quiz", "Samen"]);
+  const [selectedCats, setSelectedCats] = useState(["Disney Dagboek", "Pictionary", "Inschattingsvragen", "Dilemma", "Emoji Quiz", "Wie ben ik?", "Feit of Fabel", "Quiz", "Samen"]);
 
   const [room, setRoom] = useState(null);
   const [players, setPlayers] = useState([]);
@@ -494,6 +497,9 @@ export default function App() {
   const [sudokuErrors, setSudokuErrors] = useState([]);
   const [sudokuSolved, setSudokuSolved] = useState(false);
   const [sudokuSolvedStats, setSudokuSolvedStats] = useState(null);
+  const [sudokuHintsUsed, setSudokuHintsUsed] = useState(0);
+  const [sudokuZoom, setSudokuZoom] = useState(1);
+  const sudokuPinchRef = useRef(null);
 
   const checkSudokuConflicts = (grid, size) => {
     const conflicts = [];
@@ -532,40 +538,112 @@ export default function App() {
     return conflicts;
   };
 
-  const generateSudoku = (size) => {
-    const templates = size === 6 ? SUDOKU_6X6_TEMPLATES : SUDOKU_9X9_TEMPLATES;
-    const template = templates[Math.floor(Math.random() * templates.length)];
-    const emojis = size === 6 ? EMOJIS_6X6 : EMOJIS_9X9;
+  const shuffleArray = (items) => [...items].sort(() => Math.random() - 0.5);
 
-    const shuffledEmojis = [...emojis].sort(() => Math.random() - 0.5);
-    const mapping = {};
-    for (let i = 1; i <= size; i++) {
-      mapping[i] = shuffledEmojis[i - 1];
+  const getSudokuBlockShape = (size) => size === 6
+    ? { blockRows: 2, blockCols: 3 }
+    : { blockRows: 3, blockCols: 3 };
+
+  const makeSolvedSudokuNumbers = (size) => {
+    const { blockRows, blockCols } = getSudokuBlockShape(size);
+    const rowBands = shuffleArray(Array.from({ length: size / blockRows }, (_, i) => i));
+    const colBands = shuffleArray(Array.from({ length: size / blockCols }, (_, i) => i));
+    const rows = rowBands.flatMap(band => shuffleArray(Array.from({ length: blockRows }, (_, i) => band * blockRows + i)));
+    const cols = colBands.flatMap(band => shuffleArray(Array.from({ length: blockCols }, (_, i) => band * blockCols + i)));
+    const nums = shuffleArray(Array.from({ length: size }, (_, i) => i + 1));
+    const pattern = (r, c) => (blockCols * (r % blockRows) + Math.floor(r / blockRows) + c) % size;
+    return rows.map(r => cols.map(c => nums[pattern(r, c)]));
+  };
+
+  const getSudokuCandidates = (puzzle, size, row, col) => {
+    if (puzzle[row][col]) return [];
+    const { blockRows, blockCols } = getSudokuBlockShape(size);
+    const used = new Set();
+    for (let i = 0; i < size; i++) {
+      if (puzzle[row][i]) used.add(puzzle[row][i]);
+      if (puzzle[i][col]) used.add(puzzle[i][col]);
     }
-
-    const newGrid = [];
-    const newSolution = [];
-    const newClues = [];
-
-    for (let r = 0; r < size; r++) {
-      const gridRow = [];
-      const solRow = [];
-      const clueRow = [];
-      for (let c = 0; c < size; c++) {
-        const solVal = template.solution[r][c];
-        const clueVal = template.clues[r][c];
-        
-        const mappedSol = mapping[solVal];
-        const mappedClue = clueVal === 0 ? null : mapping[clueVal];
-        
-        gridRow.push(mappedClue);
-        solRow.push(mappedSol);
-        clueRow.push(clueVal !== 0);
+    const startR = Math.floor(row / blockRows) * blockRows;
+    const startC = Math.floor(col / blockCols) * blockCols;
+    for (let r = startR; r < startR + blockRows; r++) {
+      for (let c = startC; c < startC + blockCols; c++) {
+        if (puzzle[r][c]) used.add(puzzle[r][c]);
       }
-      newGrid.push(gridRow);
-      newSolution.push(solRow);
-      newClues.push(clueRow);
     }
+    return shuffleArray(Array.from({ length: size }, (_, i) => i + 1).filter(value => !used.has(value)));
+  };
+
+  const countSudokuSolutions = (puzzle, size, limit = 2) => {
+    const board = puzzle.map(row => [...row]);
+    let count = 0;
+
+    const solve = () => {
+      if (count >= limit) return;
+      let bestCell = null;
+      let bestCandidates = null;
+
+      for (let r = 0; r < size; r++) {
+        for (let c = 0; c < size; c++) {
+          if (board[r][c]) continue;
+          const candidates = getSudokuCandidates(board, size, r, c);
+          if (candidates.length === 0) return;
+          if (!bestCandidates || candidates.length < bestCandidates.length) {
+            bestCell = { r, c };
+            bestCandidates = candidates;
+            if (candidates.length === 1) break;
+          }
+        }
+        if (bestCandidates?.length === 1) break;
+      }
+
+      if (!bestCell) {
+        count++;
+        return;
+      }
+
+      for (const value of bestCandidates) {
+        board[bestCell.r][bestCell.c] = value;
+        solve();
+        board[bestCell.r][bestCell.c] = 0;
+        if (count >= limit) return;
+      }
+    };
+
+    solve();
+    return count;
+  };
+
+  const makeUniqueSudokuPuzzle = (solution, size) => {
+    const puzzle = solution.map(row => [...row]);
+    const minClues = size === 6 ? 16 : 32;
+    let clues = size * size;
+    const positions = shuffleArray(Array.from({ length: size * size }, (_, idx) => ({
+      r: Math.floor(idx / size),
+      c: idx % size
+    })));
+
+    for (const { r, c } of positions) {
+      if (clues <= minClues) break;
+      const oldValue = puzzle[r][c];
+      puzzle[r][c] = 0;
+      if (countSudokuSolutions(puzzle, size, 2) === 1) {
+        clues--;
+      } else {
+        puzzle[r][c] = oldValue;
+      }
+    }
+    return puzzle;
+  };
+
+  const generateSudoku = (size) => {
+    const emojis = size === 6 ? EMOJIS_6X6 : EMOJIS_9X9;
+    const solutionNumbers = makeSolvedSudokuNumbers(size);
+    const puzzleNumbers = makeUniqueSudokuPuzzle(solutionNumbers, size);
+    const shuffledEmojis = shuffleArray(emojis);
+    const mapping = Object.fromEntries(shuffledEmojis.map((emoji, index) => [index + 1, emoji]));
+    const newSolution = solutionNumbers.map(row => row.map(value => mapping[value]));
+    const newGrid = puzzleNumbers.map(row => row.map(value => value ? mapping[value] : null));
+    const newClues = puzzleNumbers.map(row => row.map(value => value !== 0));
 
     setSudokuGrid(newGrid);
     setSudokuSolution(newSolution);
@@ -576,6 +654,85 @@ export default function App() {
     setSudokuErrors([]);
     setSudokuSolved(false);
     setSudokuSolvedStats(null);
+    setSudokuHintsUsed(0);
+    setSudokuZoom(1);
+  };
+
+  const isSudokuSolvedGrid = (grid) => (
+    grid.length === sudokuSolution.length
+    && grid.every((row, r) => row.every((cell, c) => cell && cell === sudokuSolution[r]?.[c]))
+  );
+
+  const finishSudokuIfSolved = (grid, hintsUsed = sudokuHintsUsed) => {
+    const newConflicts = checkSudokuConflicts(grid, sudokuSize);
+    setSudokuErrors(newConflicts);
+    if (!isSudokuSolvedGrid(grid) || newConflicts.length > 0) return;
+
+    const sec = Math.round((Date.now() - sudokuStartTime) / 1000);
+    let pts = 1;
+    let label = "Matig";
+    if (sudokuSize === 6) {
+      if (sec <= 120) { pts = 3; label = "Goed"; }
+      else if (sec <= 240) { pts = 2; label = "Gemiddeld"; }
+    } else {
+      if (sec <= 300) { pts = 3; label = "Goed"; }
+      else if (sec <= 480) { pts = 2; label = "Gemiddeld"; }
+    }
+    const finalPts = Math.max(0, pts - hintsUsed);
+    const hintText = hintsUsed > 0 ? ` Hint gebruikt: -${hintsUsed} ster${hintsUsed === 1 ? '' : 'ren'}.` : '';
+    const statsStr = `${sudokuSize === 6 ? "Mickey Sudoku (6x6)" : "Kasteel Sudoku (9x9)"} gekraakt in ${Math.floor(sec / 60)}m ${sec % 60}s. Beoordeling: ${label}. Score: ${finalPts} ster${finalPts === 1 ? '' : 'ren'}.${hintText}`;
+    setSudokuSolved(true);
+    setSudokuSolvedStats(statsStr);
+    addPlayerScore('solo', localPlayer, finalPts, statsStr, 'knowledge');
+  };
+
+  const handleSudokuHint = () => {
+    if (sudokuSolved) return;
+    const emptyCells = [];
+    sudokuGrid.forEach((row, r) => row.forEach((cell, c) => {
+      if (!sudokuClues[r]?.[c] && cell !== sudokuSolution[r]?.[c]) {
+        emptyCells.push({ r, c });
+      }
+    }));
+    if (!emptyCells.length) return;
+
+    const selected = sudokuSelectedCell
+      && !sudokuClues[sudokuSelectedCell.row]?.[sudokuSelectedCell.col]
+      && sudokuGrid[sudokuSelectedCell.row]?.[sudokuSelectedCell.col] !== sudokuSolution[sudokuSelectedCell.row]?.[sudokuSelectedCell.col]
+      ? { r: sudokuSelectedCell.row, c: sudokuSelectedCell.col }
+      : emptyCells[0];
+
+    const nextGrid = sudokuGrid.map(row => [...row]);
+    const nextClues = sudokuClues.map(row => [...row]);
+    nextGrid[selected.r][selected.c] = sudokuSolution[selected.r][selected.c];
+    nextClues[selected.r][selected.c] = true;
+    const nextHintsUsed = sudokuHintsUsed + 1;
+    setSudokuGrid(nextGrid);
+    setSudokuClues(nextClues);
+    setSudokuSelectedCell(null);
+    setSudokuHintsUsed(nextHintsUsed);
+    finishSudokuIfSolved(nextGrid, nextHintsUsed);
+  };
+
+  const getTouchDistance = (touches) => {
+    const [a, b] = touches;
+    return Math.hypot(a.clientX - b.clientX, a.clientY - b.clientY);
+  };
+
+  const handleSudokuTouchStart = (e) => {
+    if (e.touches.length === 2) {
+      sudokuPinchRef.current = {
+        distance: getTouchDistance(e.touches),
+        zoom: sudokuZoom
+      };
+    }
+  };
+
+  const handleSudokuTouchMove = (e) => {
+    if (e.touches.length !== 2 || !sudokuPinchRef.current) return;
+    e.preventDefault();
+    const nextZoom = sudokuPinchRef.current.zoom * (getTouchDistance(e.touches) / sudokuPinchRef.current.distance);
+    setSudokuZoom(Math.min(2.4, Math.max(0.9, nextZoom)));
   };
 
   const getCollectorKey = (name) => norm(name || 'speler') || 'speler';
@@ -798,7 +955,7 @@ export default function App() {
     }
 
     const newEntry = {
-      category: currentTask.type === 'arcade-game' ? 'arena' : 'quest-solo',
+      category: currentTask.type === 'arcade-game' || room?.game_mode?.startsWith('arcade-') ? 'arena' : 'quest-solo',
       gameType: gameName,
       date: new Date().toISOString(),
       score: points,
@@ -818,7 +975,7 @@ export default function App() {
     const text = `${item?.gameType || ''} ${item?.details || ''}`;
     return item?.category === 'arena'
       || item?.gameType === 'Duel Arena'
-      || /Othello|Dots|Color Lines|Marble|Pirates|Plank|Yahtzee|Qwixx|verhuren/i.test(text);
+      || /Othello|Dots|Color Lines|Marble|Pirates|Plank|Yahtzee|Qwixx|Mastermind|Sudoku|verhuren/i.test(text);
   };
 
   const updateRoomState = async (roomId, updates) => {
@@ -902,6 +1059,36 @@ export default function App() {
     localStorage.setItem('disney_player_name', name);
     localStorage.setItem('disney_ai_level', aiLevel);
     const p = { id: 'solo-player', name, score: 0 };
+
+    if (gameId === 'mastermind' || gameId === 'sudoku6' || gameId === 'sudoku9') {
+      const isSudoku = gameId.startsWith('sudoku');
+      const size = gameId === 'sudoku9' ? 9 : 6;
+      const taskId = isSudoku
+        ? 'solo-sudoku'
+        : (DEFAULT_TASKS.find(t => t.type === 'mastermind')?.id || 'mastermind-01');
+
+      if (isSudoku) generateSudoku(size);
+
+      setLocalPlayer(p);
+      setPlayers([p]);
+      setRoom({
+        id: 'solo',
+        status: 'playing',
+        game_mode: 'arcade-' + gameId,
+        current_task_id: taskId,
+        current_player_index: 0,
+        current_task_state: {
+          usedTasks: isSudoku ? [] : [taskId],
+          taskHistory: [],
+          codeLength: 5,
+          enabledCategories: [isSudoku ? `Disney Sudoku ${size}x${size}` : 'Disney Mastermind'],
+          sudokuSize: size
+        }
+      });
+      soloLoggedRef.current = false;
+      setScreen('game');
+      return;
+    }
     
     setLocalPlayer(p);
     setPlayers([p]);
@@ -1322,7 +1509,7 @@ export default function App() {
   const selectNextTask = async (currentRoom, currentPlayers, forcePersonal = false) => {
     const usedTasks = currentRoom.current_task_state?.usedTasks || [];
     const taskHistory = currentRoom.current_task_state?.taskHistory || [];
-    const enabledCats = currentRoom.current_task_state?.enabledCategories || ["Disney Dagboek", "Pictionary", "Inschattingsvragen", "Dilemma", "Emoji Quiz", "Wie ben ik?", "Disney Mastermind", "Feit of Fabel", "Quiz", "Samen"];
+    const enabledCats = currentRoom.current_task_state?.enabledCategories || ["Disney Dagboek", "Pictionary", "Inschattingsvragen", "Dilemma", "Emoji Quiz", "Wie ben ik?", "Feit of Fabel", "Quiz", "Samen"];
 
     const activeTasks = DEFAULT_TASKS.filter(t => 
       t.active !== false && 
@@ -3123,7 +3310,7 @@ export default function App() {
                     <div className="portal-card-media portal-glow-duel">
                       <img src={assetPath("portal/kasteel.png")} onLoad={removeBg} className="portal-media-img" alt="Disney Castle" />
                     </div>
-                    <span className="portal-card-badge arcade">7 Spellen</span>
+                    <span className="portal-card-badge arcade">10 Spellen</span>
                   </div>
                   <div className="portal-card-body">
                     <h3>Disney Duel Arena</h3>
@@ -3395,7 +3582,10 @@ export default function App() {
                         abalone: "Marble Push (Abalone)",
                         piratesplank: "Pirates' Plank",
                         yahtzee: "Disney Yahtzee",
-                        qwixx: "Disney Qwixx"
+                        qwixx: "Disney Qwixx",
+                        mastermind: "Disney Mastermind",
+                        sudoku6: "Mickey Sudoku (6x6)",
+                        sudoku9: "Kasteel Sudoku (9x9)"
                       }[selectedArcadeGame]
                     }</strong>
                   </p>
@@ -3407,7 +3597,7 @@ export default function App() {
                         : 'Dit spel is ontworpen voor 2 spelers.'}
                   </p>
 
-                  {selectedArcadeGame === 'colorlines' ? (
+                  {getArenaGame(selectedArcadeGame)?.maxPlayers === 1 ? (
                     <button
                       className="btn primary full"
                       onClick={() => handleStartArcadeSolo(selectedArcadeGame)}
@@ -3433,7 +3623,7 @@ export default function App() {
 
                       {arcadePlayMode === 'solo' && (
                         <div className="animate-fade-in">
-                          {selectedArcadeGame !== 'colorlines' && (
+                          {getArenaGame(selectedArcadeGame)?.maxPlayers !== 1 && (
                             <div style={{ background: '#07152c', border: '1px solid var(--line)', borderRadius: '12px', padding: '12px', marginBottom: '12px' }}>
                               <label style={{ display: 'block', marginBottom: '8px', fontSize: '13px', fontWeight: 'bold', color: 'var(--gold)' }}>AI-niveau tegenstander</label>
                               <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '8px' }}>
@@ -3703,9 +3893,9 @@ export default function App() {
                 <button 
                   className="btn primary" 
                   style={{ background: 'var(--gold)', color: '#000', width: '100%', marginTop: '12px' }} 
-                  onClick={() => setScreen('solo_select')}
+                  onClick={() => setScreen('arcade_select')}
                 >
-                  Quest Solo (Mastermind & Sudoku)
+                  Solo puzzels in Duel Arena
                 </button>
                 <button 
                   className="btn secondary" 
@@ -3741,7 +3931,7 @@ export default function App() {
               <section className="card">
                 <h2 className="sectiontitle">1. Kies de spelonderdelen</h2>
                 <div className="category-grid">
-                  {["Disney Dagboek", "Pictionary", "Inschattingsvragen", "Dilemma", "Emoji Quiz", "Wie ben ik?", "Disney Mastermind", "Feit of Fabel", "Quiz", "Samen"].map(cat => {
+                  {["Disney Dagboek", "Pictionary", "Inschattingsvragen", "Dilemma", "Emoji Quiz", "Wie ben ik?", "Feit of Fabel", "Quiz", "Samen"].map(cat => {
                     const checked = selectedCats.includes(cat);
                     return (
                       <label key={cat} className={`category-item ${checked ? 'checked' : ''}`}>
@@ -3974,6 +4164,8 @@ export default function App() {
                                   if (room.id === 'solo') {
                                     logSoloAttempt(score, detail);
                                     soloLoggedRef.current = true;
+                                  } else if (score > 0) {
+                                    awardStarsToCollector(activeProfileName || localPlayer?.name || playerNameInput, Math.max(1, Math.ceil(score / 2)));
                                   }
                                   handleFinishTask();
                                 }}
@@ -4001,21 +4193,51 @@ export default function App() {
                                   <div>
                                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '10px', fontSize: '13px', color: 'var(--muted)' }}>
                                       <span>Tijd verstreken: {Math.floor((Date.now() - sudokuStartTime) / 1000)}s</span>
-                                      <span>Geen fouten maken voor bonussterren!</span>
+                                      <span>Hints gebruikt: {sudokuHintsUsed} (-{sudokuHintsUsed} ster{sudokuHintsUsed === 1 ? '' : 'ren'})</span>
+                                    </div>
+
+                                    <div style={{ display: 'grid', gridTemplateColumns: '1fr auto auto auto', gap: '8px', alignItems: 'center', marginBottom: '10px' }}>
+                                      <button className="btn secondary mini" onClick={handleSudokuHint}>
+                                        Hint (-1 ster)
+                                      </button>
+                                      <button className="btn secondary mini" onClick={() => setSudokuZoom(z => Math.max(0.9, +(z - 0.15).toFixed(2)))}>
+                                        -
+                                      </button>
+                                      <span style={{ color: 'var(--muted)', fontSize: '12px', minWidth: '44px', textAlign: 'center' }}>{Math.round(sudokuZoom * 100)}%</span>
+                                      <button className="btn secondary mini" onClick={() => setSudokuZoom(z => Math.min(2.4, +(z + 0.15).toFixed(2)))}>
+                                        +
+                                      </button>
                                     </div>
 
                                     {/* The Sudoku Grid */}
+                                    <div
+                                      onTouchStart={handleSudokuTouchStart}
+                                      onTouchMove={handleSudokuTouchMove}
+                                      onTouchEnd={() => { sudokuPinchRef.current = null; }}
+                                      style={{
+                                        width: '100%',
+                                        maxWidth: 'min(94vw, 760px)',
+                                        maxHeight: 'min(76vh, 760px)',
+                                        overflow: 'auto',
+                                        margin: '10px auto',
+                                        padding: '6px',
+                                        touchAction: 'none',
+                                        WebkitOverflowScrolling: 'touch'
+                                      }}
+                                    >
                                     <div 
                                       style={{ 
                                         display: 'grid', 
                                         gridTemplateColumns: `repeat(${sudokuSize}, 1fr)`, 
                                         gap: '4px', 
-                                        maxWidth: '360px', 
-                                        margin: '10px auto', 
+                                        width: sudokuSize === 6 ? 'min(92vw, 560px)' : 'min(94vw, 720px)',
+                                        margin: '0 auto', 
                                         background: '#041026', 
                                         padding: '8px', 
                                         borderRadius: '16px', 
-                                        border: '2px solid var(--line)' 
+                                        border: '2px solid var(--line)',
+                                        transform: `scale(${sudokuZoom})`,
+                                        transformOrigin: 'top center'
                                       }}
                                     >
                                       {sudokuGrid.map((row, rIdx) => 
@@ -4037,7 +4259,7 @@ export default function App() {
                                                 display: 'flex',
                                                 alignItems: 'center',
                                                 justifyContent: 'center',
-                                                fontSize: sudokuSize === 6 ? '24px' : '18px',
+                                                fontSize: sudokuSize === 6 ? '34px' : '26px',
                                                 borderRadius: '8px',
                                                 cursor: isClue ? 'not-allowed' : 'pointer',
                                                 userSelect: 'none',
@@ -4068,6 +4290,7 @@ export default function App() {
                                         })
                                       )}
                                     </div>
+                                    </div>
 
                                     {/* Palette selector */}
                                     <div style={{ marginTop: '20px' }}>
@@ -4095,33 +4318,13 @@ export default function App() {
                                             onClick={() => {
                                               if (!sudokuSelectedCell) return;
                                               const { row, col } = sudokuSelectedCell;
-                                              const newGrid = [...sudokuGrid];
+                                              const newGrid = sudokuGrid.map(gridRow => [...gridRow]);
                                               newGrid[row][col] = emoji;
                                               setSudokuGrid(newGrid);
 
                                               const newConflicts = checkSudokuConflicts(newGrid, sudokuSize);
                                               setSudokuErrors(newConflicts);
-
-                                              // Check completion
-                                              const isFilled = newGrid.every(r => r.every(c => c !== null));
-                                              if (isFilled && newConflicts.length === 0) {
-                                                const sec = Math.round((Date.now() - sudokuStartTime) / 1000);
-                                                let pts = 1;
-                                                let label = "Matig";
-                                                if (sudokuSize === 6) {
-                                                  if (sec <= 120) { pts = 3; label = "Goed"; }
-                                                  else if (sec <= 240) { pts = 2; label = "Gemiddeld"; }
-                                                } else {
-                                                  if (sec <= 300) { pts = 3; label = "Goed"; }
-                                                  else if (sec <= 480) { pts = 2; label = "Gemiddeld"; }
-                                                }
-                                                const statsStr = `${sudokuSize === 6 ? "Mickey Sudoku (6x6)" : "Kasteel Sudoku (9x9)"} gekraakt in ${Math.floor(sec / 60)}m ${sec % 60}s. Beoordeling: ${label}`;
-                                                setSudokuSolved(true);
-                                                setSudokuSolvedStats(statsStr);
-
-                                                // Award score
-                                                addPlayerScore('solo', localPlayer, pts, statsStr, 'knowledge');
-                                              }
+                                              finishSudokuIfSolved(newGrid, sudokuHintsUsed);
                                             }}
                                             style={{
                                               width: '44px',
@@ -4148,7 +4351,7 @@ export default function App() {
                                           onClick={() => {
                                             if (!sudokuSelectedCell) return;
                                             const { row, col } = sudokuSelectedCell;
-                                            const newGrid = [...sudokuGrid];
+                                            const newGrid = sudokuGrid.map(gridRow => [...gridRow]);
                                             newGrid[row][col] = null;
                                             setSudokuGrid(newGrid);
 
