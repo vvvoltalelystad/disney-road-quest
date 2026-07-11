@@ -848,7 +848,7 @@ export function ColorLinesGame({ onFinish }) {
     if (score >= 40) { pts = 3; rating = "Goed"; }
     else if (score >= 20) { pts = 2; rating = "Gemiddeld"; }
     
-    onFinish(pts, `Color Lines score: ${score} (${rating})`);
+    onFinish(pts, `Inside Out Kleurenchaos score: ${score} (${rating})`);
   };
 
   return (
@@ -1905,7 +1905,7 @@ export function AbaloneGame({ mode, room, localPlayer, players, updateRoomState,
   const handleEndGame = () => {
     const won = (myIndex === 0 && p2Out >= 6) || (myIndex === 1 && p1Out >= 6);
     const pts = won ? 3 : 1;
-    const details = won ? "Marble Push gewonnen!" : "Marble Push verloren";
+    const details = won ? "Hercules' Olympus Push gewonnen!" : "Hercules' Olympus Push verloren";
     onFinish(pts, details);
   };
 
@@ -2421,10 +2421,10 @@ export function DisneyYahtzeeGame({ mode, room, localPlayer, players, updateRoom
     const tie = myTotal === otherTotal;
     const points = won ? 3 : tie ? 2 : 1;
     const detail = won
-      ? `Disney Yahtzee gewonnen: ${myTotal}-${otherTotal}`
+      ? `Goofy's Geluksworp gewonnen: ${myTotal}-${otherTotal}`
       : tie
-        ? `Disney Yahtzee gelijkspel: ${myTotal}-${otherTotal}`
-        : `Disney Yahtzee verloren: ${myTotal}-${otherTotal}`;
+        ? `Goofy's Geluksworp gelijkspel: ${myTotal}-${otherTotal}`
+        : `Goofy's Geluksworp verloren: ${myTotal}-${otherTotal}`;
     onFinish(points, detail);
   };
 
@@ -2861,10 +2861,10 @@ export function DisneyQwixxGame({ mode, room, localPlayer, players, updateRoomSt
     const tie = myTotal === otherTotal;
     const points = won ? 3 : tie ? 2 : 1;
     const detail = won
-      ? `Disney Qwixx gewonnen: ${myTotal}-${otherTotal}`
+      ? `Mickey's Racekaart gewonnen: ${myTotal}-${otherTotal}`
       : tie
-        ? `Disney Qwixx gelijkspel: ${myTotal}-${otherTotal}`
-        : `Disney Qwixx verloren: ${myTotal}-${otherTotal}`;
+        ? `Mickey's Racekaart gelijkspel: ${myTotal}-${otherTotal}`
+        : `Mickey's Racekaart verloren: ${myTotal}-${otherTotal}`;
     onFinish(points, detail);
   };
 
@@ -3560,8 +3560,8 @@ export function DisneyKeerOpKeerGame({ mode, room, localPlayer, players, updateR
 
 const MINI_GAME_RULES = {
   othello: {
-    title: "Othello / Reversi",
-    intro: "Leg fiches op het bord en sluit fiches van de tegenstander in.",
+    title: "Ursula's Spiegelstrijd",
+    intro: "Origineel: Othello / Reversi. Leg fiches op het bord en sluit fiches van de tegenstander in.",
     rules: [
       "Blauw begint.",
       "Je mag alleen plaatsen op een vakje waarmee je minstens een fiche van de tegenstander insluit.",
@@ -3573,8 +3573,8 @@ const MINI_GAME_RULES = {
     duel: "Duel: speler 1 is blauw, speler 2 is rood. Beurten worden realtime gesynchroniseerd."
   },
   dotsboxes: {
-    title: "Dots & Boxes",
-    intro: "Trek lijnen tussen punten en probeer de meeste vakjes te claimen.",
+    title: "Rapunzel's Torenkamers",
+    intro: "Origineel: Dots & Boxes. Trek lijnen tussen punten en probeer de meeste vakjes te claimen.",
     rules: [
       "Tik op een stippellijn om die lijn te trekken.",
       "Maak je de vierde zijde van een vakje af, dan claim je dat vakje.",
@@ -3586,8 +3586,8 @@ const MINI_GAME_RULES = {
     duel: "Duel: elke getrokken lijn en elk geclaimd vakje verschijnt realtime bij de ander."
   },
   colorlines: {
-    title: "Color Lines",
-    intro: "Maak lijnen van vijf dezelfde bollen voordat het bord volloopt.",
+    title: "Inside Out Kleurenchaos",
+    intro: "Origineel: Color Lines. Maak lijnen van vijf dezelfde bollen voordat het bord volloopt.",
     rules: [
       "Tik eerst een bol aan en tik daarna op een leeg vakje om hem te verplaatsen.",
       "Een bol kan alleen bewegen als er een vrij pad naar het doelvakje is.",
@@ -3624,8 +3624,8 @@ const MINI_GAME_RULES = {
     duel: "Duel: alle steenposities en botsingen worden realtime gesynchroniseerd."
   },
   abalone: {
-    title: "Marble Push (Abalone)",
-    intro: "Verplaats bollen op het hex-bord en duw bollen van de tegenstander eruit.",
+    title: "Hercules' Olympus Push",
+    intro: "Origineel: Marble Push / Abalone. Verplaats bollen op het hex-bord en duw bollen van de tegenstander eruit.",
     rules: [
       "Tik op een eigen bol om die te selecteren.",
       "Tik daarna op een aangrenzend vakje om te bewegen.",
@@ -3638,7 +3638,7 @@ const MINI_GAME_RULES = {
   },
   piratesplank: {
     title: "Pirates' Plank",
-    intro: "Raad het Disney-woord voordat de piraat van de plank loopt.",
+    intro: "Origineel: Galgje. Raad het Disney-woord voordat de piraat van de plank loopt.",
     rules: [
       "Gebruik de hint om het verborgen Disney/Pixar woord te raden.",
       "Kies per beurt een letter.",
@@ -3650,8 +3650,8 @@ const MINI_GAME_RULES = {
     duel: "Duel: spelers raden om de beurt. Een goede letter geeft nog een beurt; de speler die het woord afmaakt wint."
   },
   yahtzee: {
-    title: "Disney Yahtzee",
-    intro: "Gooi vijf dobbelstenen en vul slim je scorekaart.",
+    title: "Goofy's Geluksworp",
+    intro: "Origineel: Yahtzee. Gooi vijf dobbelstenen en vul slim je scorekaart.",
     rules: [
       "Je mag per beurt maximaal drie keer gooien.",
       "Na je eerste worp kun je dobbelstenen vasthouden door erop te tikken.",
@@ -3663,8 +3663,8 @@ const MINI_GAME_RULES = {
     duel: "Duel: spelers gooien om de beurt en vullen samen realtime de scorekaart."
   },
   qwixx: {
-    title: "Disney Qwixx",
-    intro: "Streep getallen af in gekleurde Disney-rijen en pak zoveel mogelijk punten.",
+    title: "Mickey's Racekaart",
+    intro: "Origineel: Qwixx. Streep getallen af in gekleurde Disney-rijen en pak zoveel mogelijk punten.",
     rules: [
       "Gooi twee witte en vier gekleurde dobbelstenen.",
       "Je mag alleen getallen afstrepen die verder naar rechts staan dan je eerdere kruisjes in die rij.",
@@ -3830,30 +3830,6 @@ export function MiniGameRenderer({ gameId, mode, room, localPlayer, players, upd
         />
       );
       break;
-    case 'ricochet':
-      gameView = (
-        <RicochetShotGame
-          mode={mode}
-          room={room}
-          localPlayer={localPlayer}
-          players={players}
-          updateRoomState={safeUpdateRoomState}
-          onFinish={onFinish}
-        />
-      );
-      break;
-    case 'curling':
-      gameView = (
-        <CurlingGame
-          mode={mode}
-          room={room}
-          localPlayer={localPlayer}
-          players={players}
-          updateRoomState={safeUpdateRoomState}
-          onFinish={onFinish}
-        />
-      );
-      break;
     case 'abalone':
       gameView = (
         <AbaloneGame
@@ -3893,18 +3869,6 @@ export function MiniGameRenderer({ gameId, mode, room, localPlayer, players, upd
     case 'qwixx':
       gameView = (
         <DisneyQwixxGame
-          mode={mode}
-          room={room}
-          localPlayer={localPlayer}
-          players={players}
-          updateRoomState={safeUpdateRoomState}
-          onFinish={onFinish}
-        />
-      );
-      break;
-    case 'keeropkeer':
-      gameView = (
-        <DisneyKeerOpKeerGame
           mode={mode}
           room={room}
           localPlayer={localPlayer}

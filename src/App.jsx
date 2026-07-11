@@ -57,16 +57,16 @@ const POWER_CARDS = {
 };
 
 const ARENA_GAMES = [
-  { id: 'othello', name: "Othello / Reversi", icon: "\u26AA", desc: "Verover het bord door vijandelijke fiches in te sluiten.", maxPlayers: 2 },
-  { id: 'dotsboxes', name: "Dots & Boxes", icon: "\u270F\uFE0F", desc: "Trek lijntjes en claim de meeste kamertjes.", maxPlayers: 4 },
-  { id: 'colorlines', name: "Color Lines", icon: "\u{1F534}", desc: "Solo puzzel: maak rijen van 5 gelijke bollen.", maxPlayers: 1 },
-  { id: 'abalone', name: "Marble Push (Abalone)", icon: "\u{1F41C}", desc: "Duw de bollen van de tegenstander uit het hex-raster.", maxPlayers: 2 },
-  { id: 'piratesplank', name: "Pirates' Plank", icon: "\u2620\uFE0F", desc: "Raad Disney-woorden voordat de piraat van de plank loopt.", maxPlayers: 4 },
-  { id: 'yahtzee', name: "Disney Yahtzee", icon: "\u{1F3B2}", desc: "Gooi, houd dobbelstenen vast en vul je magische scorekaart.", maxPlayers: 2 },
-  { id: 'qwixx', name: "Disney Qwixx", icon: "\u270F\uFE0F", desc: "Streep gekleurde rijen af en ontwijk strafvakjes.", maxPlayers: 2 },
-  { id: 'mastermind', name: "Disney Mastermind", icon: "\u{1F9E0}", desc: "Solo puzzel: kraak de geheime Disney-kleurcode.", maxPlayers: 1 },
-  { id: 'sudoku6', name: "Mickey Sudoku (6x6)", icon: "\u2728", desc: "Solo puzzel: uniek 6x6 Sudoku-raster met Disney-symbolen.", maxPlayers: 1 },
-  { id: 'sudoku9', name: "Kasteel Sudoku (9x9)", icon: "\u{1F3F0}", desc: "Solo puzzel: klassiek 9x9 Sudoku-raster met Disney-symbolen.", maxPlayers: 1 }
+  { id: 'othello', name: "Ursula's Spiegelstrijd", icon: "\u26AA", desc: "Origineel: Othello / Reversi. Verover het bord door vijandelijke fiches in te sluiten.", maxPlayers: 2 },
+  { id: 'dotsboxes', name: "Rapunzel's Torenkamers", icon: "\u270F\uFE0F", desc: "Origineel: Dots & Boxes. Trek lijntjes en claim de meeste kamertjes.", maxPlayers: 4 },
+  { id: 'colorlines', name: "Inside Out Kleurenchaos", icon: "\u{1F534}", desc: "Origineel: Color Lines. Solo puzzel: maak rijen van 5 gelijke bollen.", maxPlayers: 1 },
+  { id: 'abalone', name: "Hercules' Olympus Push", icon: "\u{1F41C}", desc: "Origineel: Marble Push / Abalone. Duw de bollen van de tegenstander uit het hex-raster.", maxPlayers: 2 },
+  { id: 'piratesplank', name: "Pirates' Plank", icon: "\u2620\uFE0F", desc: "Origineel: Galgje. Raad Disney-woorden voordat de piraat van de plank loopt.", maxPlayers: 4 },
+  { id: 'yahtzee', name: "Goofy's Geluksworp", icon: "\u{1F3B2}", desc: "Origineel: Yahtzee. Gooi, houd dobbelstenen vast en vul je magische scorekaart.", maxPlayers: 2 },
+  { id: 'qwixx', name: "Mickey's Racekaart", icon: "\u270F\uFE0F", desc: "Origineel: Qwixx. Streep gekleurde rijen af en ontwijk strafvakjes.", maxPlayers: 2 },
+  { id: 'mastermind', name: "Yzma's Geheime Code", icon: "\u{1F9E0}", desc: "Origineel: Mastermind. Solo puzzel: kraak de geheime Disney-kleurcode.", maxPlayers: 1 },
+  { id: 'sudoku6', name: "Tinker Bell Sudoku", icon: "\u2728", desc: "Origineel: Sudoku 6x6. Solo puzzel met Disney-symbolen.", maxPlayers: 1 },
+  { id: 'sudoku9', name: "Kasteel Sudoku", icon: "\u{1F3F0}", desc: "Origineel: Sudoku 9x9. Klassiek raster met Disney-symbolen.", maxPlayers: 1 }
 ];
 
 const getArenaGame = (gameId) => ARENA_GAMES.find(game => game.id === gameId);
@@ -437,7 +437,7 @@ export default function App() {
 
   const [localPlayer, setLocalPlayer] = useState(null);
   const [roomCodeInput, setRoomCodeInput] = useState('');
-  const [activeProfileName, setActiveProfileName] = useState(() => localStorage.getItem(ACTIVE_PROFILE_KEY) || '');
+  const [activeProfileName, setActiveProfileName] = useState('');
   const [playerNameInput, setPlayerNameInput] = useState(() => localStorage.getItem(ACTIVE_PROFILE_KEY) || localStorage.getItem('disney_player_name') || '');
 
   const [setupMode, setSetupMode] = useState('mix');
@@ -680,7 +680,7 @@ export default function App() {
     }
     const finalPts = Math.max(0, pts - hintsUsed);
     const hintText = hintsUsed > 0 ? ` Hint gebruikt: -${hintsUsed} ster${hintsUsed === 1 ? '' : 'ren'}.` : '';
-    const statsStr = `${sudokuSize === 6 ? "Mickey Sudoku (6x6)" : "Kasteel Sudoku (9x9)"} gekraakt in ${Math.floor(sec / 60)}m ${sec % 60}s. Beoordeling: ${label}. Score: ${finalPts} ster${finalPts === 1 ? '' : 'ren'}.${hintText}`;
+    const statsStr = `${sudokuSize === 6 ? "Tinker Bell Sudoku" : "Kasteel Sudoku"} gekraakt in ${Math.floor(sec / 60)}m ${sec % 60}s. Beoordeling: ${label}. Score: ${finalPts} ster${finalPts === 1 ? '' : 'ren'}.${hintText}`;
     setSudokuSolved(true);
     setSudokuSolvedStats(statsStr);
     addPlayerScore('solo', localPlayer, finalPts, statsStr, 'knowledge');
@@ -1014,10 +1014,12 @@ export default function App() {
   const handleStartSoloGame = (category) => {
     let taskId;
     let size = 6;
-    if (category.startsWith('Disney Sudoku')) {
+    if (category.startsWith('Disney Sudoku') || category === "Tinker Bell Sudoku" || category === "Kasteel Sudoku") {
       taskId = 'solo-sudoku';
-      size = category.endsWith('6x6') ? 6 : 9;
+      size = category.endsWith('6x6') || category === "Tinker Bell Sudoku" ? 6 : 9;
       generateSudoku(size);
+    } else if (category === "Yzma's Geheime Code") {
+      taskId = DEFAULT_TASKS.find(t => t.type === 'mastermind')?.id || 'mastermind-01';
     } else if (category === 'Quiz') {
       taskId = 'quiz-choice';
     } else {
@@ -1081,7 +1083,7 @@ export default function App() {
           usedTasks: isSudoku ? [] : [taskId],
           taskHistory: [],
           codeLength: 5,
-          enabledCategories: [isSudoku ? `Disney Sudoku ${size}x${size}` : 'Disney Mastermind'],
+          enabledCategories: [isSudoku ? (size === 6 ? "Tinker Bell Sudoku" : "Kasteel Sudoku") : "Yzma's Geheime Code"],
           sudokuSize: size
         }
       });
@@ -1436,8 +1438,18 @@ export default function App() {
     if (room.current_task_id === 'solo-sudoku') {
       return { 
         id: "solo-sudoku", 
-        cat: room.current_task_state?.sudokuSize === 6 ? "Mickey Sudoku (6x6)" : "Kasteel Sudoku (9x9)", 
+        cat: room.current_task_state?.sudokuSize === 6 ? "Tinker Bell Sudoku" : "Kasteel Sudoku", 
         type: "sudoku" 
+      };
+    }
+    if (room.game_mode === 'arcade-mastermind') {
+      const task = DEFAULT_TASKS.find(t => t.id === room.current_task_id) || {};
+      return {
+        ...task,
+        id: room.current_task_id,
+        cat: "Yzma's Geheime Code",
+        type: "mastermind",
+        title: "Yzma's Geheime Code"
       };
     }
     if (room.current_task_id?.startsWith('solo-arcade-') || room.current_task_id?.startsWith('duel-arcade-')) {
@@ -1446,13 +1458,16 @@ export default function App() {
         ? room.current_task_id.replace('solo-arcade-', '') 
         : room.current_task_id.replace('duel-arcade-', '');
       const titles = {
-        othello: "Othello / Reversi",
-        dotsboxes: "Dots & Boxes",
-        colorlines: "Color Lines",
-        abalone: "Marble Push (Abalone)",
+        othello: "Ursula's Spiegelstrijd",
+        dotsboxes: "Rapunzel's Torenkamers",
+        colorlines: "Inside Out Kleurenchaos",
+        abalone: "Hercules' Olympus Push",
         piratesplank: "Pirates' Plank",
-        yahtzee: "Disney Yahtzee",
-        qwixx: "Disney Qwixx"
+        yahtzee: "Goofy's Geluksworp",
+        qwixx: "Mickey's Racekaart",
+        mastermind: "Yzma's Geheime Code",
+        sudoku6: "Tinker Bell Sudoku",
+        sudoku9: "Kasteel Sudoku"
       };
       return {
         id: room.current_task_id,
@@ -3284,7 +3299,7 @@ export default function App() {
                   </div>
                 </div>
 
-                {/* Game 2: Disney Music Quiz */}
+                {/* Game 2: Mickey's Music Match */}
                 <a 
                   href={room?.code ? `./music/index.html?room=${room.code}` : "./music/index.html"} 
                   className="portal-card music-quiz-card"
@@ -3296,7 +3311,8 @@ export default function App() {
                     <span className="portal-card-badge music">Hitster Editie</span>
                   </div>
                   <div className="portal-card-body">
-                    <h3>Disney Music Quiz</h3>
+                    <h3>Mickey's Music Match</h3>
+                    <p style={{ color: 'var(--gold)', fontSize: '12px', marginTop: '-4px' }}>Origineel: Disney Music Quiz</p>
                     <p>Dé interactieve muziekquiz met 150 betoverende Disney en Pixar songs. Scan scancodes met Spotify, raad de film, het jaartal of de uitvoerder en verover de troon!</p>
                   </div>
                   <div className="portal-card-footer">
@@ -3576,16 +3592,16 @@ export default function App() {
                   <p style={{ fontSize: '13px', color: 'var(--muted)', marginBottom: '15px' }}>
                     Geselecteerd spel: <strong>{
                       {
-                        othello: "Othello / Reversi",
-                        dotsboxes: "Dots & Boxes",
-                        colorlines: "Color Lines",
-                        abalone: "Marble Push (Abalone)",
+                        othello: "Ursula's Spiegelstrijd",
+                        dotsboxes: "Rapunzel's Torenkamers",
+                        colorlines: "Inside Out Kleurenchaos",
+                        abalone: "Hercules' Olympus Push",
                         piratesplank: "Pirates' Plank",
-                        yahtzee: "Disney Yahtzee",
-                        qwixx: "Disney Qwixx",
-                        mastermind: "Disney Mastermind",
-                        sudoku6: "Mickey Sudoku (6x6)",
-                        sudoku9: "Kasteel Sudoku (9x9)"
+                        yahtzee: "Goofy's Geluksworp",
+                        qwixx: "Mickey's Racekaart",
+                        mastermind: "Yzma's Geheime Code",
+                        sudoku6: "Tinker Bell Sudoku",
+                        sudoku9: "Kasteel Sudoku"
                       }[selectedArcadeGame]
                     }</strong>
                   </p>
@@ -3752,9 +3768,9 @@ export default function App() {
                 <h2 className="sectiontitle">🎮 Kies een Speltype</h2>
                 <div style={{ display: 'grid', gridTemplateColumns: 'repeat(1, 1fr)', gap: '12px', marginTop: '14px' }}>
                   {[
-                    { cat: "Disney Mastermind", icon: "🧠", name: "Disney Mastermind", desc: "Kleurcode kraken (4, 5 of 6 stippen)", active: true },
-                    { cat: "Disney Sudoku 6x6", icon: "✨", name: "Mickey Sudoku (6x6)", desc: "Mickey-oren grid met 6 symbolen. Makkelijk.", active: true },
-                    { cat: "Disney Sudoku 9x9", icon: "🏰", name: "Kasteel Sudoku (9x9)", desc: "Klassiek Sudoku raster met 9 symbolen. Uitdagend.", active: true },
+                    { cat: "Yzma's Geheime Code", icon: "🧠", name: "Yzma's Geheime Code", desc: "Origineel: Mastermind. Kleurcode kraken (4, 5 of 6 stippen)", active: true },
+                    { cat: "Tinker Bell Sudoku", icon: "✨", name: "Tinker Bell Sudoku", desc: "Origineel: Sudoku 6x6. Makkelijker raster met 6 symbolen.", active: true },
+                    { cat: "Kasteel Sudoku", icon: "🏰", name: "Kasteel Sudoku", desc: "Origineel: Sudoku 9x9. Klassiek raster met 9 symbolen.", active: true },
                     { cat: "Disney Dagboek", icon: "📔", name: "Disney Dagboek (Geheim)", desc: "Binnenkort beschikbaar", active: false }
                   ].map(game => (
                     <button
@@ -4106,7 +4122,7 @@ export default function App() {
 
                   <div className="routecaption">
                     {room.id === 'solo' 
-                      ? (room.game_mode?.startsWith('arcade-') ? `Solo Spel · Duel Arena` : "Solo Spel · Disney Mastermind")
+                      ? (room.game_mode?.startsWith('arcade-') ? `Solo Spel · Duel Arena` : `Solo Spel · ${getCurrentTask()?.cat || "Quest Solo"}`)
                       : (
                         <span>
                           Kamer: <span style={{ fontFamily: 'Outfit, Inter, sans-serif', fontWeight: 'bold' }}>{room.code}</span> · Mode: {room.game_mode?.startsWith('arcade-') ? "Duel Arena" : GAME_MODES.find(m => m.id === room.game_mode)?.name}
