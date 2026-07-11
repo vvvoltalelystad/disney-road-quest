@@ -117,7 +117,7 @@ const assetPath = (path) => {
 };
 
 const DISNEY_SHOP_ITEMS = [
-  { id: 'mickey-sticker', name: 'Mickey Sticker', icon: '🔴', cost: 1, type: 'everyone', desc: 'Een vrolijke startbadge voor elke speler.' },
+  { id: 'mickey-sticker', name: 'Mickey Sticker', icon: '🔴', image: 'collectables/mickey-sticker.png', cost: 1, type: 'everyone', desc: 'Een vrolijke startbadge voor elke speler.' },
   { id: 'castle-pin', name: 'Kasteel Pin', icon: '🏰', cost: 1, type: 'everyone', desc: 'Voor in je Disney Collection.' },
   { id: 'pixie-dust', name: 'Tinkelstof Zakje', icon: '✨', cost: 1, type: 'everyone', desc: 'Een klein beetje magie voor onderweg.' },
   { id: 'golden-fastpass', name: 'Gouden FastPass', icon: '🎫', cost: 5, type: 'exclusive', desc: 'Exclusief: maar een speler kan deze claimen.' },
@@ -126,6 +126,20 @@ const DISNEY_SHOP_ITEMS = [
 ];
 
 const formatCocoCoins = (amount) => `${amount} Coco Coin${Number(amount) === 1 ? '' : 's'}`;
+
+const renderCollectableVisual = (item, className = '', style = {}) => {
+  if (item?.image) {
+    return (
+      <img
+        src={assetPath(item.image)}
+        alt={item.name}
+        className={className}
+        style={style}
+      />
+    );
+  }
+  return <span className={className} style={style}>{item?.icon}</span>;
+};
 
 const readJsonStorage = (key, fallback) => {
   try {
@@ -2814,7 +2828,7 @@ export default function App() {
                   ×
                 </button>
                 <div className="collection-popup-visual">
-                  <span>{selectedCollectionItem.icon}</span>
+                  {renderCollectableVisual(selectedCollectionItem, 'collection-popup-image')}
                 </div>
                 <div className="badge" style={{ alignSelf: 'center', marginBottom: '8px' }}>
                   Disney Collection
@@ -2960,7 +2974,9 @@ export default function App() {
                         return (
                           <div key={item.id} style={{ background: '#07152c', border: '1px solid var(--line)', borderRadius: '10px', padding: '10px' }}>
                             <div style={{ display: 'flex', gap: '8px', alignItems: 'center', marginBottom: '6px' }}>
-                              <span style={{ fontSize: '24px' }}>{item.icon}</span>
+                              <span className="shop-item-visual">
+                                {renderCollectableVisual(item, 'shop-item-image')}
+                              </span>
                               <div style={{ minWidth: 0 }}>
                                 <strong style={{ display: 'block', fontSize: '13px' }}>{item.name}</strong>
                                 <span style={{ color: item.type === 'exclusive' ? 'var(--gold)' : 'var(--muted)', fontSize: '10px' }}>
@@ -2998,7 +3014,7 @@ export default function App() {
                                 onClick={() => setSelectedCollectionItem(item)}
                                 style={{ background: '#10264c', color: '#fff' }}
                               >
-                                {item.icon} {item.name}
+                                {renderCollectableVisual(item, 'collection-badge-image')} {item.name}
                               </button>
                             ) : null;
                           })}
