@@ -60,12 +60,10 @@ const ARENA_GAMES = [
   { id: 'othello', name: "Othello / Reversi", icon: "\u26AA", desc: "Verover het bord door vijandelijke fiches in te sluiten.", maxPlayers: 2 },
   { id: 'dotsboxes', name: "Dots & Boxes", icon: "\u270F\uFE0F", desc: "Trek lijntjes en claim de meeste kamertjes.", maxPlayers: 4 },
   { id: 'colorlines', name: "Color Lines", icon: "\u{1F534}", desc: "Solo puzzel: maak rijen van 5 gelijke bollen.", maxPlayers: 1 },
-  { id: 'curling', name: "Curling Duel", icon: "\u{1F94C}", desc: "Glijd stenen en stoot je tegenstander uit het huis.", maxPlayers: 2 },
   { id: 'abalone', name: "Marble Push (Abalone)", icon: "\u{1F41C}", desc: "Duw de bollen van de tegenstander uit het hex-raster.", maxPlayers: 2 },
   { id: 'piratesplank', name: "Pirates' Plank", icon: "\u2620\uFE0F", desc: "Raad Disney-woorden voordat de piraat van de plank loopt.", maxPlayers: 4 },
   { id: 'yahtzee', name: "Disney Yahtzee", icon: "\u{1F3B2}", desc: "Gooi, houd dobbelstenen vast en vul je magische scorekaart.", maxPlayers: 2 },
-  { id: 'qwixx', name: "Disney Qwixx", icon: "\u270F\uFE0F", desc: "Streep gekleurde rijen af en ontwijk strafvakjes.", maxPlayers: 2 },
-  { id: 'keeropkeer', name: "Disney Keer op Keer", icon: "\u{1F308}", desc: "Rol kleur en aantal, kleur vakjes en scoor bonuslijnen.", maxPlayers: 2 }
+  { id: 'qwixx', name: "Disney Qwixx", icon: "\u270F\uFE0F", desc: "Streep gekleurde rijen af en ontwijk strafvakjes.", maxPlayers: 2 }
 ];
 
 const getArenaGame = (gameId) => ARENA_GAMES.find(game => game.id === gameId);
@@ -628,7 +626,7 @@ export default function App() {
     const text = `${item?.gameType || ''} ${item?.details || ''}`;
     return item?.category === 'arena'
       || item?.gameType === 'Duel Arena'
-      || /Othello|Dots|Color Lines|Ricochet|Curling|Marble|Pirates|Plank|Yahtzee|Qwixx|Keer op Keer|verhuren/i.test(text);
+      || /Othello|Dots|Color Lines|Marble|Pirates|Plank|Yahtzee|Qwixx|verhuren/i.test(text);
   };
 
   const updateRoomState = async (roomId, updates) => {
@@ -871,12 +869,29 @@ export default function App() {
   const clearSession = () => {
     localStorage.removeItem('disney_room_id');
     localStorage.removeItem('disney_player_id');
-    localStorage.removeItem('disney_player_name');
     setRoom(null);
     setPlayers([]);
     setScoreHistory([]);
     setLocalPlayer(null);
     setScreen('portal');
+  };
+
+  const leaveCurrentRoom = async (targetScreen = 'portal') => {
+    const currentRoomId = room?.id;
+    if (currentRoomId && currentRoomId !== 'solo') {
+      try {
+        await updateRoomState(currentRoomId, { status: 'ended' });
+      } catch (e) {
+        console.warn("Could not close room before leaving", e);
+      }
+    }
+    localStorage.removeItem('disney_room_id');
+    localStorage.removeItem('disney_player_id');
+    setRoom(null);
+    setPlayers([]);
+    setScoreHistory([]);
+    setLocalPlayer(null);
+    setScreen(targetScreen);
   };
 
   // Real-time subscription
@@ -1054,12 +1069,10 @@ export default function App() {
         othello: "Othello / Reversi",
         dotsboxes: "Dots & Boxes",
         colorlines: "Color Lines",
-        curling: "Curling Duel",
         abalone: "Marble Push (Abalone)",
         piratesplank: "Pirates' Plank",
         yahtzee: "Disney Yahtzee",
-        qwixx: "Disney Qwixx",
-        keeropkeer: "Disney Keer op Keer"
+        qwixx: "Disney Qwixx"
       };
       return {
         id: room.current_task_id,
@@ -1593,10 +1606,7 @@ export default function App() {
   };
 
   const handleNewGameStart = async () => {
-    if (room) {
-      await updateRoomState(room.id, { status: 'ended' });
-    }
-    clearSession();
+    await leaveCurrentRoom('portal');
   };
 
   const handleAddTask = () => {
@@ -2296,6 +2306,8 @@ export default function App() {
 
   const renderRouteProgressRoad = () => {
     if (room?.id === 'solo') return null;
+    if (room?.game_mode?.startsWith('arcade-')) return null;
+    if (!room?.total_rounds) return null;
     const pct = Math.min(100, Math.round((room.round / room.total_rounds) * 100));
     const stations = [
       { pct: 0, label: "Start", icon: "🔑" },
@@ -2829,7 +2841,7 @@ export default function App() {
                     <div className="portal-card-media" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'radial-gradient(circle, rgba(189, 83, 237, 0.15) 0%, transparent 75%)', height: '140px' }}>
                       <span style={{ fontSize: '64px', filter: 'drop-shadow(0 0 12px rgba(189, 83, 237, 0.6))', animation: 'bounce 3s infinite' }}>🏰</span>
                     </div>
-                    <span className="portal-card-badge arcade">9 Spellen</span>
+                    <span className="portal-card-badge arcade">7 Spellen</span>
                   </div>
                   <div className="portal-card-body">
                     <h3>Disney Duel Arena</h3>
@@ -2976,17 +2988,7 @@ export default function App() {
               <section className="card">
                 <h2 className="sectiontitle">🎮 Kies een Arena Spel</h2>
                 <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '10px', marginTop: '14px' }}>
-                  {[
-                    { id: 'othello', name: "Othello / Reversi", icon: "⚪", desc: "Verover het bord door vijandelijke fiches in te sluiten." },
-                    { id: 'dotsboxes', name: "Dots & Boxes", icon: "✏️", desc: "Trek lijntjes en claim de meeste kamertjes." },
-                    { id: 'colorlines', name: "Color Lines", icon: "🔴", desc: "Solo puzzel: maak rijen van 5 gelijke bollen." },
-                    { id: 'curling', name: "Curling Duel", icon: "🥌", desc: "Glijd stenen en stoot je tegenstander uit het huis." },
-                    { id: 'abalone', name: "Marble Push (Abalone)", icon: "🐜", desc: "Duw de bollen van de tegenstander uit het hex-raster." },
-                    { id: 'piratesplank', name: "Pirates' Plank", icon: "☠️", desc: "Raad Disney-woorden voordat de piraat van de plank loopt." },
-                    { id: 'yahtzee', name: "Disney Yahtzee", icon: "🎲", desc: "Gooi, houd dobbelstenen vast en vul je magische scorekaart." },
-                    { id: 'qwixx', name: "Disney Qwixx", icon: "✏️", desc: "Streep gekleurde rijen af en ontwijk strafvakjes." },
-                    { id: 'keeropkeer', name: "Disney Keer op Keer", icon: "🌈", desc: "Rol kleur en aantal, kleur vakjes en scoor bonuslijnen." }
-                  ].map(game => {
+                  {ARENA_GAMES.map(game => {
                     const isSelected = selectedArcadeGame === game.id;
                     return (
                       <div
@@ -3030,12 +3032,10 @@ export default function App() {
                         othello: "Othello / Reversi",
                         dotsboxes: "Dots & Boxes",
                         colorlines: "Color Lines",
-                        curling: "Curling Duel",
                         abalone: "Marble Push (Abalone)",
                         piratesplank: "Pirates' Plank",
                         yahtzee: "Disney Yahtzee",
-                        qwixx: "Disney Qwixx",
-                        keeropkeer: "Disney Keer op Keer"
+                        qwixx: "Disney Qwixx"
                       }[selectedArcadeGame]
                     }</strong>
                   </p>
@@ -3543,10 +3543,7 @@ export default function App() {
                         setRoom(null);
                         setScreen(targetScreen);
                       } else if (room.game_mode?.startsWith('arcade-')) {
-                        setRoom(null);
-                        setPlayers([]);
-                        setScoreHistory([]);
-                        setScreen('arcade_select');
+                        leaveCurrentRoom('arcade_select');
                       } else {
                         setScoreReturnScreen('game');
                         setScreen('scores');
@@ -3565,6 +3562,14 @@ export default function App() {
                       )
                     }
                   </div>
+
+                  {room.id !== 'solo' && room.game_mode?.startsWith('arcade-') && (
+                    <div className="btnrow one" style={{ margin: '10px 0 14px' }}>
+                      <button className="btn danger" onClick={() => leaveCurrentRoom('arcade_select')}>
+                        Kamer verlaten en nieuw Arena-spel kiezen
+                      </button>
+                    </div>
+                  )}
 
                   {/* Render animated road progress */}
                   {renderRouteProgressRoad()}
