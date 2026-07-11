@@ -69,6 +69,8 @@ const ARENA_GAMES = [
 const getArenaGame = (gameId) => ARENA_GAMES.find(game => game.id === gameId);
 
 const COCO_BANK_KEY = 'disney_coco_coin_bank';
+const COCO_PROFILES_KEY = 'disney_coco_profiles';
+const DEFAULT_COCO_PROFILES = ['Speler 1', 'Speler 2', 'Speler 3', 'Speler 4'];
 
 function CocoCoinIcon({ size = 30 }) {
   return (
@@ -454,7 +456,24 @@ export default function App() {
   const [collections, setCollections] = useState(() => readJsonStorage('disney_collections', {}));
   const [exclusiveClaims, setExclusiveClaims] = useState(() => readJsonStorage('disney_exclusive_claims', {}));
   const [shopPlayerName, setShopPlayerName] = useState(() => localStorage.getItem('disney_player_name') || 'Speler 1');
+  const [cocoProfiles, setCocoProfiles] = useState(() => {
+    const saved = readJsonStorage(COCO_PROFILES_KEY, []);
+    const legacyName = localStorage.getItem('disney_player_name');
+    const names = [...DEFAULT_COCO_PROFILES, legacyName, ...saved].filter(Boolean);
+    const seen = new Set();
+    return names
+      .map(name => String(name).trim())
+      .filter(name => {
+        const key = norm(name);
+        if (!name || seen.has(key)) return false;
+        seen.add(key);
+        return true;
+      })
+      .slice(0, 12);
+  });
   const [newShopPlayerName, setNewShopPlayerName] = useState('');
+  const [donationTargetName, setDonationTargetName] = useState('');
+  const [donationAmount, setDonationAmount] = useState('');
   const [selectedCollectionItem, setSelectedCollectionItem] = useState(null);
   const [aiLevel, setAiLevel] = useState(() => localStorage.getItem('disney_ai_level') || 'normal');
 
@@ -563,21 +582,40 @@ export default function App() {
 
   const getCollectorKey = (name) => norm(name || 'speler') || 'speler';
 
+  const uniqueProfileNames = (names) => {
+    const seen = new Set();
+    return names
+      .filter(Boolean)
+      .map(name => String(name).trim())
+      .filter(name => {
+        const key = getCollectorKey(name);
+        if (!name || seen.has(key)) return false;
+        seen.add(key);
+        return true;
+      })
+      .slice(0, 12);
+  };
+
+  const persistCocoProfiles = (names) => {
+    const next = uniqueProfileNames(names);
+    setCocoProfiles(next);
+    localStorage.setItem(COCO_PROFILES_KEY, JSON.stringify(next));
+    return next;
+  };
+
   const getDisplayShopPlayers = () => {
-    const names = [
-      shopPlayerName,
-      playerNameInput,
-      localStorage.getItem('disney_player_name'),
-      ...playerNames,
-      ...players.map(p => p.name)
-    ].filter(Boolean).map(name => String(name).trim()).filter(Boolean);
-    return [...new Set(names)].slice(0, 8);
+    return uniqueProfileNames(cocoProfiles.length ? cocoProfiles : DEFAULT_COCO_PROFILES);
   };
 
   const awardStarsToCollector = (name, amount) => {
     const coins = Math.max(0, Number(amount) || 0);
     if (coins <= 0) return;
     const key = getCollectorKey(name);
+    setCocoProfiles(prev => {
+      const next = uniqueProfileNames([...prev, name || 'Speler 1']);
+      localStorage.setItem(COCO_PROFILES_KEY, JSON.stringify(next));
+      return next;
+    });
     setStarBank(prev => {
       const next = { ...prev, [key]: (prev[key] || 0) + coins };
       localStorage.setItem(COCO_BANK_KEY, JSON.stringify(next));
@@ -612,9 +650,115 @@ export default function App() {
   const handleAddShopPlayer = () => {
     const name = newShopPlayerName.trim();
     if (!name) return;
+    persistCocoProfiles([...cocoProfiles, name]);
     setShopPlayerName(name);
     localStorage.setItem('disney_player_name', name);
     setNewShopPlayerName('');
+  };
+
+  const handleRenameShopProfile = () => {
+    const currentName = shopPlayerName.trim() || 'Speler 1';
+    const nextName = window.prompt('Nieuwe profielnaam', currentName)?.trim();
+    if (!nextName || nextName === currentName) return;
+
+    const oldKey = getCollectorKey(currentName);
+    const newKey = getCollectorKey(nextName);
+    const exists = getDisplayShopPlayers().some(name => getCollectorKey(name) === newKey && getCollectorKey(name) !== oldKey);
+    if (exists) {
+      window.alert('Er bestaat al een profiel met deze naam.');
+      return;
+    }
+
+    persistCocoProfiles(cocoProfiles.map(name => getCollectorKey(name) === oldKey ? nextName : name));
+
+    if (oldKey !== newKey) {
+      const nextBank = { ...starBank };
+      nextBank[newKey] = (nextBank[newKey] || 0) + (nextBank[oldKey] || 0);
+      delete nextBank[oldKey];
+
+      const nextCollections = { ...collections };
+      nextCollections[newKey] = [...new Set([...(nextCollections[newKey] || []), ...(nextCollections[oldKey] || [])])];
+      delete nextCollections[oldKey];
+
+      const nextClaims = Object.fromEntries(
+        Object.entries(exclusiveClaims).map(([itemId, ownerKey]) => [itemId, ownerKey === oldKey ? newKey : ownerKey])
+      );
+
+      setStarBank(nextBank);
+      setCollections(nextCollections);
+      setExclusiveClaims(nextClaims);
+      localStorage.setItem(COCO_BANK_KEY, JSON.stringify(nextBank));
+      localStorage.setItem('disney_collections', JSON.stringify(nextCollections));
+      localStorage.setItem('disney_exclusive_claims', JSON.stringify(nextClaims));
+    }
+
+    setShopPlayerName(nextName);
+    localStorage.setItem('disney_player_name', nextName);
+  };
+
+  const handleDeleteShopProfile = () => {
+    const currentName = shopPlayerName.trim() || 'Speler 1';
+    if (getDisplayShopPlayers().length <= 1) {
+      window.alert('Er moet minimaal een profiel overblijven.');
+      return;
+    }
+    if (!window.confirm(`Profiel "${currentName}" verwijderen? De Coco Coins en Collection van dit profiel worden ook verwijderd.`)) return;
+
+    const currentKey = getCollectorKey(currentName);
+    const nextProfiles = persistCocoProfiles(cocoProfiles.filter(name => getCollectorKey(name) !== currentKey));
+    const nextName = nextProfiles[0] || 'Speler 1';
+
+    const nextBank = { ...starBank };
+    const nextCollections = { ...collections };
+    delete nextBank[currentKey];
+    delete nextCollections[currentKey];
+
+    const nextClaims = Object.fromEntries(
+      Object.entries(exclusiveClaims).filter(([, ownerKey]) => ownerKey !== currentKey)
+    );
+
+    setStarBank(nextBank);
+    setCollections(nextCollections);
+    setExclusiveClaims(nextClaims);
+    setShopPlayerName(nextName);
+    setDonationTargetName('');
+    localStorage.setItem(COCO_BANK_KEY, JSON.stringify(nextBank));
+    localStorage.setItem('disney_collections', JSON.stringify(nextCollections));
+    localStorage.setItem('disney_exclusive_claims', JSON.stringify(nextClaims));
+    localStorage.setItem('disney_player_name', nextName);
+  };
+
+  const handleDonateCoins = () => {
+    const fromName = shopPlayerName.trim() || 'Speler 1';
+    const fromKey = getCollectorKey(fromName);
+    const targetName = donationTargetName || getDisplayShopPlayers().find(name => getCollectorKey(name) !== fromKey);
+    const targetKey = getCollectorKey(targetName);
+    const amount = Math.floor(Number(donationAmount));
+
+    if (!targetName || targetKey === fromKey) {
+      window.alert('Kies een ander profiel om Coco Coins aan te doneren.');
+      return;
+    }
+    if (!Number.isFinite(amount) || amount <= 0) {
+      window.alert('Vul een positief aantal Coco Coins in.');
+      return;
+    }
+    if ((starBank[fromKey] || 0) < amount) {
+      window.alert('Dit profiel heeft niet genoeg Coco Coins.');
+      return;
+    }
+
+    const nextProfiles = persistCocoProfiles([...cocoProfiles, targetName]);
+    const nextBank = {
+      ...starBank,
+      [fromKey]: (starBank[fromKey] || 0) - amount,
+      [targetKey]: (starBank[targetKey] || 0) + amount
+    };
+
+    setStarBank(nextBank);
+    setDonationAmount('');
+    setDonationTargetName(nextProfiles.find(name => getCollectorKey(name) === targetKey) || '');
+    localStorage.setItem(COCO_BANK_KEY, JSON.stringify(nextBank));
   };
 
   const logSoloAttempt = (points = 0, customReason = null) => {
@@ -646,7 +790,8 @@ export default function App() {
       localStorage.setItem('disney_solo_history', JSON.stringify(updated));
       return updated;
     });
-    awardStarsToCollector(localPlayer?.name || playerNameInput || shopPlayerName, points);
+    const soloCoinReward = points > 0 ? Math.max(1, Math.ceil(points / 2)) : 0;
+    awardStarsToCollector(localPlayer?.name || playerNameInput || shopPlayerName, soloCoinReward);
   };
 
   const isArenaHistoryItem = (item) => {
@@ -2915,6 +3060,8 @@ export default function App() {
                 const activeKey = getCollectorKey(activeName);
                 const balance = starBank[activeKey] || 0;
                 const owned = collections[activeKey] || [];
+                const donationTargets = shopNames.filter(name => getCollectorKey(name) !== activeKey);
+                const selectedDonationTarget = donationTargetName || donationTargets[0] || '';
                 return (
                   <section className="card" style={{ marginTop: '20px' }}>
                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '12px', marginBottom: '12px', flexWrap: 'wrap' }}>
@@ -2945,24 +3092,88 @@ export default function App() {
                             <option key={name} value={name}>{name}</option>
                           ))}
                         </select>
+                        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '6px', marginTop: '8px' }}>
+                          <button
+                            type="button"
+                            className="btn mini secondary"
+                            onClick={handleRenameShopProfile}
+                            style={{ padding: '7px 6px', fontSize: '10px' }}
+                          >
+                            Naam wijzigen
+                          </button>
+                          <button
+                            type="button"
+                            className="btn mini secondary"
+                            onClick={handleDeleteShopProfile}
+                            style={{ padding: '7px 6px', fontSize: '10px' }}
+                          >
+                            Verwijderen
+                          </button>
+                        </div>
                       </div>
                       <div>
                         <label style={{ display: 'block', marginBottom: '6px', fontSize: '12px', fontWeight: 'bold' }}>Nieuwe speler toevoegen</label>
-                        <input
-                          type="text"
-                          placeholder="Bijv. Esmikka"
-                          value={newShopPlayerName}
-                          onChange={(e) => setNewShopPlayerName(e.target.value)}
-                          onBlur={handleAddShopPlayer}
-                          onKeyDown={(e) => {
-                            if (e.key === 'Enter') handleAddShopPlayer();
-                          }}
-                          style={{ width: '100%', boxSizing: 'border-box' }}
-                        />
+                        <div style={{ display: 'grid', gridTemplateColumns: '1fr auto', gap: '6px' }}>
+                          <input
+                            type="text"
+                            placeholder="Bijv. Esmikka"
+                            value={newShopPlayerName}
+                            onChange={(e) => setNewShopPlayerName(e.target.value)}
+                            onKeyDown={(e) => {
+                              if (e.key === 'Enter') handleAddShopPlayer();
+                            }}
+                            style={{ width: '100%', boxSizing: 'border-box' }}
+                          />
+                          <button
+                            type="button"
+                            className="btn mini primary"
+                            onClick={handleAddShopPlayer}
+                            style={{ padding: '7px 9px', fontSize: '10px' }}
+                          >
+                            Voeg toe
+                          </button>
+                        </div>
                         <span style={{ display: 'block', marginTop: '5px', color: 'var(--muted)', fontSize: '10px', lineHeight: 1.3 }}>
                           Voeg hier iemand toe om apart Coco Coins en Collection-items bij te houden.
                         </span>
                       </div>
+                    </div>
+
+                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 110px auto', gap: '8px', alignItems: 'end', marginBottom: '14px', padding: '10px', background: '#061225', border: '1px solid var(--line)', borderRadius: '10px' }}>
+                      <div>
+                        <label style={{ display: 'block', marginBottom: '6px', fontSize: '12px', fontWeight: 'bold' }}>Coco Coins doneren aan</label>
+                        <select
+                          value={selectedDonationTarget}
+                          onChange={(e) => setDonationTargetName(e.target.value)}
+                          disabled={donationTargets.length === 0}
+                          style={{ width: '100%', boxSizing: 'border-box' }}
+                        >
+                          {donationTargets.map(name => (
+                            <option key={name} value={name}>{name}</option>
+                          ))}
+                        </select>
+                      </div>
+                      <div>
+                        <label style={{ display: 'block', marginBottom: '6px', fontSize: '12px', fontWeight: 'bold' }}>Aantal</label>
+                        <input
+                          type="number"
+                          min="1"
+                          max={balance}
+                          value={donationAmount}
+                          onChange={(e) => setDonationAmount(e.target.value)}
+                          placeholder="0"
+                          style={{ width: '100%', boxSizing: 'border-box' }}
+                        />
+                      </div>
+                      <button
+                        type="button"
+                        className="btn mini primary"
+                        disabled={donationTargets.length === 0 || balance <= 0}
+                        onClick={handleDonateCoins}
+                        style={{ padding: '10px 11px', fontSize: '11px' }}
+                      >
+                        Doneer
+                      </button>
                     </div>
 
                     <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '8px' }}>
