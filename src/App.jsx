@@ -70,6 +70,7 @@ const getArenaGame = (gameId) => ARENA_GAMES.find(game => game.id === gameId);
 
 const COCO_BANK_KEY = 'disney_coco_coin_bank';
 const COCO_PROFILES_KEY = 'disney_coco_profiles';
+const ACTIVE_PROFILE_KEY = 'disney_active_profile';
 const DEFAULT_COCO_PROFILES = ['Speler 1', 'Speler 2', 'Speler 3', 'Speler 4'];
 
 function CocoCoinIcon({ size = 30 }) {
@@ -79,34 +80,19 @@ function CocoCoinIcon({ size = 30 }) {
       style={{
         width: size,
         height: size,
-        borderRadius: '50%',
         display: 'inline-flex',
         alignItems: 'center',
         justifyContent: 'center',
         position: 'relative',
         flex: '0 0 auto',
-        background: 'radial-gradient(circle at 30% 25%, #fff1a8 0 13%, #ffcf3a 14% 36%, #ff8a1f 62%, #8b2f0a 100%)',
-        border: `${Math.max(2, Math.round(size / 12))}px solid #ffe27a`,
-        boxShadow: '0 0 12px rgba(255, 157, 46, 0.55), inset 0 -3px 8px rgba(93, 35, 5, 0.55)',
-        color: '#3a1605',
-        fontWeight: 900,
-        fontSize: Math.round(size * 0.48),
-        lineHeight: 1
+        filter: 'drop-shadow(0 0 9px rgba(255, 196, 71, 0.65))'
       }}
     >
-      <span style={{ transform: 'translateY(-1px)', textShadow: '0 1px 0 rgba(255,255,255,0.35)' }}>*</span>
-      <span
-        style={{
-          position: 'absolute',
-          bottom: Math.max(2, Math.round(size / 13)),
-          right: Math.max(2, Math.round(size / 13)),
-          fontSize: Math.round(size * 0.22),
-          color: '#fff7c8',
-          textShadow: '0 1px 2px rgba(0,0,0,0.45)'
-        }}
-      >
-        CC
-      </span>
+      <img
+        src={assetPath('collectables/coco-coin.png')}
+        alt=""
+        style={{ width: '100%', height: '100%', objectFit: 'contain', display: 'block' }}
+      />
     </span>
   );
 }
@@ -118,13 +104,23 @@ const assetPath = (path) => {
   return '/' + path;
 };
 
-const DISNEY_SHOP_ITEMS = [
+const LEGACY_DISNEY_SHOP_ITEMS = [
   { id: 'mickey-sticker', name: 'Mickey Sticker', icon: '🔴', image: 'collectables/mickey-sticker.png', cost: 1, type: 'everyone', desc: 'Een vrolijke startbadge voor elke speler.' },
   { id: 'castle-pin', name: 'Kasteel Pin', icon: '🏰', cost: 1, type: 'everyone', desc: 'Voor in je Disney Collection.' },
   { id: 'pixie-dust', name: 'Tinkelstof Zakje', icon: '✨', cost: 1, type: 'everyone', desc: 'Een klein beetje magie voor onderweg.' },
   { id: 'golden-fastpass', name: 'Gouden FastPass', icon: '🎫', cost: 5, type: 'exclusive', desc: 'Exclusief: maar een speler kan deze claimen.' },
   { id: 'captains-compass', name: 'Kapiteinskompas', icon: '🧭', cost: 7, type: 'exclusive', desc: 'Exclusief verzamelitem voor de snelste avonturier.' },
   { id: 'crystal-castle', name: 'Kristallen Kasteel', icon: '💎', cost: 10, type: 'exclusive', desc: 'Zeldzaam pronkstuk voor de Collection.' }
+];
+
+const DISNEY_SHOP_ITEMS = [
+  { id: 'mickey-sticker', name: 'Mickey Sticker', icon: 'MS', image: 'collectables/mickey-sticker.png', cost: 1, type: 'everyone', desc: 'Een vrolijke startbadge voor elke speler.' },
+  { id: 'castle-pin', name: 'Kasteel Pin', icon: 'KP', image: 'collectables/castle-pin.png', cost: 1, type: 'everyone', desc: 'Een klassiek pin-item voor elke Disney Collection.' },
+  { id: 'pixie-dust', name: 'Tinkelstof Zakjes', icon: 'TZ', image: 'collectables/pixie-dust-bags.png', cost: 1, type: 'everyone', desc: 'Een voorraadje magie voor onderweg.' },
+  { id: 'golden-fastpass', name: 'Royal Access Pass', icon: 'RA', image: 'collectables/royal-access-pass.png', cost: 5, type: 'exclusive', desc: 'Exclusief: maar een speler kan deze claimen.' },
+  { id: 'captains-compass', name: "Jack Sparrow's Compass", icon: 'JS', image: 'collectables/jack-sparrows-compass.png', cost: 7, type: 'exclusive', desc: 'Exclusief verzamelitem voor wie altijd de juiste route vindt.' },
+  { id: 'crystal-castle', name: 'Swarovski Pluto', icon: 'SP', image: 'collectables/swarovski-pluto.png', cost: 8, type: 'exclusive', desc: 'Een fonkelend pronkstuk voor de Collection.' },
+  { id: 'swarovski-beauty-set', name: 'Swarovski Beauty Set', icon: 'SB', image: 'collectables/swarovski-beauty-set.png', cost: 12, type: 'exclusive', desc: 'Een luxe set voor de speler met de meeste Coco Coin-discipline.' }
 ];
 
 const formatCocoCoins = (amount) => `${amount} Coco Coin${Number(amount) === 1 ? '' : 's'}`;
@@ -438,7 +434,8 @@ export default function App() {
 
   const [localPlayer, setLocalPlayer] = useState(null);
   const [roomCodeInput, setRoomCodeInput] = useState('');
-  const [playerNameInput, setPlayerNameInput] = useState('');
+  const [activeProfileName, setActiveProfileName] = useState(() => localStorage.getItem(ACTIVE_PROFILE_KEY) || '');
+  const [playerNameInput, setPlayerNameInput] = useState(() => localStorage.getItem(ACTIVE_PROFILE_KEY) || localStorage.getItem('disney_player_name') || '');
 
   const [setupMode, setSetupMode] = useState('mix');
   const [setupVersion, setSetupVersion] = useState(1);
@@ -472,6 +469,7 @@ export default function App() {
       .slice(0, 12);
   });
   const [newShopPlayerName, setNewShopPlayerName] = useState('');
+  const [startupProfileName, setStartupProfileName] = useState('');
   const [donationTargetName, setDonationTargetName] = useState('');
   const [donationAmount, setDonationAmount] = useState('');
   const [selectedCollectionItem, setSelectedCollectionItem] = useState(null);
@@ -603,6 +601,17 @@ export default function App() {
     return next;
   };
 
+  const activateCocoProfile = (name) => {
+    const cleanName = String(name || '').trim();
+    if (!cleanName) return;
+    persistCocoProfiles([...cocoProfiles, cleanName]);
+    setActiveProfileName(cleanName);
+    setShopPlayerName(cleanName);
+    setPlayerNameInput(cleanName);
+    localStorage.setItem(ACTIVE_PROFILE_KEY, cleanName);
+    localStorage.setItem('disney_player_name', cleanName);
+  };
+
   const getDisplayShopPlayers = () => {
     return uniqueProfileNames(cocoProfiles.length ? cocoProfiles : DEFAULT_COCO_PROFILES);
   };
@@ -610,9 +619,9 @@ export default function App() {
   const awardStarsToCollector = (name, amount) => {
     const coins = Math.max(0, Number(amount) || 0);
     if (coins <= 0) return;
-    const key = getCollectorKey(name);
+    const key = getCollectorKey(name || activeProfileName);
     setCocoProfiles(prev => {
-      const next = uniqueProfileNames([...prev, name || 'Speler 1']);
+      const next = uniqueProfileNames([...prev, name || activeProfileName || 'Speler 1']);
       localStorage.setItem(COCO_PROFILES_KEY, JSON.stringify(next));
       return next;
     });
@@ -624,7 +633,7 @@ export default function App() {
   };
 
   const handleBuyShopItem = (item) => {
-    const name = shopPlayerName.trim() || playerNameInput.trim() || 'Speler 1';
+    const name = activeProfileName || shopPlayerName.trim() || playerNameInput.trim() || 'Speler 1';
     const key = getCollectorKey(name);
     const balance = starBank[key] || 0;
     const owned = collections[key] || [];
@@ -650,14 +659,19 @@ export default function App() {
   const handleAddShopPlayer = () => {
     const name = newShopPlayerName.trim();
     if (!name) return;
-    persistCocoProfiles([...cocoProfiles, name]);
-    setShopPlayerName(name);
-    localStorage.setItem('disney_player_name', name);
+    activateCocoProfile(name);
     setNewShopPlayerName('');
   };
 
+  const handleCreateStartupProfile = () => {
+    const name = startupProfileName.trim();
+    if (!name) return;
+    activateCocoProfile(name);
+    setStartupProfileName('');
+  };
+
   const handleRenameShopProfile = () => {
-    const currentName = shopPlayerName.trim() || 'Speler 1';
+    const currentName = activeProfileName || shopPlayerName.trim() || 'Speler 1';
     const nextName = window.prompt('Nieuwe profielnaam', currentName)?.trim();
     if (!nextName || nextName === currentName) return;
 
@@ -693,11 +707,14 @@ export default function App() {
     }
 
     setShopPlayerName(nextName);
+    setActiveProfileName(nextName);
+    setPlayerNameInput(nextName);
+    localStorage.setItem(ACTIVE_PROFILE_KEY, nextName);
     localStorage.setItem('disney_player_name', nextName);
   };
 
   const handleDeleteShopProfile = () => {
-    const currentName = shopPlayerName.trim() || 'Speler 1';
+    const currentName = activeProfileName || shopPlayerName.trim() || 'Speler 1';
     if (getDisplayShopPlayers().length <= 1) {
       window.alert('Er moet minimaal een profiel overblijven.');
       return;
@@ -721,15 +738,18 @@ export default function App() {
     setCollections(nextCollections);
     setExclusiveClaims(nextClaims);
     setShopPlayerName(nextName);
+    setActiveProfileName(nextName);
+    setPlayerNameInput(nextName);
     setDonationTargetName('');
     localStorage.setItem(COCO_BANK_KEY, JSON.stringify(nextBank));
     localStorage.setItem('disney_collections', JSON.stringify(nextCollections));
     localStorage.setItem('disney_exclusive_claims', JSON.stringify(nextClaims));
+    localStorage.setItem(ACTIVE_PROFILE_KEY, nextName);
     localStorage.setItem('disney_player_name', nextName);
   };
 
   const handleDonateCoins = () => {
-    const fromName = shopPlayerName.trim() || 'Speler 1';
+    const fromName = activeProfileName || shopPlayerName.trim() || 'Speler 1';
     const fromKey = getCollectorKey(fromName);
     const targetName = donationTargetName || getDisplayShopPlayers().find(name => getCollectorKey(name) !== fromKey);
     const targetKey = getCollectorKey(targetName);
@@ -791,7 +811,7 @@ export default function App() {
       return updated;
     });
     const soloCoinReward = points > 0 ? Math.max(1, Math.ceil(points / 2)) : 0;
-    awardStarsToCollector(localPlayer?.name || playerNameInput || shopPlayerName, soloCoinReward);
+    awardStarsToCollector(activeProfileName || localPlayer?.name || playerNameInput || shopPlayerName, soloCoinReward);
   };
 
   const isArenaHistoryItem = (item) => {
@@ -870,7 +890,7 @@ export default function App() {
 
     soloLoggedRef.current = false;
 
-    const name = playerNameInput.trim() || localStorage.getItem('disney_player_name') || 'Solo Speler';
+    const name = activeProfileName || playerNameInput.trim() || localStorage.getItem('disney_player_name') || 'Solo Speler';
     const pObj = { id: 'solo-player', name, score: 0 };
     setPlayers([pObj]);
     setLocalPlayer(pObj);
@@ -878,7 +898,7 @@ export default function App() {
   };
 
   const handleStartArcadeSolo = (gameId) => {
-    const name = playerNameInput.trim() || localStorage.getItem('disney_player_name') || 'Solo Speler';
+    const name = activeProfileName || playerNameInput.trim() || localStorage.getItem('disney_player_name') || 'Solo Speler';
     localStorage.setItem('disney_player_name', name);
     localStorage.setItem('disney_ai_level', aiLevel);
     const p = { id: 'solo-player', name, score: 0 };
@@ -898,7 +918,8 @@ export default function App() {
   };
 
   const handleCreateArcadeDuel = async (gameId) => {
-    if (!playerNameInput.trim()) {
+    const profileName = activeProfileName || playerNameInput.trim();
+    if (!profileName) {
       setError("Voer een naam in om te kunnen starten.");
       return;
     }
@@ -906,7 +927,7 @@ export default function App() {
     setError(null);
     try {
       const arenaGame = getArenaGame(gameId);
-      const { room: r, player: p } = await createRoom('mix', 1, 10, playerNameInput);
+      const { room: r, player: p } = await createRoom('mix', 1, 10, profileName);
       
       const updates = { 
         game_mode: 'arcade-' + gameId, 
@@ -1399,7 +1420,8 @@ export default function App() {
   };
 
   const handleCreateRoom = async () => {
-    if (!playerNameInput.trim()) {
+    const profileName = activeProfileName || playerNameInput.trim();
+    if (!profileName) {
       setError("Voer een naam in om te kunnen starten.");
       return;
     }
@@ -1408,7 +1430,7 @@ export default function App() {
     try {
       const mode = (selectedCats.length === 1 && selectedCats[0] === "Samen") ? "Samen" : "mix";
       const totalRounds = mode === 'Samen' ? roundsPerPlayer : roundsPerPlayer * 4;
-      const { room: r, player: p } = await createRoom(mode, setupVersion, roundsPerPlayer, playerNameInput);
+      const { room: r, player: p } = await createRoom(mode, setupVersion, roundsPerPlayer, profileName);
       
       await updateRoomState(r.id, { total_rounds: totalRounds });
       r.total_rounds = totalRounds;
@@ -1430,14 +1452,15 @@ export default function App() {
   };
 
   const handleJoinRoom = async () => {
-    if (!roomCodeInput.trim() || !playerNameInput.trim()) {
+    const profileName = activeProfileName || playerNameInput.trim();
+    if (!roomCodeInput.trim() || !profileName) {
       setError("Voer zowel de kamercode als je naam in.");
       return;
     }
     setLoading(true);
     setError(null);
     try {
-      const { room: r, player: p } = await joinRoom(roomCodeInput, playerNameInput);
+      const { room: r, player: p } = await joinRoom(roomCodeInput, profileName);
       setRoom(r);
       setLocalPlayer(p);
 
@@ -2957,7 +2980,65 @@ export default function App() {
         </div>
       )}
 
-      {!loading && (
+      {!loading && !activeProfileName && (
+        <div className="portal-container">
+          <section className="card" style={{ maxWidth: '560px', margin: '40px auto 0' }}>
+            <div style={{ textAlign: 'center', marginBottom: '18px' }}>
+              <div style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', marginBottom: '10px' }}>
+                <CocoCoinIcon size={74} />
+              </div>
+              <h1 style={{ margin: '0 0 8px' }}>Kies je Disney-profiel</h1>
+              <p style={{ color: 'var(--muted)', margin: 0 }}>
+                Je Coco Coins, aankopen, collectables en spelersnaam worden aan dit profiel gekoppeld.
+              </p>
+            </div>
+
+            <div style={{ display: 'grid', gap: '8px', marginBottom: '16px' }}>
+              {getDisplayShopPlayers().map(name => {
+                const key = getCollectorKey(name);
+                const balance = starBank[key] || 0;
+                const ownedCount = (collections[key] || []).length;
+                return (
+                  <button
+                    key={name}
+                    type="button"
+                    className="versioncard"
+                    onClick={() => activateCocoProfile(name)}
+                  >
+                    <span style={{ fontSize: '26px', fontWeight: 900, color: 'var(--gold)' }}>{name.slice(0, 1).toUpperCase()}</span>
+                    <span>
+                      <strong>{name}</strong>
+                      <small>{formatCocoCoins(balance)} · {ownedCount} collectable{ownedCount === 1 ? '' : 's'}</small>
+                    </span>
+                  </button>
+                );
+              })}
+            </div>
+
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr auto', gap: '8px' }}>
+              <input
+                type="text"
+                value={startupProfileName}
+                onChange={(e) => setStartupProfileName(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter') handleCreateStartupProfile();
+                }}
+                placeholder="Nieuw profiel"
+                style={{ width: '100%', boxSizing: 'border-box' }}
+              />
+              <button
+                type="button"
+                className="btn primary"
+                onClick={handleCreateStartupProfile}
+              >
+                Aanmaken
+              </button>
+            </div>
+          </section>
+        </div>
+      )}
+
+      {!loading && activeProfileName && (
         <>
           {selectedCollectionItem && (
             <div
@@ -3056,7 +3137,7 @@ export default function App() {
 
               {(() => {
                 const shopNames = getDisplayShopPlayers();
-                const activeName = shopPlayerName.trim() || shopNames[0] || 'Speler 1';
+                const activeName = activeProfileName || shopPlayerName.trim() || shopNames[0] || 'Speler 1';
                 const activeKey = getCollectorKey(activeName);
                 const balance = starBank[activeKey] || 0;
                 const owned = collections[activeKey] || [];
@@ -3083,8 +3164,7 @@ export default function App() {
                         <select
                           value={activeName}
                           onChange={(e) => {
-                            setShopPlayerName(e.target.value);
-                            localStorage.setItem('disney_player_name', e.target.value);
+                            activateCocoProfile(e.target.value);
                           }}
                           style={{ width: '100%', boxSizing: 'border-box' }}
                         >
@@ -3256,7 +3336,8 @@ export default function App() {
                   <label style={{ display: 'block', marginBottom: '8px', fontSize: '14px', fontWeight: 'bold' }}>Jouw Spelersnaam:</label>
                   <input
                     type="text"
-                    value={playerNameInput}
+                    value={activeProfileName || playerNameInput}
+                    readOnly={!!activeProfileName}
                     onChange={(e) => setPlayerNameInput(e.target.value)}
                     placeholder="Voer je naam in..."
                     style={{ width: '100%', boxSizing: 'border-box' }}
@@ -3607,7 +3688,8 @@ export default function App() {
                   <input 
                     id="joinName" 
                     placeholder="Bijv. Mickey"
-                    value={playerNameInput} 
+                    value={activeProfileName || playerNameInput} 
+                    readOnly={!!activeProfileName}
                     onChange={e => setPlayerNameInput(e.target.value)}
                   />
                 </div>
@@ -3709,7 +3791,8 @@ export default function App() {
                   <input 
                     id="hostName" 
                     placeholder="Bijv. Donald" 
-                    value={playerNameInput} 
+                    value={activeProfileName || playerNameInput} 
+                    readOnly={!!activeProfileName}
                     onChange={e => setPlayerNameInput(e.target.value)}
                   />
                 </div>
