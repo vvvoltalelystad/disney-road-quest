@@ -1905,7 +1905,7 @@ export function AbaloneGame({ mode, room, localPlayer, players, updateRoomState,
   const handleEndGame = () => {
     const won = (myIndex === 0 && p2Out >= 6) || (myIndex === 1 && p1Out >= 6);
     const pts = won ? 3 : 1;
-    const details = won ? "Hercules' Olympus Push gewonnen!" : "Hercules' Olympus Push verloren";
+    const details = won ? "Louisa's Power Push gewonnen!" : "Louisa's Power Push verloren";
     onFinish(pts, details);
   };
 
@@ -2105,8 +2105,8 @@ function LegacyPiratesPlankGame({ mode, room, localPlayer, players, updateRoomSt
     const won = winnerId === localPlayer.id || (isSolo && winnerId);
     const pts = won ? (wrong <= 2 ? 3 : 2) : 1;
     const detail = winnerId
-      ? `Pirates' Plank opgelost: ${word}`
-      : `Pirates' Plank gemist: ${word}`;
+      ? `Black Pearl's Plank opgelost: ${word}`
+      : `Black Pearl's Plank gemist: ${word}`;
     onFinish(pts, detail);
   };
 
@@ -2383,8 +2383,8 @@ export function PiratesPlankGame({ mode, room, localPlayer, players, updateRoomS
     const treasureBonus = Math.min(1, Math.floor(treasure / 10));
     const pts = won ? Math.min(6, 1 + speedBonus + strikeBonus + thriftBonus + treasureBonus) : 0;
     const detail = winnerId
-      ? `Pirates' Plank opgelost: ${word} (${treasure} munten, ${strikes} strikes, ${turns} beurten)`
-      : `Pirates' Plank gezonken: ${word}`;
+      ? `Black Pearl's Plank opgelost: ${word} (${treasure} munten, ${strikes} strikes, ${turns} beurten)`
+      : `Black Pearl's Plank gezonken: ${word}`;
     onFinish(pts, detail);
   };
 
@@ -3243,10 +3243,10 @@ export function DisneyQwixxGame({ mode, room, localPlayer, players, updateRoomSt
     const tie = myTotal === otherTotal;
     const points = won ? 3 : tie ? 2 : 1;
     const detail = won
-      ? `Mickey's Racekaart gewonnen: ${myTotal}-${otherTotal}`
+      ? `Mike's Wazowski-Board gewonnen: ${myTotal}-${otherTotal}`
       : tie
-        ? `Mickey's Racekaart gelijkspel: ${myTotal}-${otherTotal}`
-        : `Mickey's Racekaart verloren: ${myTotal}-${otherTotal}`;
+        ? `Mike's Wazowski-Board gelijkspel: ${myTotal}-${otherTotal}`
+        : `Mike's Wazowski-Board verloren: ${myTotal}-${otherTotal}`;
     onFinish(points, detail);
   };
 
@@ -4006,7 +4006,7 @@ const MINI_GAME_RULES = {
     duel: "Duel: alle steenposities en botsingen worden realtime gesynchroniseerd."
   },
   abalone: {
-    title: "Hercules' Olympus Push",
+    title: "Louisa's Power Push",
     intro: "Origineel: Marble Push / Abalone. Verplaats bollen op het hex-bord en duw bollen van de tegenstander eruit.",
     rules: [
       "Tik op een eigen bol om die te selecteren.",
@@ -4019,7 +4019,7 @@ const MINI_GAME_RULES = {
     duel: "Duel: elke verplaatsing en duw wordt realtime gedeeld met de tegenstander."
   },
   piratesplank: {
-    title: "Pirates' Plank",
+    title: "Black Pearl's Plank",
     intro: "Origineel: Galgje/Wheel of Fortune. Kraak een volledig blanco Disney/Pixar-code voordat The Black Pearl je bereikt.",
     rules: [
       "Er is geen hint en geen categorie: je ziet alleen lege vakjes.",
@@ -4046,7 +4046,7 @@ const MINI_GAME_RULES = {
     duel: "Duel: spelers gooien om de beurt en vullen samen realtime de scorekaart."
   },
   qwixx: {
-    title: "Mickey's Racekaart",
+    title: "Mike's Wazowski-Board",
     intro: "Origineel: Qwixx. Streep getallen af in gekleurde Disney-rijen en pak zoveel mogelijk punten.",
     rules: [
       "Gooi twee witte en vier gekleurde dobbelstenen.",

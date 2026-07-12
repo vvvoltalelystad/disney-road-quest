@@ -57,16 +57,16 @@ const POWER_CARDS = {
 };
 
 const ARENA_GAMES = [
-  { id: 'othello', name: "Ursula's Spiegelstrijd", icon: "\u26AA", desc: "Origineel: Othello / Reversi. Verover het bord door vijandelijke fiches in te sluiten.", maxPlayers: 2 },
-  { id: 'dotsboxes', name: "Rapunzel's Torenkamers", icon: "\u270F\uFE0F", desc: "Origineel: Dots & Boxes. Trek lijntjes en claim de meeste kamertjes.", maxPlayers: 4 },
-  { id: 'colorlines', name: "Inside Out Kleurenchaos", icon: "\u{1F534}", desc: "Origineel: Color Lines. Solo puzzel: maak rijen van 5 gelijke bollen.", maxPlayers: 1 },
-  { id: 'abalone', name: "Hercules' Olympus Push", icon: "\u{1F41C}", desc: "Origineel: Marble Push / Abalone. Duw de bollen van de tegenstander uit het hex-raster.", maxPlayers: 2 },
-  { id: 'piratesplank', name: "Pirates' Plank", icon: "\u2620\uFE0F", desc: "Origineel: Galgje/Wheel of Fortune. Gooi dobbelstenen, koop klinkers en kraak de blanco schatkistcode.", maxPlayers: 4 },
-  { id: 'yahtzee', name: "Goofy's Geluksworp", icon: "\u{1F3B2}", desc: "Origineel: Yahtzee. Gooi, houd dobbelstenen vast en vul je magische scorekaart.", maxPlayers: 2 },
-  { id: 'qwixx', name: "Mickey's Racekaart", icon: "\u270F\uFE0F", desc: "Origineel: Qwixx. Streep gekleurde rijen af en ontwijk strafvakjes.", maxPlayers: 2 },
-  { id: 'mastermind', name: "Yzma's Geheime Code", icon: "\u{1F9E0}", desc: "Origineel: Mastermind. Solo puzzel: kraak de geheime Disney-kleurcode.", maxPlayers: 1 },
+  { id: 'othello', name: "Ursula's Spiegelstrijd", icon: "\u26AA", image: 'arena/games/Ursula.png', desc: "Origineel: Othello / Reversi. Verover het bord door vijandelijke fiches in te sluiten.", maxPlayers: 2 },
+  { id: 'dotsboxes', name: "Rapunzel's Torenkamers", icon: "\u270F\uFE0F", image: 'arena/games/Rapunzel.png', desc: "Origineel: Dots & Boxes. Trek lijntjes en claim de meeste kamertjes.", maxPlayers: 4 },
+  { id: 'colorlines', name: "Inside Out Kleurenchaos", icon: "\u{1F534}", image: 'arena/games/Inside Out.png', desc: "Origineel: Color Lines. Solo puzzel: maak rijen van 5 gelijke bollen.", maxPlayers: 1 },
+  { id: 'abalone', name: "Louisa's Power Push", icon: "\u{1F41C}", image: 'arena/games/Louisa.png', desc: "Origineel: Marble Push / Abalone. Duw de bollen van de tegenstander uit het hex-raster.", maxPlayers: 2 },
+  { id: 'piratesplank', name: "Black Pearl's Plank", icon: "\u2620\uFE0F", desc: "Origineel: Galgje/Wheel of Fortune. Gooi dobbelstenen, koop klinkers en kraak de blanco schatkistcode.", maxPlayers: 4 },
+  { id: 'yahtzee', name: "Goofy's Geluksworp", icon: "\u{1F3B2}", image: 'arena/games/Goofy.png', desc: "Origineel: Yahtzee. Gooi, houd dobbelstenen vast en vul je magische scorekaart.", maxPlayers: 2 },
+  { id: 'qwixx', name: "Mike's Wazowski-Board", icon: "\u270F\uFE0F", image: 'arena/games/Mike.png', desc: "Origineel: Qwixx. Streep gekleurde rijen af en ontwijk strafvakjes.", maxPlayers: 2 },
+  { id: 'mastermind', name: "Yzma's Poison Struggle", icon: "\u{1F9E0}", image: 'arena/games/Yzma.png', desc: "Origineel: Mastermind. Solo puzzel: kraak de geheime Disney-kleurcode.", maxPlayers: 1 },
   { id: 'sudoku6', name: "Tinker Bell Sudoku", icon: "\u2728", desc: "Origineel: Sudoku 6x6. Solo puzzel met Disney-symbolen.", maxPlayers: 1 },
-  { id: 'sudoku9', name: "Kasteel Sudoku", icon: "\u{1F3F0}", desc: "Origineel: Sudoku 9x9. Klassiek raster met Disney-symbolen.", maxPlayers: 1 }
+  { id: 'sudoku9', name: "Zazu's Sudoku", icon: "\u{1F3F0}", image: 'arena/games/Zazu.png', desc: "Origineel: Sudoku 9x9. Klassiek raster met Disney-symbolen.", maxPlayers: 1 }
 ];
 
 const getArenaGame = (gameId) => ARENA_GAMES.find(game => game.id === gameId);
@@ -887,7 +887,7 @@ export default function App() {
     }
     const finalPts = Math.max(0, pts - hintsUsed);
     const hintText = hintsUsed > 0 ? ` Hint gebruikt: -${hintsUsed} ster${hintsUsed === 1 ? '' : 'ren'}.` : '';
-    const statsStr = `${sudokuSize === 6 ? "Tinker Bell Sudoku" : "Kasteel Sudoku"} gekraakt in ${Math.floor(sec / 60)}m ${sec % 60}s. Beoordeling: ${label}. Score: ${finalPts} ster${finalPts === 1 ? '' : 'ren'}.${hintText}`;
+    const statsStr = `${sudokuSize === 6 ? "Tinker Bell Sudoku" : "Zazu's Sudoku"} gekraakt in ${Math.floor(sec / 60)}m ${sec % 60}s. Beoordeling: ${label}. Score: ${finalPts} ster${finalPts === 1 ? '' : 'ren'}.${hintText}`;
     setSudokuSolved(true);
     setSudokuSolvedStats(statsStr);
     addPlayerScore('solo', localPlayer, finalPts, statsStr, 'knowledge');
@@ -1593,11 +1593,11 @@ export default function App() {
   const handleStartSoloGame = (category) => {
     let taskId;
     let size = 6;
-    if (category.startsWith('Disney Sudoku') || category === "Tinker Bell Sudoku" || category === "Kasteel Sudoku") {
+    if (category.startsWith('Disney Sudoku') || category === "Tinker Bell Sudoku" || category === "Zazu's Sudoku" || category === "Kasteel Sudoku") {
       taskId = 'solo-sudoku';
       size = category.endsWith('6x6') || category === "Tinker Bell Sudoku" ? 6 : 9;
       generateSudoku(size);
-    } else if (category === "Yzma's Geheime Code") {
+    } else if (category === "Yzma's Poison Struggle" || category === "Yzma's Geheime Code") {
       taskId = DEFAULT_TASKS.find(t => t.type === 'mastermind')?.id || 'mastermind-01';
     } else if (category === 'Quiz') {
       taskId = 'quiz-choice';
@@ -1662,7 +1662,7 @@ export default function App() {
           usedTasks: isSudoku ? [] : [taskId],
           taskHistory: [],
           codeLength: 5,
-          enabledCategories: [isSudoku ? (size === 6 ? "Tinker Bell Sudoku" : "Kasteel Sudoku") : "Yzma's Geheime Code"],
+          enabledCategories: [isSudoku ? (size === 6 ? "Tinker Bell Sudoku" : "Zazu's Sudoku") : "Yzma's Poison Struggle"],
           sudokuSize: size
         }
       });
@@ -2017,7 +2017,7 @@ export default function App() {
     if (room.current_task_id === 'solo-sudoku') {
       return { 
         id: "solo-sudoku", 
-        cat: room.current_task_state?.sudokuSize === 6 ? "Tinker Bell Sudoku" : "Kasteel Sudoku", 
+        cat: room.current_task_state?.sudokuSize === 6 ? "Tinker Bell Sudoku" : "Zazu's Sudoku",
         type: "sudoku" 
       };
     }
@@ -2026,9 +2026,9 @@ export default function App() {
       return {
         ...task,
         id: room.current_task_id,
-        cat: "Yzma's Geheime Code",
+        cat: "Yzma's Poison Struggle",
         type: "mastermind",
-        title: "Yzma's Geheime Code"
+        title: "Yzma's Poison Struggle"
       };
     }
     if (room.current_task_id?.startsWith('solo-arcade-') || room.current_task_id?.startsWith('duel-arcade-')) {
@@ -2040,13 +2040,13 @@ export default function App() {
         othello: "Ursula's Spiegelstrijd",
         dotsboxes: "Rapunzel's Torenkamers",
         colorlines: "Inside Out Kleurenchaos",
-        abalone: "Hercules' Olympus Push",
-        piratesplank: "Pirates' Plank",
+        abalone: "Louisa's Power Push",
+        piratesplank: "Black Pearl's Plank",
         yahtzee: "Goofy's Geluksworp",
-        qwixx: "Mickey's Racekaart",
-        mastermind: "Yzma's Geheime Code",
+        qwixx: "Mike's Wazowski-Board",
+        mastermind: "Yzma's Poison Struggle",
         sudoku6: "Tinker Bell Sudoku",
-        sudoku9: "Kasteel Sudoku"
+        sudoku9: "Zazu's Sudoku"
       };
       return {
         id: room.current_task_id,
@@ -4442,7 +4442,11 @@ export default function App() {
                           transition: 'all 0.15s ease'
                         }}
                       >
-                        <span style={{ fontSize: '32px', marginBottom: '8px' }}>{game.icon}</span>
+                        {game.image ? (
+                          <img src={game.image} alt="" style={{ width: '64px', height: '64px', objectFit: 'contain', marginBottom: '8px' }} />
+                        ) : (
+                          <span style={{ fontSize: '32px', marginBottom: '8px' }}>{game.icon}</span>
+                        )}
                         <strong style={{ fontSize: '15px', color: '#fff', marginBottom: '4px' }}>{game.name}</strong>
                         <span style={{ fontSize: '10px', color: getArenaGame(game.id)?.maxPlayers === 4 ? 'var(--ok)' : 'var(--gold)', fontWeight: 'bold', marginBottom: '5px' }}>
                           {getArenaGame(game.id)?.maxPlayers === 1 ? 'solo' : getArenaGame(game.id)?.maxPlayers === 4 ? 'max 4 spelers' : '2 spelers'}
@@ -4463,13 +4467,13 @@ export default function App() {
                         othello: "Ursula's Spiegelstrijd",
                         dotsboxes: "Rapunzel's Torenkamers",
                         colorlines: "Inside Out Kleurenchaos",
-                        abalone: "Hercules' Olympus Push",
-                        piratesplank: "Pirates' Plank",
+                        abalone: "Louisa's Power Push",
+                        piratesplank: "Black Pearl's Plank",
                         yahtzee: "Goofy's Geluksworp",
-                        qwixx: "Mickey's Racekaart",
-                        mastermind: "Yzma's Geheime Code",
+                        qwixx: "Mike's Wazowski-Board",
+                        mastermind: "Yzma's Poison Struggle",
                         sudoku6: "Tinker Bell Sudoku",
-                        sudoku9: "Kasteel Sudoku"
+                        sudoku9: "Zazu's Sudoku"
                       }[selectedArcadeGame]
                     }</strong>
                   </p>
@@ -4636,9 +4640,9 @@ export default function App() {
                 <h2 className="sectiontitle">🎮 Kies een Speltype</h2>
                 <div style={{ display: 'grid', gridTemplateColumns: 'repeat(1, 1fr)', gap: '12px', marginTop: '14px' }}>
                   {[
-                    { cat: "Yzma's Geheime Code", icon: "🧠", name: "Yzma's Geheime Code", desc: "Origineel: Mastermind. Kleurcode kraken (4, 5 of 6 stippen)", active: true },
+                    { cat: "Yzma's Poison Struggle", icon: "🧠", name: "Yzma's Poison Struggle", desc: "Origineel: Mastermind. Kleurcode kraken (4, 5 of 6 stippen)", active: true },
                     { cat: "Tinker Bell Sudoku", icon: "✨", name: "Tinker Bell Sudoku", desc: "Origineel: Sudoku 6x6. Makkelijker raster met 6 symbolen.", active: true },
-                    { cat: "Kasteel Sudoku", icon: "🏰", name: "Kasteel Sudoku", desc: "Origineel: Sudoku 9x9. Klassiek raster met 9 symbolen.", active: true },
+                    { cat: "Zazu's Sudoku", icon: "🏰", name: "Zazu's Sudoku", desc: "Origineel: Sudoku 9x9. Klassiek raster met 9 symbolen.", active: true },
                     { cat: "Disney Dagboek", icon: "📔", name: "Disney Dagboek (Geheim)", desc: "Binnenkort beschikbaar", active: false }
                   ].map(game => (
                     <button
