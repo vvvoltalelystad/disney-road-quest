@@ -2797,14 +2797,6 @@ export default function App() {
           <span>{title}</span>
         </div>
         <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
-          <button
-            className="iconbtn"
-            onClick={handleHardRefresh}
-            aria-label="Game volledig verversen"
-            title="Game volledig verversen"
-          >
-            ⟳
-          </button>
           {room?.code && (
             <button className="btn secondary mini" onClick={handleForceSync} style={{ padding: '4px 8px', fontSize: '11px' }}>
               🔄 Herlaad
@@ -3362,16 +3354,7 @@ export default function App() {
 
       {!loading && !activeProfileName && (
         <div className="portal-container">
-          <section className="card" style={{ maxWidth: '560px', margin: '40px auto 0', position: 'relative' }}>
-            <button
-              className="iconbtn"
-              onClick={handleHardRefresh}
-              aria-label="Game volledig verversen"
-              title="Game volledig verversen"
-              style={{ position: 'absolute', top: '14px', right: '14px' }}
-            >
-              ⟳
-            </button>
+          <section className="card" style={{ maxWidth: '560px', margin: '40px auto 0' }}>
             <div style={{ textAlign: 'center', marginBottom: '18px' }}>
               <div style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', marginBottom: '10px' }}>
                 <CocoCoinIcon size={74} onInspect={() => { setCoinFlipped(false); setCoinPopupOpen(true); }} />
@@ -3423,6 +3406,14 @@ export default function App() {
                 Aanmaken
               </button>
             </div>
+            <button
+              type="button"
+              className="btn secondary full"
+              onClick={handleHardRefresh}
+              style={{ marginTop: '10px' }}
+            >
+              ⟳ Game volledig verversen
+            </button>
           </section>
         </div>
       )}
