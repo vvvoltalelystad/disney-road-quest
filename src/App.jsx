@@ -92,7 +92,7 @@ function CocoCoinIcon({ size = 30, onInspect }) {
       }}
     >
       <img
-        src={assetPath('collectables/coco-coin.png')}
+        src={assetPath('collectables/coco-coin-front.png')}
         alt=""
         style={{ width: '100%', height: '100%', objectFit: 'contain', display: 'block' }}
       />
@@ -3293,23 +3293,27 @@ export default function App() {
               style={{ 
                 display: 'flex', 
                 alignItems: 'center', 
-                gap: '5px', 
+                gap: '7px',
                 background: 'rgba(255,212,92,0.12)', 
                 border: '1px solid rgba(255,212,92,0.3)', 
-                borderRadius: '16px', 
-                padding: '4px 8px', 
+                borderRadius: '18px',
+                padding: '6px 11px',
+                minHeight: '38px',
                 cursor: 'pointer',
-                fontSize: '12px',
+                fontSize: '13px',
                 fontWeight: 'bold',
                 color: 'var(--gold)',
-                userSelect: 'none'
+                userSelect: 'none',
+                whiteSpace: 'nowrap'
               }}
               title="Open Captain's Log"
             >
               <span>{activeProfileName}</span>
               <span>·</span>
-              <span>{balance} 🪙</span>
-              <span>⚓</span>
+              <span>{balance}</span>
+              <CocoCoinIcon size={18} />
+              <span>·</span>
+              <span style={{ fontSize: '16px', lineHeight: 1 }}>⚓</span>
             </div>
           )}
           {room?.code && (
