@@ -3940,6 +3940,256 @@ export function DisneyKeerOpKeerGame({ mode, room, localPlayer, players, updateR
   );
 }
 
+const ULTIMATE_LINES = [
+  [0, 1, 2], [3, 4, 5], [6, 7, 8],
+  [0, 3, 6], [1, 4, 7], [2, 5, 8],
+  [0, 4, 8], [2, 4, 6]
+];
+
+const createUltimateTicTacToeState = () => ({
+  cells: Array.from({ length: 9 }, () => Array(9).fill(null)),
+  boardOwners: Array(9).fill(null),
+  forcedBoard: null,
+  turn: 0,
+  winner: null,
+  moveCount: 0,
+  lastMove: null
+});
+
+const getUltimateWinner = (values) => {
+  for (const [a, b, c] of ULTIMATE_LINES) {
+    if (values[a] !== null && values[a] === values[b] && values[a] === values[c]) return values[a];
+  }
+  return null;
+};
+
+const isUltimateBoardClosed = (cells, boardOwners, boardIndex) => (
+  boardOwners[boardIndex] !== null || cells[boardIndex].every(cell => cell !== null)
+);
+
+const getUltimateLegalMoves = (state) => {
+  const allowedBoards = state.forcedBoard !== null && !isUltimateBoardClosed(state.cells, state.boardOwners, state.forcedBoard)
+    ? [state.forcedBoard]
+    : Array.from({ length: 9 }, (_, index) => index).filter(index => !isUltimateBoardClosed(state.cells, state.boardOwners, index));
+
+  return allowedBoards.flatMap(boardIndex => (
+    state.cells[boardIndex]
+      .map((value, cellIndex) => value === null ? { boardIndex, cellIndex } : null)
+      .filter(Boolean)
+  ));
+};
+
+const makeUltimateMove = (state, boardIndex, cellIndex, playerIndex) => {
+  const cells = state.cells.map(board => [...board]);
+  const boardOwners = [...state.boardOwners];
+  cells[boardIndex][cellIndex] = playerIndex;
+
+  const smallBoardWinner = getUltimateWinner(cells[boardIndex]);
+  if (smallBoardWinner !== null) boardOwners[boardIndex] = smallBoardWinner;
+
+  const macroWinner = getUltimateWinner(boardOwners);
+  const isDraw = macroWinner === null && getUltimateLegalMoves({
+    cells,
+    boardOwners,
+    forcedBoard: null
+  }).length === 0;
+  const nextForcedBoard = isUltimateBoardClosed(cells, boardOwners, cellIndex) ? null : cellIndex;
+
+  return {
+    ...state,
+    cells,
+    boardOwners,
+    forcedBoard: macroWinner !== null || isDraw ? null : nextForcedBoard,
+    turn: macroWinner !== null || isDraw ? playerIndex : (playerIndex + 1) % 2,
+    winner: macroWinner !== null ? macroWinner : isDraw ? 'draw' : null,
+    moveCount: (state.moveCount || 0) + 1,
+    lastMove: { boardIndex, cellIndex, playerIndex }
+  };
+};
+
+const chooseUltimateAiMove = (state, level) => {
+  const legalMoves = getUltimateLegalMoves(state);
+  if (legalMoves.length === 0) return null;
+  if (level !== 'easy') {
+    const winningMove = legalMoves.find(move => {
+      const next = makeUltimateMove(state, move.boardIndex, move.cellIndex, 1);
+      return next.winner === 1 || next.boardOwners[move.boardIndex] === 1;
+    });
+    if (winningMove) return winningMove;
+
+    const blockingMove = legalMoves.find(move => {
+      const simulated = makeUltimateMove({ ...state, turn: 0 }, move.boardIndex, move.cellIndex, 0);
+      return simulated.winner === 0 || simulated.boardOwners[move.boardIndex] === 0;
+    });
+    if (blockingMove) return blockingMove;
+  }
+  if (level === 'hard') {
+    const centerMove = legalMoves.find(move => move.cellIndex === 4);
+    if (centerMove) return centerMove;
+  }
+  return legalMoves[Math.floor(Math.random() * legalMoves.length)];
+};
+
+function UltimateTicTacToeGame({ mode, room, localPlayer, players, updateRoomState, onFinish }) {
+  const isSolo = mode === 'solo' || room.id === 'solo';
+  const taskState = room.current_task_state || {};
+  const state = taskState.ultimateTicTacToe;
+  const aiLevel = taskState.aiLevel || 'normal';
+  const myIndex = Math.max(0, players.findIndex(player => player.id === localPlayer?.id));
+  const playerNames = [
+    isSolo ? 'Jij' : (players[0]?.name || 'Speler 1'),
+    isSolo ? 'Computer' : (players[1]?.name || 'Speler 2')
+  ];
+  const playerMarks = ['X', 'O'];
+  const playerColors = ['#65bfff', '#ff6b74'];
+  const aiMoveRef = useRef('');
+
+  useEffect(() => {
+    if (!taskState.ultimateTicTacToe) {
+      updateRoomState(room.id, {
+        current_player_index: 0,
+        current_task_state: {
+          ...taskState,
+          ultimateTicTacToe: createUltimateTicTacToeState()
+        }
+      });
+    }
+  }, []);
+
+  const commitMove = (boardIndex, cellIndex, playerIndex) => {
+    if (!state || state.winner !== null) return;
+    const legalMove = getUltimateLegalMoves(state).some(move => (
+      move.boardIndex === boardIndex && move.cellIndex === cellIndex
+    ));
+    if (!legalMove) return;
+
+    const nextState = makeUltimateMove(state, boardIndex, cellIndex, playerIndex);
+    updateRoomState(room.id, {
+      current_player_index: nextState.turn,
+      current_task_state: {
+        ...taskState,
+        ultimateTicTacToe: nextState
+      }
+    });
+  };
+
+  useEffect(() => {
+    if (!isSolo || !state || state.winner !== null || state.turn !== 1) return;
+    const turnToken = `${room.id}-${state.moveCount}`;
+    if (aiMoveRef.current === turnToken) return;
+    aiMoveRef.current = turnToken;
+    const timer = window.setTimeout(() => {
+      const move = chooseUltimateAiMove(state, aiLevel);
+      if (move) commitMove(move.boardIndex, move.cellIndex, 1);
+    }, 650);
+    return () => window.clearTimeout(timer);
+  }, [isSolo, state?.moveCount, state?.turn, state?.winner, aiLevel]);
+
+  if (!state) {
+    return <div className="center" style={{ padding: '28px', color: 'var(--muted)' }}>Magisch bord wordt klaargezet...</div>;
+  }
+
+  const myTurn = state.turn === myIndex && state.winner === null;
+  const activeName = playerNames[state.turn];
+  const handleFinish = () => {
+    const draw = state.winner === 'draw';
+    const won = state.winner === myIndex;
+    const points = draw ? 2 : won ? 3 : 1;
+    const detail = draw
+      ? "Tic Tac Tinker Bell gelijkspel"
+      : won
+        ? "Tic Tac Tinker Bell gewonnen!"
+        : "Tic Tac Tinker Bell verloren";
+    onFinish(points, detail);
+  };
+
+  return (
+    <div style={{ textAlign: 'center' }}>
+      <div style={{ display: 'flex', justifyContent: 'space-around', gap: '8px', marginBottom: '10px', fontSize: '14px', fontWeight: 850 }}>
+        {[0, 1].map(index => (
+          <span key={index} style={{ color: playerColors[index] }}>
+            {playerMarks[index]} {playerNames[index]}
+          </span>
+        ))}
+      </div>
+
+      {state.winner !== null ? (
+        <div style={{ marginBottom: '10px', color: 'var(--gold)', fontWeight: 850 }}>
+          {state.winner === 'draw' ? 'Gelijkspel op het grote bord.' : `${playerNames[state.winner]} verovert het grote bord!`}
+        </div>
+      ) : (
+        <div style={{ marginBottom: '10px', color: myTurn ? 'var(--gold)' : 'var(--muted)', fontSize: '13px', fontWeight: 800 }}>
+          {myTurn ? 'Jouw beurt.' : `Aan zet: ${activeName}.`} {state.forcedBoard === null ? 'Vrije bordkeuze.' : `Ga naar klein bord ${state.forcedBoard + 1}.`}
+        </div>
+      )}
+
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '5px', maxWidth: '390px', margin: '0 auto', padding: '7px', background: '#041026', borderRadius: '16px' }}>
+        {state.cells.map((board, boardIndex) => {
+          const owner = state.boardOwners[boardIndex];
+          const forced = state.forcedBoard === boardIndex && owner === null;
+          const availableBoard = state.forcedBoard === null || forced;
+          return (
+            <div
+              key={boardIndex}
+              style={{
+                position: 'relative',
+                display: 'grid',
+                gridTemplateColumns: 'repeat(3, 1fr)',
+                gap: '2px',
+                aspectRatio: '1',
+                padding: '3px',
+                background: '#07152c',
+                border: `3px solid ${forced ? '#a7ffe7' : '#65d9bd'}`,
+                borderRadius: '8px',
+                boxShadow: forced ? '0 0 14px rgba(101, 217, 189, 0.6)' : 'none',
+                opacity: owner !== null ? 0.72 : availableBoard ? 1 : 0.45
+              }}
+            >
+              {board.map((mark, cellIndex) => {
+                const canPlay = myTurn && owner === null && availableBoard && mark === null;
+                return (
+                  <button
+                    key={cellIndex}
+                    type="button"
+                    disabled={!canPlay}
+                    onClick={() => commitMove(boardIndex, cellIndex, myIndex)}
+                    aria-label={`Klein bord ${boardIndex + 1}, vak ${cellIndex + 1}`}
+                    style={{
+                      minWidth: 0,
+                      padding: 0,
+                      border: '1px solid #23466f',
+                      borderRadius: '4px',
+                      background: '#0a1c38',
+                      color: mark === null ? 'transparent' : playerColors[mark],
+                      fontSize: 'clamp(14px, 4vw, 23px)',
+                      fontWeight: 950,
+                      lineHeight: 1,
+                      cursor: canPlay ? 'pointer' : 'default'
+                    }}
+                  >
+                    {mark === null ? '-' : playerMarks[mark]}
+                  </button>
+                );
+              })}
+              {owner !== null && (
+                <div style={{ position: 'absolute', inset: 0, display: 'grid', placeItems: 'center', pointerEvents: 'none', color: playerColors[owner], fontSize: 'clamp(34px, 10vw, 64px)', fontWeight: 950, textShadow: '0 2px 12px #000' }}>
+                  {playerMarks[owner]}
+                </div>
+              )}
+            </div>
+          );
+        })}
+      </div>
+
+      {state.winner !== null && (
+        <button className="btn primary full" onClick={handleFinish} style={{ marginTop: '14px' }}>
+          Voltooien & score bepalen
+        </button>
+      )}
+    </div>
+  );
+}
+
 const MINI_GAME_RULES = {
   othello: {
     title: "Ursula's Spiegelstrijd",
@@ -4057,6 +4307,19 @@ const MINI_GAME_RULES = {
     ],
     solo: "Solo: jij speelt tegen de computer. De computer kiest automatisch een geldig vakje of past.",
     duel: "Duel: spelers gooien om de beurt. De gedeelde scorekaart wordt realtime bijgewerkt."
+  },
+  tictactinker: {
+    title: "Tic Tac Tinker Bell",
+    intro: "Origineel: Ultimate Tic Tac Toe. Verover kleine 3x3-borden om drie grote vakken op rij te claimen.",
+    rules: [
+      "De eerste speler mag op elk klein bord beginnen.",
+      "Het vakje dat je kiest, bepaalt op welk kleine bord je tegenstander daarna moet spelen.",
+      "Is dat kleine bord al gewonnen of vol, dan mag je tegenstander vrij kiezen.",
+      "Drie X'en of O's op rij winnen een klein bord.",
+      "Wie drie kleine borden op rij verovert, wint het grote bord."
+    ],
+    solo: "Solo: jij speelt X tegen de computer. Het gekozen vakje stuurt de computer naar zijn volgende kleine bord.",
+    duel: "Duel: X begint. Elke zet en de verplichte volgende bordkeuze worden realtime gedeeld."
   },
   keeropkeer: {
     title: "Disney Keer op Keer",
@@ -4252,6 +4515,18 @@ export function MiniGameRenderer({ gameId, mode, room, localPlayer, players, upd
     case 'qwixx':
       gameView = (
         <DisneyQwixxGame
+          mode={mode}
+          room={room}
+          localPlayer={localPlayer}
+          players={players}
+          updateRoomState={safeUpdateRoomState}
+          onFinish={onFinish}
+        />
+      );
+      break;
+    case 'tictactinker':
+      gameView = (
+        <UltimateTicTacToeGame
           mode={mode}
           room={room}
           localPlayer={localPlayer}

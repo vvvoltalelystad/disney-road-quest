@@ -65,7 +65,7 @@ const ARENA_GAMES = [
   { id: 'yahtzee', name: "Goofy's Geluksworp", icon: "\u{1F3B2}", image: 'arena/games/Goofy.png', desc: "Origineel: Yahtzee. Gooi, houd dobbelstenen vast en vul je magische scorekaart.", maxPlayers: 2 },
   { id: 'qwixx', name: "Mike's Wazowski-Board", icon: "\u270F\uFE0F", image: 'arena/games/Mike.png', desc: "Origineel: Qwixx. Streep gekleurde rijen af en ontwijk strafvakjes.", maxPlayers: 2 },
   { id: 'mastermind', name: "Yzma's Poison Struggle", icon: "\u{1F9E0}", image: 'arena/games/Yzma.png', desc: "Origineel: Mastermind. Solo puzzel: kraak de geheime Disney-kleurcode.", maxPlayers: 1 },
-  { id: 'tictactinker', name: "Tic Tac Tinker Bell", icon: "\u2728", image: 'arena/games/Tinker Bell.png', desc: "Origineel: Ultimate Tic Tac Toe. Win kleine borden om het grote bord te veroveren.", maxPlayers: 2, comingSoon: true },
+  { id: 'tictactinker', name: "Tic Tac Tinker Bell", icon: "\u2728", image: 'arena/games/Tinker Bell.png', desc: "Origineel: Ultimate Tic Tac Toe. Win kleine borden om het grote bord te veroveren.", maxPlayers: 2 },
   { id: 'sudoku9', name: "Zazu's Sudoku", icon: "\u{1F3F0}", image: 'arena/games/Zazu.png', desc: "Origineel: Sudoku 9x9. Klassiek raster met Disney-symbolen.", maxPlayers: 1 }
 ];
 
@@ -458,7 +458,7 @@ const getCellBorderStyles = (r, c, size, isSelected, hasError) => {
   return styles;
 };
 
-function GameZoomContainer({ children, maxHeight = '420px', aspectRatio = '1 / 1', maxWidth = '100%' }) {
+function GameZoomContainer({ children, maxHeight = '420px', aspectRatio = '1 / 1', maxWidth = '100%', resetKey }) {
   const [zoom, setZoom] = useState(1);
   const [pan, setPan] = useState({ x: 0, y: 0 });
   const viewportRef = useRef(null);
@@ -525,14 +525,15 @@ function GameZoomContainer({ children, maxHeight = '420px', aspectRatio = '1 / 1
     }
 
     if (e.touches.length !== 1 || gesture.mode !== 'pan') return;
-    e.preventDefault();
     const touch = e.touches[0];
     const dx = touch.clientX - gesture.startX;
     const dy = touch.clientY - gesture.startY;
-    if (Math.abs(dx) + Math.abs(dy) > 6) {
+    if (!gesture.moved && Math.abs(dx) + Math.abs(dy) > 6) {
       gesture.moved = true;
       suppressClickRef.current = true;
     }
+    if (!gesture.moved) return;
+    e.preventDefault();
     setPan(clampPan({ x: gesture.pan.x + dx, y: gesture.pan.y + dy }, zoom));
   };
 
@@ -555,6 +556,13 @@ function GameZoomContainer({ children, maxHeight = '420px', aspectRatio = '1 / 1
     window.addEventListener('resize', keepInView);
     return () => window.removeEventListener('resize', keepInView);
   }, [zoom]);
+
+  useEffect(() => {
+    touchRef.current = null;
+    suppressClickRef.current = false;
+    setZoom(1);
+    setPan({ x: 0, y: 0 });
+  }, [resetKey]);
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', width: '100%' }}>
@@ -5036,7 +5044,7 @@ export default function App() {
                            <div style={{ marginTop: '20px' }}>
                             {/* -1. DISNEY DUEL ARENA */}
                             {t.type === "arcade-game" && (
-                              <GameZoomContainer maxHeight="420px" aspectRatio="1 / 1">
+                              <GameZoomContainer maxHeight={t.gameId === 'tictactinker' ? '520px' : '420px'} aspectRatio="1 / 1">
                                 <MiniGameRenderer
                                   gameId={t.gameId}
                                   mode={t.mode}
@@ -5053,7 +5061,8 @@ export default function App() {
                                       colorlines: "Color Lines",
                                       ricochet: "Ricochet Shot",
                                       curling: "Curling Duel",
-                                      abalone: "Marble Push (Abalone)"
+                                      abalone: "Marble Push (Abalone)",
+                                      tictactinker: "Tic Tac Tinker Bell"
                                     }[t.gameId] || "Arena Game";
 
                                     if (room.id === 'solo') {
@@ -5098,7 +5107,12 @@ export default function App() {
                                     </div>
 
                                     {/* The Sudoku Grid wrapped in GameZoomContainer */}
-                                    <GameZoomContainer maxHeight="380px" maxWidth="380px" aspectRatio="1 / 1">
+                                    <GameZoomContainer
+                                      maxHeight="min(65dvh, 520px)"
+                                      maxWidth="min(100%, 65dvh, 520px)"
+                                      aspectRatio="1 / 1"
+                                      resetKey={`${sudokuSize}-${sudokuStartTime}`}
+                                    >
                                       <div 
                                         style={{ 
                                           display: 'grid', 
