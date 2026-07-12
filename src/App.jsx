@@ -11,7 +11,7 @@ import {
   adjustScoreEntry,
   removeScoreEntry
 } from './multiplayer';
-import { MiniGameRenderer } from './MiniGames';
+import { MiniGameRenderer, MiniGameRulesButton } from './MiniGames';
 
 const GAME_MODES = [
   { id: "mix", name: "Road Race", icon: "🚗", description: "De volledige afwisselende mix van alle speltypen." },
@@ -458,7 +458,7 @@ const getCellBorderStyles = (r, c, size, isSelected, hasError) => {
   return styles;
 };
 
-function GameZoomContainer({ children, maxHeight = '420px', aspectRatio = '1 / 1', maxWidth = '100%', resetKey }) {
+function GameZoomContainer({ children, maxHeight = '420px', aspectRatio = '1 / 1', maxWidth = '100%', resetKey, toolbarContent, footerContent }) {
   const [zoom, setZoom] = useState(1);
   const [pan, setPan] = useState({ x: 0, y: 0 });
   const viewportRef = useRef(null);
@@ -566,14 +566,17 @@ function GameZoomContainer({ children, maxHeight = '420px', aspectRatio = '1 / 1
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', width: '100%' }}>
-      <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '8px', alignItems: 'center', marginBottom: '8px' }}>
-        <button type="button" className="btn secondary mini" style={{ padding: '4px 8px' }} onClick={() => applyZoom(+(zoom - 0.15).toFixed(2))}>
-          -
-        </button>
-        <span style={{ color: 'var(--muted)', fontSize: '12px', minWidth: '40px', textAlign: 'center' }}>{Math.round(zoom * 100)}%</span>
-        <button type="button" className="btn secondary mini" style={{ padding: '4px 8px' }} onClick={() => applyZoom(+(zoom + 0.15).toFixed(2))}>
-          +
-        </button>
+      <div style={{ display: 'flex', gap: '8px', alignItems: 'center', marginBottom: '8px' }}>
+        {toolbarContent && <div style={{ flex: 1, minWidth: 0 }}>{toolbarContent}</div>}
+        <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '8px', alignItems: 'center' }}>
+          <button type="button" className="btn secondary mini" style={{ padding: '4px 8px' }} onClick={() => applyZoom(+(zoom - 0.15).toFixed(2))}>
+            -
+          </button>
+          <span style={{ color: 'var(--muted)', fontSize: '12px', minWidth: '40px', textAlign: 'center' }}>{Math.round(zoom * 100)}%</span>
+          <button type="button" className="btn secondary mini" style={{ padding: '4px 8px' }} onClick={() => applyZoom(+(zoom + 0.15).toFixed(2))}>
+            +
+          </button>
+        </div>
       </div>
 
       <div
@@ -626,6 +629,7 @@ function GameZoomContainer({ children, maxHeight = '420px', aspectRatio = '1 / 1
           {children}
         </div>
       </div>
+      {footerContent && <div style={{ marginTop: '9px', textAlign: 'center' }}>{footerContent}</div>}
     </div>
   );
 }
@@ -697,6 +701,7 @@ export default function App() {
   const [selectedArcadeGame, setSelectedArcadeGame] = useState(null);
   const [arcadePlayMode, setArcadePlayMode] = useState(null); // 'solo' or 'duel'
   const [arcadeLobbyCode, setArcadeLobbyCode] = useState('');
+  const [arenaToolbar, setArenaToolbar] = useState(null);
 
   // Sudoku states
   const [sudokuGrid, setSudokuGrid] = useState([]);
@@ -4048,7 +4053,6 @@ export default function App() {
                 <>
               <div className="portal-header">
                 <div className="portal-logo-glow"></div>
-                <div className="portal-badge">✨ MAGIC GAME PORTAL</div>
                 <h1 className="portal-title">Disney Game Portal</h1>
                 <p className="portal-subtitle">Kies een interactief multiplayer spel voor in de auto of thuis. Iedereen speelt op zijn eigen telefoon!</p>
               </div>
@@ -4392,13 +4396,6 @@ export default function App() {
 
               {!showPortalShop && (
                 <>
-              <div className="portal-info-box">
-                <div className="info-icon">ℹ️</div>
-                <div className="info-text">
-                  <strong>Magische Verbinding</strong> Beide spellen maken gebruik van dezelfde database op Supabase, maar werken apart. Open een kamer, laat je medereizigers de code scannen en laat de magie beginnen!
-                </div>
-              </div>
-
               <button
                 type="button"
                 className="btn secondary full"
@@ -5046,8 +5043,33 @@ export default function App() {
 
                            <div style={{ marginTop: '20px' }}>
                             {/* -1. DISNEY DUEL ARENA */}
-                            {t.type === "arcade-game" && (
-                              <GameZoomContainer maxHeight={t.gameId === 'tictactinker' ? '520px' : '420px'} aspectRatio="1 / 1">
+                            {t.type === "arcade-game" && (() => {
+                              const isTinkerGame = t.gameId === 'tictactinker';
+                              const tinkerToolbar = isTinkerGame && arenaToolbar?.gameId === 'tictactinker' ? (
+                                <div style={{ position: 'relative', minHeight: '34px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                                  <div style={{ position: 'absolute', left: 0 }}>
+                                    <MiniGameRulesButton gameId="tictactinker" mode={t.mode} compact />
+                                  </div>
+                                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '14px', paddingLeft: '28px', color: 'var(--muted)', fontSize: '13px', fontWeight: 850, whiteSpace: 'nowrap' }}>
+                                    <span style={{ color: arenaToolbar.playerColors[0] }}>X {arenaToolbar.playerNames[0]}</span>
+                                    <span style={{ color: arenaToolbar.playerColors[1] }}>O {arenaToolbar.playerNames[1]}</span>
+                                    <span style={{ color: arenaToolbar.myTurn ? 'var(--gold)' : 'var(--muted)' }}>{arenaToolbar.turnText}</span>
+                                  </div>
+                                </div>
+                              ) : null;
+                              const tinkerFooter = isTinkerGame && arenaToolbar?.gameId === 'tictactinker' ? (
+                                <span style={{ color: arenaToolbar.myTurn ? 'var(--gold)' : 'var(--muted)', fontSize: '13px', fontWeight: 850 }}>
+                                  {arenaToolbar.boardMessage}
+                                </span>
+                              ) : null;
+
+                              return (
+                              <GameZoomContainer
+                                maxHeight={isTinkerGame ? '520px' : '420px'}
+                                aspectRatio="1 / 1"
+                                toolbarContent={tinkerToolbar}
+                                footerContent={tinkerFooter}
+                              >
                                 <MiniGameRenderer
                                   gameId={t.gameId}
                                   mode={t.mode}
@@ -5055,6 +5077,8 @@ export default function App() {
                                   localPlayer={localPlayer}
                                   players={players}
                                   updateRoomState={updateRoomState}
+                                  showRules={!isTinkerGame}
+                                  onToolbarChange={isTinkerGame ? setArenaToolbar : undefined}
                                   onFinish={async (score, detail) => {
                                     const isScoreBased = t.gameId === 'ricochet';
                                     const coinsEarned = isScoreBased ? score : (score === 3 ? 2 : (score === 2 ? 1 : 0));
@@ -5078,7 +5102,8 @@ export default function App() {
                                   }}
                                 />
                               </GameZoomContainer>
-                            )}
+                              );
+                            })()}
 
                             {/* 0. DISNEY SUDOKU */}
                             {t.type === "sudoku" && (

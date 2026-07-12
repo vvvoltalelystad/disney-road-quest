@@ -4030,7 +4030,7 @@ const chooseUltimateAiMove = (state, level) => {
   return legalMoves[Math.floor(Math.random() * legalMoves.length)];
 };
 
-function UltimateTicTacToeGame({ mode, room, localPlayer, players, updateRoomState, onFinish }) {
+function UltimateTicTacToeGame({ mode, room, localPlayer, players, updateRoomState, onFinish, onToolbarChange }) {
   const isSolo = mode === 'solo' || room.id === 'solo';
   const taskState = room.current_task_state || {};
   const state = taskState.ultimateTicTacToe;
@@ -4085,12 +4085,32 @@ function UltimateTicTacToeGame({ mode, room, localPlayer, players, updateRoomSta
     return () => window.clearTimeout(timer);
   }, [isSolo, state?.moveCount, state?.turn, state?.winner, aiLevel]);
 
+  const myTurn = Boolean(state) && state.turn === myIndex && state.winner === null;
+  const activeName = state ? playerNames[state.turn] : '';
+  const turnText = !state ? '' : state.winner !== null
+    ? state.winner === 'draw' ? 'Gelijkspel' : `${playerNames[state.winner]} wint`
+    : myTurn ? 'Jouw beurt' : `Aan zet: ${activeName}`;
+  const boardMessage = !state ? '' : state.winner !== null
+    ? state.winner === 'draw' ? 'Het grote bord is vol: gelijkspel.' : `${playerNames[state.winner]} verovert het grote bord!`
+    : state.forcedBoard === null ? 'Vrije bordkeuze' : `Speel op klein bord ${state.forcedBoard + 1}`;
+
+  useEffect(() => {
+    if (!onToolbarChange || !state) return undefined;
+    onToolbarChange({
+      gameId: 'tictactinker',
+      playerNames,
+      playerColors,
+      myTurn,
+      turnText,
+      boardMessage
+    });
+    return () => onToolbarChange(null);
+  }, [onToolbarChange, playerNames[0], playerNames[1], myTurn, turnText, boardMessage]);
+
   if (!state) {
     return <div className="center" style={{ padding: '28px', color: 'var(--muted)' }}>Magisch bord wordt klaargezet...</div>;
   }
 
-  const myTurn = state.turn === myIndex && state.winner === null;
-  const activeName = playerNames[state.turn];
   const handleFinish = () => {
     const draw = state.winner === 'draw';
     const won = state.winner === myIndex;
@@ -4104,26 +4124,8 @@ function UltimateTicTacToeGame({ mode, room, localPlayer, players, updateRoomSta
   };
 
   return (
-    <div style={{ textAlign: 'center' }}>
-      <div style={{ display: 'flex', justifyContent: 'space-around', gap: '8px', marginBottom: '10px', fontSize: '14px', fontWeight: 850 }}>
-        {[0, 1].map(index => (
-          <span key={index} style={{ color: playerColors[index] }}>
-            {playerMarks[index]} {playerNames[index]}
-          </span>
-        ))}
-      </div>
-
-      {state.winner !== null ? (
-        <div style={{ marginBottom: '10px', color: 'var(--gold)', fontWeight: 850 }}>
-          {state.winner === 'draw' ? 'Gelijkspel op het grote bord.' : `${playerNames[state.winner]} verovert het grote bord!`}
-        </div>
-      ) : (
-        <div style={{ marginBottom: '10px', color: myTurn ? 'var(--gold)' : 'var(--muted)', fontSize: '13px', fontWeight: 800 }}>
-          {myTurn ? 'Jouw beurt.' : `Aan zet: ${activeName}.`} {state.forcedBoard === null ? 'Vrije bordkeuze.' : `Ga naar klein bord ${state.forcedBoard + 1}.`}
-        </div>
-      )}
-
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '5px', maxWidth: '390px', margin: '0 auto', padding: '7px', background: '#041026', borderRadius: '16px' }}>
+    <div style={{ width: '100%', height: '100%', display: 'flex', flexDirection: 'column', alignItems: 'stretch' }}>
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '5px', width: '100%', height: state.winner !== null ? 'calc(100% - 58px)' : '100%', padding: '7px', background: '#041026', borderRadius: '16px' }}>
         {state.cells.map((board, boardIndex) => {
           const owner = state.boardOwners[boardIndex];
           const forced = state.forcedBoard === boardIndex && owner === null;
@@ -4181,11 +4183,7 @@ function UltimateTicTacToeGame({ mode, room, localPlayer, players, updateRoomSta
         })}
       </div>
 
-      {state.winner !== null && (
-        <button className="btn primary full" onClick={handleFinish} style={{ marginTop: '14px' }}>
-          Voltooien & score bepalen
-        </button>
-      )}
+      {state.winner !== null && <button className="btn primary full" onClick={handleFinish} style={{ marginTop: '12px', flex: '0 0 auto' }}>Voltooien & score bepalen</button>}
     </div>
   );
 }
@@ -4336,7 +4334,7 @@ const MINI_GAME_RULES = {
   }
 };
 
-function MiniGameRulesButton({ gameId, mode }) {
+export function MiniGameRulesButton({ gameId, mode, compact = false }) {
   const [open, setOpen] = useState(false);
   const rules = MINI_GAME_RULES[gameId];
 
@@ -4345,7 +4343,7 @@ function MiniGameRulesButton({ gameId, mode }) {
   const modeText = mode === 'duel' ? rules.duel : rules.solo;
 
   return (
-    <div style={{ display: 'flex', justifyContent: 'flex-end', margin: '0 0 10px' }}>
+    <div style={{ display: 'flex', justifyContent: 'flex-end', margin: compact ? 0 : '0 0 10px' }}>
       <button
         type="button"
         className="btn ghost mini"
@@ -4440,7 +4438,7 @@ function MiniGameRulesButton({ gameId, mode }) {
 // ----------------------------------------------------
 // MAIN WRAPPER RENDERER
 // ----------------------------------------------------
-export function MiniGameRenderer({ gameId, mode, room, localPlayer, players, updateRoomState, onFinish }) {
+export function MiniGameRenderer({ gameId, mode, room, localPlayer, players, updateRoomState, onFinish, showRules = true, onToolbarChange }) {
   const safeUpdateRoomState = updateRoomState || (async () => {});
   let gameView;
 
@@ -4451,9 +4449,9 @@ export function MiniGameRenderer({ gameId, mode, room, localPlayer, players, upd
           mode={mode}
           room={room}
           localPlayer={localPlayer}
-          players={players}
-          updateRoomState={safeUpdateRoomState}
-          onFinish={onFinish}
+        players={players}
+        updateRoomState={safeUpdateRoomState}
+        onFinish={onFinish}
         />
       );
       break;
@@ -4533,6 +4531,7 @@ export function MiniGameRenderer({ gameId, mode, room, localPlayer, players, upd
           players={players}
           updateRoomState={safeUpdateRoomState}
           onFinish={onFinish}
+          onToolbarChange={onToolbarChange}
         />
       );
       break;
@@ -4541,8 +4540,8 @@ export function MiniGameRenderer({ gameId, mode, room, localPlayer, players, upd
   }
 
   return (
-    <div>
-      <MiniGameRulesButton gameId={gameId} mode={mode} />
+    <div style={gameId === 'tictactinker' ? { width: '100%', height: '100%' } : undefined}>
+      {showRules && <MiniGameRulesButton gameId={gameId} mode={mode} />}
       {gameView}
     </div>
   );
