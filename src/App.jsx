@@ -747,12 +747,12 @@ export default function App() {
   const clampSudokuZoom = (value) => Math.min(2.4, Math.max(1, value));
 
   const clampSudokuPan = (pan, zoom = sudokuZoom) => {
-    if (zoom <= 1) return { x: 0, y: 0 };
     const rect = sudokuViewportRef.current?.getBoundingClientRect();
     if (!rect) return pan;
 
-    const maxX = Math.max(0, (rect.width * (zoom - 1)) / 2);
-    const maxY = Math.max(0, (rect.height * (zoom - 1)) / 2);
+    const basePanAllowance = 22;
+    const maxX = basePanAllowance + Math.max(0, (rect.width * (zoom - 1)) / 2);
+    const maxY = basePanAllowance + Math.max(0, (rect.height * (zoom - 1)) / 2);
     return {
       x: Math.min(maxX, Math.max(-maxX, pan.x)),
       y: Math.min(maxY, Math.max(-maxY, pan.y))
@@ -800,7 +800,7 @@ export default function App() {
       return;
     }
 
-    if (e.touches.length !== 1 || gesture.mode !== 'pan' || sudokuZoom <= 1) return;
+    if (e.touches.length !== 1 || gesture.mode !== 'pan') return;
     e.preventDefault();
     const touch = e.touches[0];
     const dx = touch.clientX - gesture.startX;
@@ -892,7 +892,9 @@ export default function App() {
         coco_profiles: localProfiles,
         coco_bank: starBank,
         coco_collections: collections,
-        coco_exclusive_claims: exclusiveClaims
+        coco_exclusive_claims: exclusiveClaims,
+        coco_profile_store_version: 1,
+        updated_at: new Date().toISOString()
       };
 
       try {
@@ -935,15 +937,21 @@ export default function App() {
         }
 
         const remoteState = store?.current_task_state || {};
-        const mergedProfiles = uniqueProfileNames([...(remoteState.coco_profiles || []), ...localProfiles]);
-        const mergedBank = mergeBank(remoteState.coco_bank, starBank);
-        const mergedCollections = mergeCollections(remoteState.coco_collections, collections);
-        const mergedClaims = { ...(exclusiveClaims || {}), ...(remoteState.coco_exclusive_claims || {}) };
+        const remoteProfiles = uniqueProfileNames(remoteState.coco_profiles || []);
+        const migrateLocalState = remoteProfiles.length === 0 && localProfiles.length > 0;
+        const mergedProfiles = migrateLocalState ? uniqueProfileNames([...remoteProfiles, ...localProfiles]) : remoteProfiles;
+        const mergedBank = migrateLocalState ? mergeBank(remoteState.coco_bank, starBank) : (remoteState.coco_bank || {});
+        const mergedCollections = migrateLocalState ? mergeCollections(remoteState.coco_collections, collections) : (remoteState.coco_collections || {});
+        const mergedClaims = migrateLocalState
+          ? { ...(exclusiveClaims || {}), ...(remoteState.coco_exclusive_claims || {}) }
+          : (remoteState.coco_exclusive_claims || {});
         const mergedState = {
           coco_profiles: mergedProfiles,
           coco_bank: mergedBank,
           coco_collections: mergedCollections,
-          coco_exclusive_claims: mergedClaims
+          coco_exclusive_claims: mergedClaims,
+          coco_profile_store_version: 1,
+          updated_at: new Date().toISOString()
         };
 
         if (!cancelled) {
@@ -983,7 +991,9 @@ export default function App() {
             coco_profiles: uniqueProfileNames(cocoProfiles),
             coco_bank: starBank,
             coco_collections: collections,
-            coco_exclusive_claims: exclusiveClaims
+            coco_exclusive_claims: exclusiveClaims,
+            coco_profile_store_version: 1,
+            updated_at: new Date().toISOString()
           }
         })
         .eq('id', cocoProfileStoreIdRef.current)
@@ -4560,19 +4570,19 @@ export default function App() {
                                         display: 'flex',
                                         alignItems: 'center',
                                         justifyContent: 'center',
+                                        position: 'relative',
                                         touchAction: 'none',
                                         boxSizing: 'border-box'
                                       }}
                                     >
                                     <div 
                                       style={{ 
+                                        position: 'absolute',
+                                        inset: '6px',
                                         display: 'grid', 
                                         gridTemplateColumns: `repeat(${sudokuSize}, 1fr)`, 
                                         gridTemplateRows: `repeat(${sudokuSize}, 1fr)`,
                                         gap: '4px', 
-                                        width: '100%',
-                                        height: '100%',
-                                        margin: '0 auto',
                                         background: '#041026', 
                                         padding: '8px', 
                                         borderRadius: '16px', 
