@@ -459,7 +459,10 @@ export default function App() {
   const [cocoProfiles, setCocoProfiles] = useState(() => {
     const saved = readJsonStorage(COCO_PROFILES_KEY, []);
     const legacyName = localStorage.getItem('disney_player_name');
-    const names = [...DEFAULT_COCO_PROFILES, legacyName, ...saved].filter(Boolean);
+    const savedProfiles = Array.isArray(saved) ? saved : [];
+    const names = savedProfiles.length
+      ? [legacyName, ...savedProfiles].filter(Boolean)
+      : [...DEFAULT_COCO_PROFILES, legacyName].filter(Boolean);
     const seen = new Set();
     return names
       .map(name => String(name).trim())
