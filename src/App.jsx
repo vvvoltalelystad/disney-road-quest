@@ -76,8 +76,8 @@ const COCO_PROFILES_KEY = 'disney_coco_profiles';
 const ACTIVE_PROFILE_KEY = 'disney_active_profile';
 const DEFAULT_COCO_PROFILES = ['Speler 1', 'Speler 2', 'Speler 3', 'Speler 4'];
 
-function CocoCoinIcon({ size = 30 }) {
-  return (
+function CocoCoinIcon({ size = 30, onInspect }) {
+  const icon = (
     <span
       aria-hidden="true"
       style={{
@@ -97,6 +97,20 @@ function CocoCoinIcon({ size = 30 }) {
         style={{ width: '100%', height: '100%', objectFit: 'contain', display: 'block' }}
       />
     </span>
+  );
+
+  if (!onInspect) return icon;
+
+  return (
+    <button
+      type="button"
+      className="coco-coin-button"
+      onClick={onInspect}
+      aria-label="Bekijk Coco Coin"
+      title="Bekijk Coco Coin"
+    >
+      {icon}
+    </button>
   );
 }
 
@@ -479,6 +493,8 @@ export default function App() {
   const [donationTargetName, setDonationTargetName] = useState('');
   const [donationAmount, setDonationAmount] = useState('');
   const [selectedCollectionItem, setSelectedCollectionItem] = useState(null);
+  const [coinPopupOpen, setCoinPopupOpen] = useState(false);
+  const [coinFlipped, setCoinFlipped] = useState(false);
   const [aiLevel, setAiLevel] = useState(() => localStorage.getItem('disney_ai_level') || 'normal');
 
   // Solo mode states and history
@@ -851,6 +867,19 @@ export default function App() {
   const getDisplayShopPlayers = () => {
     return uniqueProfileNames(cocoProfiles.length ? cocoProfiles : DEFAULT_COCO_PROFILES);
   };
+
+  useEffect(() => {
+    const dagobertProfile = cocoProfiles.find(name => norm(name) === 'dagobert');
+    if (!dagobertProfile) return;
+
+    const dagobertKey = getCollectorKey(dagobertProfile);
+    setStarBank(prev => {
+      if ((prev[dagobertKey] || 0) >= 100) return prev;
+      const next = { ...prev, [dagobertKey]: 100 };
+      localStorage.setItem(COCO_BANK_KEY, JSON.stringify(next));
+      return next;
+    });
+  }, [cocoProfiles]);
 
   const awardStarsToCollector = (name, amount) => {
     const coins = Math.max(0, Number(amount) || 0);
@@ -3261,12 +3290,50 @@ export default function App() {
         </div>
       )}
 
+      {coinPopupOpen && (
+        <div
+          className="collection-popup-backdrop"
+          onClick={() => setCoinPopupOpen(false)}
+        >
+          <div className="collection-popup-card coin-popup-card" onClick={(e) => e.stopPropagation()}>
+            <button
+              className="collection-popup-close"
+              onClick={() => setCoinPopupOpen(false)}
+              aria-label="Sluiten"
+            >
+              ×
+            </button>
+            <div className={`coin-flip-stage ${coinFlipped ? 'is-flipped' : ''}`}>
+              <button
+                type="button"
+                className="coin-flip-inner"
+                onClick={() => setCoinFlipped(prev => !prev)}
+                aria-label={coinFlipped ? 'Bekijk voorkant van Coco Coin' : 'Bekijk achterkant van Coco Coin'}
+              >
+                <span className="coin-flip-face coin-flip-front">
+                  <img src={assetPath('collectables/coco-coin.png')} alt="Voorkant van de Coco Coin" />
+                </span>
+                <span className="coin-flip-face coin-flip-back">
+                  <img src={assetPath('collectables/coco-coin-back.png')} alt="Achterkant van de Coco Coin" />
+                </span>
+              </button>
+            </div>
+            <div className="badge" style={{ alignSelf: 'center', marginBottom: '8px' }}>Coco Coin</div>
+            <h2>De munt van Coco</h2>
+            <p>Klik op de munt om hem om te draaien.</p>
+            <button type="button" className="btn primary full" onClick={() => setCoinFlipped(prev => !prev)}>
+              {coinFlipped ? 'Bekijk voorkant' : 'Draai Coco Coin om'}
+            </button>
+          </div>
+        </div>
+      )}
+
       {!loading && !activeProfileName && (
         <div className="portal-container">
           <section className="card" style={{ maxWidth: '560px', margin: '40px auto 0' }}>
             <div style={{ textAlign: 'center', marginBottom: '18px' }}>
               <div style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', marginBottom: '10px' }}>
-                <CocoCoinIcon size={74} />
+                <CocoCoinIcon size={74} onInspect={() => { setCoinFlipped(false); setCoinPopupOpen(true); }} />
               </div>
               <h1 style={{ margin: '0 0 8px' }}>Kies je Disney-profiel</h1>
               <p style={{ color: 'var(--muted)', margin: 0 }}>
@@ -3343,7 +3410,7 @@ export default function App() {
                 <h2>{selectedCollectionItem.name}</h2>
                 <p>{selectedCollectionItem.desc}</p>
                 <div className="collection-popup-price">
-                  <CocoCoinIcon size={28} />
+                  <CocoCoinIcon size={28} onInspect={() => { setCoinFlipped(false); setCoinPopupOpen(true); }} />
                   <span>{formatCocoCoins(selectedCollectionItem.cost)}</span>
                 </div>
               </div>
@@ -3435,7 +3502,7 @@ export default function App() {
                         </p>
                       </div>
                       <div style={{ color: 'var(--gold)', fontWeight: 900, fontSize: '20px', display: 'flex', alignItems: 'center', gap: '8px' }}>
-                        <CocoCoinIcon size={34} />
+                        <CocoCoinIcon size={34} onInspect={() => { setCoinFlipped(false); setCoinPopupOpen(true); }} />
                         <span>{formatCocoCoins(balance)}</span>
                       </div>
                     </div>
