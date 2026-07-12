@@ -3278,17 +3278,17 @@ export default function App() {
   const renderAppHeader = (title = "McQueen's Road Race", backAction = null) => {
     const key = getCollectorKey(activeProfileName);
     const balance = starBank[key] || 0;
-    const isArenaHeader = title === "Hercules' Duel Arena";
+    const isArenaHeader = title === "Hercules' Duel Arena" || title === 'Duel Arena';
 
     return (
       <div className="topbar">
-        <div className="brand">
-          <span className="castle">
-            {isArenaHeader ? <img src={assetPath('portal/Hercules.png')} alt="Hercules" /> : '🏰'}
-          </span>
-          <span>{title}</span>
-        </div>
-        <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+        {!isArenaHeader && (
+          <div className="brand">
+            <span className="castle">🏰</span>
+            <span>{title}</span>
+          </div>
+        )}
+        <div style={{ display: 'flex', gap: '8px', alignItems: 'center', width: isArenaHeader ? '100%' : undefined }}>
           {activeProfileName && (
             <div 
               onClick={() => {
@@ -3309,7 +3309,8 @@ export default function App() {
                 fontWeight: 'bold',
                 color: 'var(--gold)',
                 userSelect: 'none',
-                whiteSpace: 'nowrap'
+                whiteSpace: 'nowrap',
+                marginRight: isArenaHeader ? 'auto' : undefined
               }}
               title="Open Captain's Log"
             >
@@ -5064,7 +5065,7 @@ export default function App() {
                       }
                     }
                   )}
-                  {renderScoreBar()}
+                  {!room.game_mode?.startsWith('arcade-') && renderScoreBar()}
 
                   <div className="routecaption">
                     {room.id === 'solo' 
@@ -5101,7 +5102,21 @@ export default function App() {
 
                       return (
                         <section className="card task">
-                          <div className="badge">{badgeText}</div>
+                          {t.type === "arcade-game" ? (
+                            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '8px', marginBottom: '6px' }}>
+                              <div className="badge">{badgeText}</div>
+                              <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '6px', minWidth: 0 }}>
+                                {players.map(player => (
+                                  <div key={player.id} style={{ background: '#0c2145', border: '1px solid var(--line)', borderRadius: '10px', padding: '5px 8px', textAlign: 'center', minWidth: '62px' }}>
+                                    <b style={{ display: 'block', maxWidth: '88px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', fontSize: '11px' }}>{player.name}</b>
+                                    <span style={{ display: 'block', color: 'var(--gold)', fontWeight: 900, fontSize: '13px' }}>{player.score || 0} ★</span>
+                                  </div>
+                                ))}
+                              </div>
+                            </div>
+                          ) : (
+                            <div className="badge">{badgeText}</div>
+                          )}
                           {t.type === "group" ? (
                             <div className="turn"><strong>Gezamenlijke opdracht</strong> · iedereen helpt mee!</div>
                           ) : (
@@ -5122,16 +5137,23 @@ export default function App() {
                                     <MiniGameRulesButton gameId="tictactinker" mode={t.mode} compact />
                                   </div>
                                   <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '14px', paddingLeft: '28px', color: 'var(--muted)', fontSize: '13px', fontWeight: 850, whiteSpace: 'nowrap' }}>
-                                    <span style={{ color: arenaToolbar.playerColors[0] }}>X {arenaToolbar.playerNames[0]}</span>
-                                    <span style={{ color: arenaToolbar.playerColors[1] }}>O {arenaToolbar.playerNames[1]}</span>
+                                    <span style={{ color: arenaToolbar.playerColors[0] }}>X {arenaToolbar.playerNames[0]} {arenaToolbar.boardScores[0]}</span>
+                                    <span style={{ color: arenaToolbar.playerColors[1] }}>O {arenaToolbar.playerNames[1]} {arenaToolbar.boardScores[1]}</span>
                                     <span style={{ color: arenaToolbar.myTurn ? 'var(--gold)' : 'var(--muted)' }}>{arenaToolbar.turnText}</span>
                                   </div>
                                 </div>
                               ) : null;
                               const tinkerFooter = isTinkerGame && arenaToolbar?.gameId === 'tictactinker' ? (
-                                <span style={{ color: arenaToolbar.myTurn ? 'var(--gold)' : 'var(--muted)', fontSize: '13px', fontWeight: 850 }}>
-                                  {arenaToolbar.boardMessage}
-                                </span>
+                                <div>
+                                  <span style={{ color: arenaToolbar.myTurn ? 'var(--gold)' : 'var(--muted)', fontSize: '13px', fontWeight: 850 }}>
+                                    {arenaToolbar.boardMessage}
+                                  </span>
+                                  {arenaToolbar.finished && (
+                                    <button className="btn primary full" onClick={arenaToolbar.finishGame} style={{ marginTop: '10px' }}>
+                                      Voltooien & score bepalen
+                                    </button>
+                                  )}
+                                </div>
                               ) : null;
 
                               return (
@@ -6284,7 +6306,7 @@ export default function App() {
                               </button>
                             )}
                           </div>
-                          {isMyTurn && t.type !== "quizChoice" && (
+                          {isMyTurn && t.type !== "quizChoice" && t.type !== "arcade-game" && (
                             <div className="btnrow one" style={{ marginTop: '10px' }}>
                               <button className="btn danger" onClick={() => handleSkipTask(true)}>
                                 👎 Nooit meer tonen

@@ -4093,23 +4093,12 @@ function UltimateTicTacToeGame({ mode, room, localPlayer, players, updateRoomSta
   const boardMessage = !state ? '' : state.winner !== null
     ? state.winner === 'draw' ? 'Het grote bord is vol: gelijkspel.' : `${playerNames[state.winner]} verovert het grote bord!`
     : state.forcedBoard === null ? 'Vrije bordkeuze' : `Speel op klein bord ${state.forcedBoard + 1}`;
-
-  useEffect(() => {
-    if (!onToolbarChange || !state) return undefined;
-    onToolbarChange({
-      gameId: 'tictactinker',
-      playerNames,
-      playerColors,
-      myTurn,
-      turnText,
-      boardMessage
-    });
-    return () => onToolbarChange(null);
-  }, [onToolbarChange, playerNames[0], playerNames[1], myTurn, turnText, boardMessage]);
-
-  if (!state) {
-    return <div className="center" style={{ padding: '28px', color: 'var(--muted)' }}>Magisch bord wordt klaargezet...</div>;
-  }
+  const boardScores = state
+    ? [
+        state.boardOwners.filter(owner => owner === 0).length,
+        state.boardOwners.filter(owner => owner === 1).length
+      ]
+    : [0, 0];
 
   const handleFinish = () => {
     const draw = state.winner === 'draw';
@@ -4123,9 +4112,29 @@ function UltimateTicTacToeGame({ mode, room, localPlayer, players, updateRoomSta
     onFinish(points, detail);
   };
 
+  useEffect(() => {
+    if (!onToolbarChange || !state) return undefined;
+    onToolbarChange({
+      gameId: 'tictactinker',
+      playerNames,
+      playerColors,
+      boardScores,
+      myTurn,
+      turnText,
+      boardMessage,
+      finished: state.winner !== null,
+      finishGame: handleFinish
+    });
+    return () => onToolbarChange(null);
+  }, [onToolbarChange, playerNames[0], playerNames[1], boardScores[0], boardScores[1], myTurn, turnText, boardMessage, state?.winner]);
+
+  if (!state) {
+    return <div className="center" style={{ padding: '28px', color: 'var(--muted)' }}>Magisch bord wordt klaargezet...</div>;
+  }
+
   return (
     <div style={{ width: '100%', height: '100%', display: 'flex', flexDirection: 'column', alignItems: 'stretch' }}>
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '5px', width: '100%', height: state.winner !== null ? 'calc(100% - 58px)' : '100%', padding: '7px', background: '#041026', borderRadius: '16px' }}>
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '5px', width: '100%', height: '100%', padding: '7px', background: '#041026', borderRadius: '16px' }}>
         {state.cells.map((board, boardIndex) => {
           const owner = state.boardOwners[boardIndex];
           const forced = state.forcedBoard === boardIndex && owner === null;
@@ -4183,7 +4192,6 @@ function UltimateTicTacToeGame({ mode, room, localPlayer, players, updateRoomSta
         })}
       </div>
 
-      {state.winner !== null && <button className="btn primary full" onClick={handleFinish} style={{ marginTop: '12px', flex: '0 0 auto' }}>Voltooien & score bepalen</button>}
     </div>
   );
 }
