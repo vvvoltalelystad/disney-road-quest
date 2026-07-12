@@ -4551,7 +4551,7 @@ export default function App() {
                         >
                           <img src={assetPath('arena/games/prince ali.png')} alt="Prince Ali Ababwa" style={{ width: '100%', height: '100px', objectFit: 'contain', filter: 'drop-shadow(0 5px 8px rgba(0, 0, 0, 0.35))' }} />
                           <span style={{ fontSize: '13px', fontWeight: 900, lineHeight: 1.25, textAlign: 'center' }}>
-                            Tegen Prince <span style={{ color: 'var(--gold)', textShadow: '0 0 9px rgba(255, 212, 92, 0.75)' }}>A</span>l<span style={{ color: 'var(--gold)', textShadow: '0 0 9px rgba(255, 212, 92, 0.75)' }}>i</span> Ababwa
+                            Tegen Prince <span style={{ color: '#ff5bcb', textShadow: '0 0 8px rgba(255, 91, 203, 0.85)' }}>A</span>l<span style={{ color: '#ff5bcb', textShadow: '0 0 8px rgba(255, 91, 203, 0.85)' }}>i</span> Ababwa
                           </span>
                         </button>
                         <button
