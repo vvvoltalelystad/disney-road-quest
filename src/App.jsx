@@ -14,7 +14,7 @@ import {
 import { MiniGameRenderer } from './MiniGames';
 
 const GAME_MODES = [
-  { id: "mix", name: "Road Quest", icon: "🚗", description: "De volledige afwisselende mix van alle speltypen." },
+  { id: "mix", name: "Road Race", icon: "🚗", description: "De volledige afwisselende mix van alle speltypen." },
   { id: "Quiz", name: "Quiz", icon: "❓", description: "Test je kennis over Disney en Pixar films." },
   { id: "Samen", name: "Samen", icon: "🤝", description: "Werk samen om groepsdoelen te halen." }
 ];
@@ -432,17 +432,195 @@ const SUDOKU_9X9_TEMPLATES = [
   }
 ];
 
-const getCellBorderStyles = (r, c, size) => {
-  const styles = {};
+const getCellBorderStyles = (r, c, size, isSelected, hasError) => {
+  const baseBorder = isSelected 
+    ? '2.5px solid var(--gold)' 
+    : hasError 
+      ? '1.5px solid var(--danger)' 
+      : '1px solid var(--line)';
+
+  const styles = {
+    borderTop: baseBorder,
+    borderLeft: baseBorder,
+    borderRight: baseBorder,
+    borderBottom: baseBorder
+  };
+
+  const goldBorder = '3.5px solid var(--gold)';
+
   if (size === 6) {
-    if (c === 2) styles.borderRight = '3.5px solid var(--gold)';
-    if (r === 1 || r === 3) styles.borderBottom = '3.5px solid var(--gold)';
+    if (c === 2) styles.borderRight = goldBorder;
+    if (r === 1 || r === 3) styles.borderBottom = goldBorder;
   } else if (size === 9) {
-    if (c === 2 || c === 5) styles.borderRight = '3.5px solid var(--gold)';
-    if (r === 2 || r === 5) styles.borderBottom = '3.5px solid var(--gold)';
+    if (c === 2 || c === 5) styles.borderRight = goldBorder;
+    if (r === 2 || r === 5) styles.borderBottom = goldBorder;
   }
   return styles;
 };
+
+function GameZoomContainer({ children, maxHeight = '420px', aspectRatio = '1 / 1', maxWidth = '100%' }) {
+  const [zoom, setZoom] = useState(1);
+  const [pan, setPan] = useState({ x: 0, y: 0 });
+  const viewportRef = useRef(null);
+  const touchRef = useRef(null);
+  const suppressClickRef = useRef(false);
+
+  const clampZoom = (value) => Math.min(2.4, Math.max(1, value));
+
+  const clampPan = (p, currentZoom = zoom) => {
+    const rect = viewportRef.current?.getBoundingClientRect();
+    if (!rect) return p;
+    const basePanAllowance = 22;
+    const maxX = basePanAllowance + Math.max(0, (rect.width * (currentZoom - 1)) / 2);
+    const maxY = basePanAllowance + Math.max(0, (rect.height * (currentZoom - 1)) / 2);
+    return {
+      x: Math.min(maxX, Math.max(-maxX, p.x)),
+      y: Math.min(maxY, Math.max(-maxY, p.y))
+    };
+  };
+
+  const applyZoom = (value) => {
+    const nextZoom = clampZoom(value);
+    setZoom(nextZoom);
+    setPan(prev => nextZoom <= 1 ? { x: 0, y: 0 } : clampPan(prev, nextZoom));
+  };
+
+  const getLocalTouchDistance = (touches) => {
+    const [a, b] = touches;
+    return Math.hypot(a.clientX - b.clientX, a.clientY - b.clientY);
+  };
+
+  const handleTouchStart = (e) => {
+    if (e.touches.length === 2) {
+      touchRef.current = {
+        mode: 'pinch',
+        distance: getLocalTouchDistance(e.touches),
+        zoom,
+        pan
+      };
+      return;
+    }
+    if (e.touches.length === 1) {
+      const touch = e.touches[0];
+      touchRef.current = {
+        mode: 'pan',
+        startX: touch.clientX,
+        startY: touch.clientY,
+        pan,
+        moved: false
+      };
+    }
+  };
+
+  const handleTouchMove = (e) => {
+    const gesture = touchRef.current;
+    if (!gesture) return;
+
+    if (e.touches.length === 2 && gesture.mode === 'pinch') {
+      e.preventDefault();
+      const nextZoom = clampZoom(gesture.zoom * (getLocalTouchDistance(e.touches) / gesture.distance));
+      setZoom(nextZoom);
+      setPan(nextZoom <= 1 ? { x: 0, y: 0 } : clampPan(gesture.pan, nextZoom));
+      return;
+    }
+
+    if (e.touches.length !== 1 || gesture.mode !== 'pan') return;
+    e.preventDefault();
+    const touch = e.touches[0];
+    const dx = touch.clientX - gesture.startX;
+    const dy = touch.clientY - gesture.startY;
+    if (Math.abs(dx) + Math.abs(dy) > 6) {
+      gesture.moved = true;
+      suppressClickRef.current = true;
+    }
+    setPan(clampPan({ x: gesture.pan.x + dx, y: gesture.pan.y + dy }, zoom));
+  };
+
+  const handleTouchEnd = () => {
+    const wasMoved = touchRef.current?.moved;
+    touchRef.current = null;
+    setPan(prev => clampPan(prev, zoom));
+    if (wasMoved) {
+      window.setTimeout(() => {
+        suppressClickRef.current = false;
+      }, 250);
+    }
+  };
+
+  useEffect(() => {
+    const keepInView = () => {
+      setPan(prev => clampPan(prev, zoom));
+    };
+    keepInView();
+    window.addEventListener('resize', keepInView);
+    return () => window.removeEventListener('resize', keepInView);
+  }, [zoom]);
+
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', width: '100%' }}>
+      <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '8px', alignItems: 'center', marginBottom: '8px' }}>
+        <button type="button" className="btn secondary mini" style={{ padding: '4px 8px' }} onClick={() => applyZoom(+(zoom - 0.15).toFixed(2))}>
+          -
+        </button>
+        <span style={{ color: 'var(--muted)', fontSize: '12px', minWidth: '40px', textAlign: 'center' }}>{Math.round(zoom * 100)}%</span>
+        <button type="button" className="btn secondary mini" style={{ padding: '4px 8px' }} onClick={() => applyZoom(+(zoom + 0.15).toFixed(2))}>
+          +
+        </button>
+      </div>
+
+      <div
+        ref={viewportRef}
+        onTouchStart={handleTouchStart}
+        onTouchMove={handleTouchMove}
+        onTouchEnd={handleTouchEnd}
+        onTouchCancel={handleTouchEnd}
+        style={{
+          width: '100%',
+          maxWidth: maxWidth,
+          maxHeight: maxHeight,
+          aspectRatio: aspectRatio,
+          overflow: 'hidden',
+          margin: '0 auto',
+          borderRadius: '18px',
+          border: '2px solid var(--line)',
+          background: '#041026',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          position: 'relative',
+          touchAction: 'none',
+          boxSizing: 'border-box'
+        }}
+      >
+        <div
+          style={{
+            position: 'absolute',
+            inset: '6px',
+            display: 'flex',
+            flexDirection: 'column',
+            justifyContent: 'center',
+            alignItems: 'center',
+            boxSizing: 'border-box',
+            transform: `translate(${pan.x}px, ${pan.y}px) scale(${zoom})`,
+            transformOrigin: 'center center',
+            willChange: 'transform',
+            width: 'calc(100% - 12px)',
+            height: 'calc(100% - 12px)'
+          }}
+          onClickCapture={(e) => {
+            if (suppressClickRef.current) {
+              e.stopPropagation();
+              e.preventDefault();
+              suppressClickRef.current = false;
+            }
+          }}
+        >
+          {children}
+        </div>
+      </div>
+    </div>
+  );
+}
 
 export default function App() {
   const [screen, setScreen] = useState('portal');
@@ -452,6 +630,10 @@ export default function App() {
   const [localPlayer, setLocalPlayer] = useState(null);
   const [roomCodeInput, setRoomCodeInput] = useState('');
   const [activeProfileName, setActiveProfileName] = useState('');
+  const [logPopupOpen, setLogPopupOpen] = useState(false);
+  const [logProfileName, setLogProfileName] = useState('');
+  const [selectedPortalGame, setSelectedPortalGame] = useState(null);
+  const [showPortalShop, setShowPortalShop] = useState(false);
   const [playerNameInput, setPlayerNameInput] = useState(() => localStorage.getItem(ACTIVE_PROFILE_KEY) || localStorage.getItem('disney_player_name') || '');
 
   const [setupMode, setSetupMode] = useState('mix');
@@ -1018,20 +1200,169 @@ export default function App() {
     });
   }, [cocoProfiles]);
 
-  const awardStarsToCollector = (name, amount) => {
+  const logCaptainMutation = (profileName, amount, type, description, balanceAfter) => {
+    const logs = JSON.parse(localStorage.getItem('disney_captains_log') || '{}');
+    if (!logs[profileName]) logs[profileName] = [];
+    
+    logs[profileName].push({
+      timestamp: new Date().toISOString(),
+      amount,
+      type,
+      description,
+      balanceAfter
+    });
+    
+    localStorage.setItem('disney_captains_log', JSON.stringify(logs));
+  };
+
+  const getOrGenerateCaptainsLog = (profileName) => {
+    const rawLogs = localStorage.getItem('disney_captains_log');
+    let logs = {};
+    try {
+      if (rawLogs) logs = JSON.parse(rawLogs);
+    } catch (e) {}
+
+    // If we already have explicit logs for this profile, use them
+    if (logs[profileName] && logs[profileName].length > 0) {
+      return logs[profileName];
+    }
+
+    const key = getCollectorKey(profileName);
+    
+    // 1. Get collection purchases
+    const collectionsRaw = localStorage.getItem('disney_collections');
+    let profileCollections = [];
+    try {
+      if (collectionsRaw) {
+        const allCollections = JSON.parse(collectionsRaw);
+        profileCollections = allCollections[key] || [];
+      }
+    } catch (e) {}
+
+    // 2. Get solo history
+    const historyRaw = localStorage.getItem('disney_solo_history');
+    let history = [];
+    try {
+      if (historyRaw) history = JSON.parse(historyRaw);
+    } catch (e) {}
+
+    const events = [];
+
+    // Add solo games
+    history.forEach(item => {
+      const scoreVal = Number(item.score) || 0;
+      let coinsEarned = 0;
+      const gameTypeNorm = item.gameType || "";
+      if (
+        gameTypeNorm === 'Othello' || 
+        gameTypeNorm === 'Rapunzel\'s Torenkamers' || 
+        gameTypeNorm === 'Color Lines' || 
+        gameTypeNorm === 'Ricochet Shot' || 
+        gameTypeNorm === 'Curling Duel' || 
+        gameTypeNorm === 'Marble Push (Abalone)'
+      ) {
+        coinsEarned = scoreVal;
+      } else {
+        coinsEarned = scoreVal > 0 ? Math.max(1, Math.ceil(scoreVal / 2)) : 0;
+      }
+
+      events.push({
+        timestamp: item.date || new Date().toISOString(),
+        amount: coinsEarned,
+        type: 'earn',
+        description: `${item.gameType}: ${item.details || 'Opdracht voltooid'}`
+      });
+    });
+
+    // Add purchases
+    profileCollections.forEach((itemId, idx) => {
+      const shopItem = [...DISNEY_SHOP_ITEMS, ...LEGACY_DISNEY_SHOP_ITEMS].find(x => x.id === itemId);
+      const itemName = shopItem ? shopItem.name : itemId;
+      const cost = shopItem ? shopItem.cost : 1;
+
+      // Timestamp slightly after the games to sort correctly
+      const timestamp = new Date(Date.now() - (profileCollections.length - idx) * 60000).toISOString();
+      events.push({
+        timestamp,
+        amount: cost,
+        type: 'spend',
+        description: `Gekocht in shop: ${itemName}`
+      });
+    });
+
+    // Sort events by timestamp ascending
+    events.sort((a, b) => new Date(a.timestamp) - new Date(b.timestamp));
+
+    // Compute cumulative balance
+    let balance = 0;
+    const finalEntries = events.map(ev => {
+      if (ev.type === 'earn') {
+        balance += ev.amount;
+      } else {
+        balance -= ev.amount;
+      }
+      return {
+        ...ev,
+        amount: ev.type === 'spend' ? -ev.amount : ev.amount,
+        balanceAfter: balance
+      };
+    });
+
+    // Compare with current starBank balance and insert adjustment if needed
+    const bankRaw = localStorage.getItem(COCO_BANK_KEY);
+    let currentBankBalance = 0;
+    try {
+      if (bankRaw) {
+        const bank = JSON.parse(bankRaw);
+        currentBankBalance = bank[key] || 0;
+      }
+    } catch (e) {}
+
+    if (balance !== currentBankBalance) {
+      const diff = currentBankBalance - balance;
+      if (diff !== 0) {
+        finalEntries.push({
+          timestamp: new Date().toISOString(),
+          amount: Math.abs(diff),
+          type: diff > 0 ? 'earn' : 'spend',
+          description: "Saldo correctie (historische synchronisatie)",
+          balanceAfter: currentBankBalance
+        });
+      }
+    }
+
+    // Save generated logs
+    if (finalEntries.length > 0) {
+      logs[profileName] = finalEntries;
+      localStorage.setItem('disney_captains_log', JSON.stringify(logs));
+    }
+
+    return finalEntries;
+  };
+
+  const awardStarsToCollector = (name, amount, reason = "Coins verdiend") => {
     const coins = Math.max(0, Number(amount) || 0);
-    if (coins <= 0) return;
     const key = getCollectorKey(name || activeProfileName);
+    const profName = name || activeProfileName || 'Speler 1';
+    
     setCocoProfiles(prev => {
-      const next = uniqueProfileNames([...prev, name || activeProfileName || 'Speler 1']);
+      const next = uniqueProfileNames([...prev, profName]);
       localStorage.setItem(COCO_PROFILES_KEY, JSON.stringify(next));
       return next;
     });
-    setStarBank(prev => {
-      const next = { ...prev, [key]: (prev[key] || 0) + coins };
-      localStorage.setItem(COCO_BANK_KEY, JSON.stringify(next));
-      return next;
-    });
+
+    if (coins > 0) {
+      setStarBank(prev => {
+        const next = { ...prev, [key]: (prev[key] || 0) + coins };
+        localStorage.setItem(COCO_BANK_KEY, JSON.stringify(next));
+        
+        logCaptainMutation(profName, coins, 'earn', reason, next[key]);
+        return next;
+      });
+    } else {
+      const currentBalance = starBank[key] || 0;
+      logCaptainMutation(profName, 0, 'earn', reason, currentBalance);
+    }
   };
 
   const handleBuyShopItem = (item) => {
@@ -1055,6 +1386,7 @@ export default function App() {
     localStorage.setItem(COCO_BANK_KEY, JSON.stringify(nextBank));
     localStorage.setItem('disney_collections', JSON.stringify(nextCollections));
     localStorage.setItem('disney_exclusive_claims', JSON.stringify(nextClaims));
+    logCaptainMutation(name, -item.cost, 'spend', `Gekocht in shop: ${item.name}`, nextBank[key]);
     setSelectedCollectionItem(item);
   };
 
@@ -1181,9 +1513,11 @@ export default function App() {
     setDonationAmount('');
     setDonationTargetName(nextProfiles.find(name => getCollectorKey(name) === targetKey) || '');
     localStorage.setItem(COCO_BANK_KEY, JSON.stringify(nextBank));
+    logCaptainMutation(fromName, -amount, 'spend', `Donatie aan ${targetName}`, nextBank[fromKey]);
+    logCaptainMutation(targetName, amount, 'earn', `Donatie ontvangen van ${fromName}`, nextBank[targetKey]);
   };
 
-  const logSoloAttempt = (points = 0, customReason = null) => {
+  const logSoloAttempt = (points = 0, customReason = null, isCoins = false) => {
     const currentTask = getCurrentTask();
     if (!currentTask) return;
 
@@ -1212,8 +1546,8 @@ export default function App() {
       localStorage.setItem('disney_solo_history', JSON.stringify(updated));
       return updated;
     });
-    const soloCoinReward = points > 0 ? Math.max(1, Math.ceil(points / 2)) : 0;
-    awardStarsToCollector(activeProfileName || localPlayer?.name || playerNameInput || shopPlayerName, soloCoinReward);
+    const soloCoinReward = isCoins ? points : (points > 0 ? Math.max(1, Math.ceil(points / 2)) : 0);
+    awardStarsToCollector(activeProfileName || localPlayer?.name || playerNameInput || shopPlayerName, soloCoinReward, `${gameName}: ${reason}`);
   };
 
   const isArenaHistoryItem = (item) => {
@@ -1250,8 +1584,8 @@ export default function App() {
       }
       return;
     }
-    if (delta > 0) {
-      awardStarsToCollector(player?.name, delta);
+    if (player?.id === localPlayer?.id) {
+      awardStarsToCollector(player?.name, delta, reason);
     }
     await dbAddPlayerScore(roomId, player, delta, reason, bucket, taskObj);
   };
@@ -2926,7 +3260,10 @@ export default function App() {
 
   // --- RENDERING HELPERS ---
 
-  const renderAppHeader = (title = "Disney Road Quest", backAction = null) => {
+  const renderAppHeader = (title = "McQueen's Road Race", backAction = null) => {
+    const key = getCollectorKey(activeProfileName);
+    const balance = starBank[key] || 0;
+
     return (
       <div className="topbar">
         <div className="brand">
@@ -2934,8 +3271,36 @@ export default function App() {
           <span>{title}</span>
         </div>
         <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+          {activeProfileName && (
+            <div 
+              onClick={() => {
+                setLogProfileName(activeProfileName);
+                setLogPopupOpen(true);
+              }}
+              style={{ 
+                display: 'flex', 
+                alignItems: 'center', 
+                gap: '5px', 
+                background: 'rgba(255,212,92,0.12)', 
+                border: '1px solid rgba(255,212,92,0.3)', 
+                borderRadius: '16px', 
+                padding: '4px 8px', 
+                cursor: 'pointer',
+                fontSize: '12px',
+                fontWeight: 'bold',
+                color: 'var(--gold)',
+                userSelect: 'none'
+              }}
+              title="Open Captain's Log"
+            >
+              <span>{activeProfileName}</span>
+              <span>·</span>
+              <span>{balance} 🪙</span>
+              <span>⚓</span>
+            </div>
+          )}
           {room?.code && (
-            <button className="btn secondary mini" onClick={handleForceSync} style={{ padding: '4px 8px', fontSize: '11px' }}>
+            <button className="btn secondary mini" onClick={handleForceSync} style={{ padding: '4px 8px', fontSize: '11px', fontFamily: 'Outfit, Inter, sans-serif' }}>
               🔄 Herlaad
             </button>
           )}
@@ -3451,6 +3816,70 @@ export default function App() {
         </div>
       )}
 
+      {logPopupOpen && logProfileName && (
+        <div
+          className="captains-log-modal"
+          onClick={() => setLogPopupOpen(false)}
+        >
+          <div className="captains-log-paper" onClick={(e) => e.stopPropagation()}>
+            <div className="captains-log-header">
+              <h2 className="captains-log-title">⚓ Captain's Log ⚓</h2>
+              <p className="captains-log-subtitle">Scheepsjournaal van Kapitein {logProfileName}</p>
+            </div>
+
+            <div className="captains-log-content">
+              {(() => {
+                const entries = getOrGenerateCaptainsLog(logProfileName);
+                if (entries.length === 0) {
+                  return (
+                    <div style={{ textAlign: 'center', padding: '30px 10px', fontStyle: 'italic', color: '#8d6e63' }}>
+                      Geen aantekeningen in het logboek gevonden voor dit profiel.
+                    </div>
+                  );
+                }
+                return [...entries].reverse().map((entry, idx) => {
+                  const dateStr = new Date(entry.timestamp).toLocaleString('nl-NL', {
+                    day: '2-digit',
+                    month: '2-digit',
+                    year: 'numeric',
+                    hour: '2-digit',
+                    minute: '2-digit'
+                  });
+                  const isEarn = entry.type === 'earn';
+                  const coinClass = isEarn ? 'captains-log-coins earn' : 'captains-log-coins spend';
+                  const displayAmount = isEarn 
+                    ? `+${Math.abs(entry.amount)}` 
+                    : `-${Math.abs(entry.amount)}`;
+                  
+                  return (
+                    <div key={idx} className="captains-log-row">
+                      <div style={{ paddingRight: '12px' }}>
+                        <div className="captains-log-desc">{entry.description}</div>
+                        <div className="captains-log-meta">{dateStr}</div>
+                      </div>
+                      <div style={{ textAlign: 'right' }}>
+                        <div className={coinClass}>{displayAmount} 🪙</div>
+                        <div style={{ fontSize: '11px', color: '#8d6e63', marginTop: '2px' }}>
+                          Saldo: {entry.balanceAfter} 🪙
+                        </div>
+                      </div>
+                    </div>
+                  );
+                });
+              })()}
+            </div>
+
+            <button
+              type="button"
+              className="captains-log-close-btn"
+              onClick={() => setLogPopupOpen(false)}
+            >
+              Logboek Sluiten
+            </button>
+          </div>
+        </div>
+      )}
+
       {coinPopupOpen && (
         <div
           className="collection-popup-backdrop"
@@ -3598,7 +4027,7 @@ export default function App() {
 
           {/* SCREEN: PORTAL */}
           {screen === 'portal' && (
-            <div className="portal-container">
+            <div className="portal-container" onClick={() => setSelectedPortalGame(null)}>
               <div className="portal-header">
                 <div className="portal-logo-glow"></div>
                 <div className="portal-badge">✨ MAGIC GAME PORTAL</div>
@@ -3607,27 +4036,52 @@ export default function App() {
               </div>
 
               <div className="portal-grid">
-                {/* Game 1: Disney Road Quest */}
-                <div className="portal-card road-quest-card" onClick={() => setScreen('home')} role="button" tabIndex={0}>
+                {/* Game 1: McQueen's Road Race */}
+                <div 
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    if (selectedPortalGame === 'road_quest') {
+                      setScreen('home');
+                    } else {
+                      setSelectedPortalGame('road_quest');
+                    }
+                  }}
+                  className={`portal-card road-quest-card ${selectedPortalGame === 'road_quest' ? 'selected-glow' : ''}`}
+                  style={selectedPortalGame === 'road_quest' ? { border: '3.5px solid var(--gold)', boxShadow: '0 0 25px rgba(255, 212, 92, 0.75)', transform: 'scale(1.03)', transition: 'all 0.25s ease' } : { transition: 'all 0.25s ease' }}
+                  role="button" 
+                  tabIndex={0}
+                >
                   <div className="portal-card-header">
                     <div className="portal-card-media portal-glow-quest">
-                      <img src={assetPath("portal/car.png")} onLoad={removeBg} className="portal-media-img" alt="Road Quest Car" />
+                      <img src={assetPath("portal/Lightning_mc_queen.png")} onLoad={removeBg} className="portal-media-img" alt="Lightning McQueen" />
                     </div>
                     <span className="portal-card-badge">Aanbevolen</span>
                   </div>
                   <div className="portal-card-body">
-                    <h3>Disney Road Quest</h3>
+                    <h3>McQueen's Road Race</h3>
                     <p>De ultieme roadtrip game voor onderweg naar Disneyland Parijs! Test je kennis met quizzen, maak moeilijke keuzes en werk samen aan magische opdrachten.</p>
                   </div>
                   <div className="portal-card-footer">
-                    <span className="btn-play">Start Quest ➔</span>
+                    <span className="btn-play">
+                      {selectedPortalGame === 'road_quest' ? 'Klik nogmaals om te starten ➔' : 'Selecteer Race ➔'}
+                    </span>
                   </div>
                 </div>
 
                 {/* Game 2: Mickey's Music Match */}
-                <a 
-                  href={room?.code ? `./music/index.html?room=${room.code}` : "./music/index.html"} 
-                  className="portal-card music-quiz-card"
+                <div 
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    if (selectedPortalGame === 'music_match') {
+                      window.location.href = room?.code ? `./music/index.html?room=${room.code}` : "./music/index.html";
+                    } else {
+                      setSelectedPortalGame('music_match');
+                    }
+                  }}
+                  className={`portal-card music-quiz-card ${selectedPortalGame === 'music_match' ? 'selected-glow' : ''}`}
+                  style={selectedPortalGame === 'music_match' ? { border: '3.5px solid #ff7b8b', boxShadow: '0 0 25px rgba(255, 123, 139, 0.75)', transform: 'scale(1.03)', transition: 'all 0.25s ease' } : { transition: 'all 0.25s ease' }}
+                  role="button" 
+                  tabIndex={0}
                 >
                   <div className="portal-card-header">
                     <div className="portal-card-media portal-glow-music">
@@ -3641,24 +4095,76 @@ export default function App() {
                     <p>Dé interactieve muziekquiz met 150 betoverende Disney en Pixar songs. Scan scancodes met Spotify, raad de film, het jaartal of de uitvoerder en verover de troon!</p>
                   </div>
                   <div className="portal-card-footer">
-                    <span className="btn-play music">Speel Quiz ➔</span>
+                    <span className="btn-play music">
+                      {selectedPortalGame === 'music_match' ? 'Klik nogmaals om te starten ➔' : 'Selecteer Quiz ➔'}
+                    </span>
                   </div>
-                </a>
+                </div>
 
-                {/* Game 3: Disney Duel Arena */}
-                <div className="portal-card duel-arena-card" onClick={() => setScreen('arcade_select')} role="button" tabIndex={0}>
+                {/* Game 3: Hercules' Duel Arena */}
+                <div 
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    if (selectedPortalGame === 'duel_arena') {
+                      setScreen('arcade_select');
+                    } else {
+                      setSelectedPortalGame('duel_arena');
+                    }
+                  }}
+                  className={`portal-card duel-arena-card ${selectedPortalGame === 'duel_arena' ? 'selected-glow' : ''}`}
+                  style={selectedPortalGame === 'duel_arena' ? { border: '3.5px solid #bd53ed', boxShadow: '0 0 25px rgba(189, 83, 237, 0.75)', transform: 'scale(1.03)', transition: 'all 0.25s ease' } : { transition: 'all 0.25s ease' }}
+                  role="button" 
+                  tabIndex={0}
+                >
                   <div className="portal-card-header">
                     <div className="portal-card-media portal-glow-duel">
-                      <img src={assetPath("portal/kasteel.png")} onLoad={removeBg} className="portal-media-img" alt="Disney Castle" />
+                      <img src={assetPath("portal/Hercules.png")} onLoad={removeBg} className="portal-media-img" alt="Hercules" />
                     </div>
                     <span className="portal-card-badge arcade">10 Spellen</span>
                   </div>
                   <div className="portal-card-body">
-                    <h3>Disney Duel Arena</h3>
+                    <h3>Hercules' Duel Arena</h3>
+                    <p style={{ color: '#bd53ed', fontSize: '12px', marginTop: '-4px' }}>Origineel: Disney Duel Arena</p>
                     <p>Daag jezelf uit in Disney-themed bord-, actie- en woordspellen tegen een computer-tegenstander, of speel een realtime duel op je eigen telefoon!</p>
                   </div>
                   <div className="portal-card-footer">
-                    <span className="btn-play arcade">Start Arena ➔</span>
+                    <span className="btn-play arcade">
+                      {selectedPortalGame === 'duel_arena' ? 'Klik nogmaals om te starten ➔' : 'Selecteer Arena ➔'}
+                    </span>
+                  </div>
+                </div>
+
+                {/* Game 4: Coco's Coin Shop */}
+                <div 
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    if (selectedPortalGame === 'coin_shop') {
+                      document.getElementById('coco-shop-section')?.scrollIntoView({ behavior: 'smooth' });
+                      setSelectedPortalGame(null);
+                    } else {
+                      setSelectedPortalGame('coin_shop');
+                    }
+                  }}
+                  className={`portal-card coin-shop-card ${selectedPortalGame === 'coin_shop' ? 'selected-glow' : ''}`}
+                  style={selectedPortalGame === 'coin_shop' ? { border: '3.5px solid #ff9800', boxShadow: '0 0 25px rgba(255, 152, 0, 0.75)', transform: 'scale(1.03)', transition: 'all 0.25s ease' } : { transition: 'all 0.25s ease' }}
+                  role="button" 
+                  tabIndex={0}
+                >
+                  <div className="portal-card-header">
+                    <div className="portal-card-media portal-glow-shop">
+                      <img src={assetPath("portal/Coco_png.png")} onLoad={removeBg} className="portal-media-img" alt="Coco Coins" />
+                    </div>
+                    <span className="portal-card-badge shop">Shop</span>
+                  </div>
+                  <div className="portal-card-body">
+                    <h3>Coco's Coin Shop</h3>
+                    <p style={{ color: '#ff9800', fontSize: '12px', marginTop: '-4px' }}>Stickers & Magische Items</p>
+                    <p>Wissel je zuurverdiende Coco Coins in voor magische stickers en exclusieve verzamelobjecten. Vul je persoonlijke Disney Collection aan!</p>
+                  </div>
+                  <div className="portal-card-footer">
+                    <span className="btn-play shop">
+                      {selectedPortalGame === 'coin_shop' ? 'Klik nogmaals om te openen ➔' : 'Selecteer Shop ➔'}
+                    </span>
                   </div>
                 </div>
 
@@ -3703,9 +4209,22 @@ export default function App() {
                           Verdien Coco Coins met Quest-, Arena- en solo-games. Spaar magische items in je Disney Collection.
                         </p>
                       </div>
-                      <div style={{ color: 'var(--gold)', fontWeight: 900, fontSize: '20px', display: 'flex', alignItems: 'center', gap: '8px' }}>
-                        <CocoCoinIcon size={34} onInspect={() => { setCoinFlipped(false); setCoinPopupOpen(true); }} />
-                        <span>{formatCocoCoins(balance)}</span>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginLeft: 'auto' }}>
+                        <div style={{ color: 'var(--gold)', fontWeight: 900, fontSize: '20px', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                          <CocoCoinIcon size={34} onInspect={() => { setCoinFlipped(false); setCoinPopupOpen(true); }} />
+                          <span>{formatCocoCoins(balance)}</span>
+                        </div>
+                        <button 
+                          type="button" 
+                          className="btn secondary mini"
+                          onClick={() => {
+                            setLogProfileName(activeName);
+                            setLogPopupOpen(true);
+                          }}
+                          style={{ padding: '6px 10px', fontSize: '12px', display: 'flex', alignItems: 'center', gap: '5px' }}
+                        >
+                          ⚓ Captain's Log
+                        </button>
                       </div>
                     </div>
 
@@ -3873,6 +4392,15 @@ export default function App() {
                   <strong>Magische Verbinding</strong> Beide spellen maken gebruik van dezelfde database op Supabase, maar werken apart. Open een kamer, laat je medereizigers de code scannen en laat de magie beginnen!
                 </div>
               </div>
+
+              <button
+                type="button"
+                className="btn secondary full"
+                onClick={handleHardRefresh}
+                style={{ marginTop: '16px' }}
+              >
+                ⟳ Game volledig verversen
+              </button>
             </div>
           )}
 
@@ -4110,7 +4638,7 @@ export default function App() {
           {/* SCREEN: SOLO SELECT */}
           {screen === 'solo_select' && (
             <div>
-              {renderAppHeader("Solo Spel", () => setScreen('home'))}
+              {renderAppHeader("Solo Spel", () => setScreen('portal'))}
               
               <section className="card">
                 <h2 className="sectiontitle">🎮 Kies een Speltype</h2>
@@ -4202,7 +4730,7 @@ export default function App() {
           {/* SCREEN: HOME */}
           {screen === 'home' && (
             <div>
-              {renderAppHeader("Disney Road Quest", () => setScreen('portal'))}
+              {renderAppHeader("McQueen's Road Race", () => setScreen('portal'))}
               <section className="card hero">
                 <div className="badge">Multiplayer Edition · Real-time</div>
                 <div style={{ display: 'flex', justifyContent: 'center', width: '100%', overflow: 'visible', margin: '15px 0' }}>
@@ -4219,10 +4747,10 @@ export default function App() {
                         filter: 'drop-shadow(0 8px 20px rgba(0, 0, 0, 0.4))',
                         borderRadius: '16px'
                       }} 
-                      alt="Disney Road Quest Logo" 
+                      alt="McQueen's Road Race Logo" 
                     />
                     <h1 style={{ margin: '8px 0 12px', whiteSpace: 'nowrap' }}>
-                      Disney <span className="gold">Road Quest</span>
+                      McQueen's <span className="gold">Road Race</span>
                     </h1>
                   </div>
                 </div>
@@ -4290,7 +4818,7 @@ export default function App() {
           {/* SCREEN: SETUP */}
           {screen === 'setup' && (
             <div>
-              {renderAppHeader("Nieuwe Game", () => setScreen('home'))}
+              {renderAppHeader("Nieuwe Game", () => setScreen('portal'))}
               
               <section className="card">
                 <h2 className="sectiontitle">1. Kies de spelonderdelen</h2>
@@ -4448,7 +4976,7 @@ export default function App() {
                   {renderAppHeader(
                     room.id === 'solo'
                       ? (room.game_mode?.startsWith('arcade-') ? "Duel Arena" : "Quest Solo")
-                      : (room.game_mode?.startsWith('arcade-') ? "Duel Arena" : "Road Quest"), 
+                      : (room.game_mode?.startsWith('arcade-') ? "Duel Arena" : "Road Race"), 
                     () => {
                       if (room.id === 'solo') {
                         if (!soloLoggedRef.current) {
@@ -4517,23 +5045,36 @@ export default function App() {
                            <div style={{ marginTop: '20px' }}>
                             {/* -1. DISNEY DUEL ARENA */}
                             {t.type === "arcade-game" && (
-                              <MiniGameRenderer
-                                gameId={t.gameId}
-                                mode={t.mode}
-                                room={room}
-                                localPlayer={localPlayer}
-                                players={players}
-                                updateRoomState={updateRoomState}
-                                onFinish={(score, detail) => {
-                                  if (room.id === 'solo') {
-                                    logSoloAttempt(score, detail);
-                                    soloLoggedRef.current = true;
-                                  } else if (score > 0) {
-                                    awardStarsToCollector(activeProfileName || localPlayer?.name || playerNameInput, Math.max(1, Math.ceil(score / 2)));
-                                  }
-                                  handleFinishTask();
-                                }}
-                              />
+                              <GameZoomContainer maxHeight="420px" aspectRatio="1 / 1">
+                                <MiniGameRenderer
+                                  gameId={t.gameId}
+                                  mode={t.mode}
+                                  room={room}
+                                  localPlayer={localPlayer}
+                                  players={players}
+                                  updateRoomState={updateRoomState}
+                                  onFinish={async (score, detail) => {
+                                    const isScoreBased = t.gameId === 'colorlines' || t.gameId === 'ricochet';
+                                    const coinsEarned = isScoreBased ? score : (score === 3 ? 2 : (score === 2 ? 1 : 0));
+                                    const gameTitle = {
+                                      othello: "Othello",
+                                      dotsboxes: "Rapunzel's Torenkamers",
+                                      colorlines: "Color Lines",
+                                      ricochet: "Ricochet Shot",
+                                      curling: "Curling Duel",
+                                      abalone: "Marble Push (Abalone)"
+                                    }[t.gameId] || "Arena Game";
+
+                                    if (room.id === 'solo') {
+                                      logSoloAttempt(coinsEarned, detail, true);
+                                      soloLoggedRef.current = true;
+                                    } else {
+                                      await addPlayerScore(room.id, localPlayer, coinsEarned, `${gameTitle}: ${detail}`, 'knowledge');
+                                    }
+                                    handleFinishTask();
+                                  }}
+                                />
+                              </GameZoomContainer>
                             )}
 
                             {/* 0. DISNEY SUDOKU */}
@@ -4559,118 +5100,74 @@ export default function App() {
                                       <span>Tijd verstreken: {Math.floor((Date.now() - sudokuStartTime) / 1000)}s</span>
                                       <span>Hints gebruikt: {sudokuHintsUsed} (-{sudokuHintsUsed} ster{sudokuHintsUsed === 1 ? '' : 'ren'})</span>
                                     </div>
-
-                                    <div style={{ display: 'grid', gridTemplateColumns: '1fr auto auto auto', gap: '8px', alignItems: 'center', marginBottom: '10px' }}>
+                                    <div style={{ display: 'grid', gridTemplateColumns: '1fr', gap: '8px', marginBottom: '10px' }}>
                                       <button className="btn secondary mini" onClick={handleSudokuHint}>
                                         Hint (-1 ster)
                                       </button>
-                                      <button className="btn secondary mini" onClick={() => applySudokuZoom(+(sudokuZoom - 0.15).toFixed(2))}>
-                                        -
-                                      </button>
-                                      <span style={{ color: 'var(--muted)', fontSize: '12px', minWidth: '44px', textAlign: 'center' }}>{Math.round(sudokuZoom * 100)}%</span>
-                                      <button className="btn secondary mini" onClick={() => applySudokuZoom(+(sudokuZoom + 0.15).toFixed(2))}>
-                                        +
-                                      </button>
                                     </div>
 
-                                    {/* The Sudoku Grid */}
-                                    <div
-                                      ref={sudokuViewportRef}
-                                      onTouchStart={handleSudokuTouchStart}
-                                      onTouchMove={handleSudokuTouchMove}
-                                      onTouchEnd={handleSudokuTouchEnd}
-                                      onTouchCancel={handleSudokuTouchEnd}
-                                      style={{
-                                        width: '100%',
-                                        maxWidth: '760px',
-                                        aspectRatio: '1 / 1',
-                                        overflow: 'hidden',
-                                        margin: '10px auto',
-                                        padding: '6px',
-                                        borderRadius: '18px',
-                                        border: '2px solid var(--line)',
-                                        background: '#041026',
-                                        display: 'flex',
-                                        alignItems: 'center',
-                                        justifyContent: 'center',
-                                        position: 'relative',
-                                        touchAction: 'none',
-                                        boxSizing: 'border-box'
-                                      }}
-                                    >
-                                    <div 
-                                      style={{ 
-                                        position: 'absolute',
-                                        inset: '6px',
-                                        display: 'grid', 
-                                        gridTemplateColumns: `repeat(${sudokuSize}, 1fr)`, 
-                                        gridTemplateRows: `repeat(${sudokuSize}, 1fr)`,
-                                        gap: '4px', 
-                                        background: '#041026', 
-                                        padding: '8px', 
-                                        borderRadius: '16px', 
-                                        boxSizing: 'border-box',
-                                        transform: `translate(${sudokuPan.x}px, ${sudokuPan.y}px) scale(${sudokuZoom})`,
-                                        transformOrigin: 'center center',
-                                        willChange: 'transform'
-                                      }}
-                                    >
-                                      {sudokuGrid.map((row, rIdx) => 
-                                        row.map((cell, cIdx) => {
-                                          const isClue = sudokuClues[rIdx]?.[cIdx];
-                                          const isSelected = sudokuSelectedCell?.row === rIdx && sudokuSelectedCell?.col === cIdx;
-                                          const hasError = sudokuErrors.some(err => err.r === rIdx && err.c === cIdx);
-                                          const borderStyles = getCellBorderStyles(rIdx, cIdx, sudokuSize);
+                                    {/* The Sudoku Grid wrapped in GameZoomContainer */}
+                                    <GameZoomContainer maxHeight="380px" maxWidth="380px" aspectRatio="1 / 1">
+                                      <div 
+                                        style={{ 
+                                          display: 'grid', 
+                                          gridTemplateColumns: `repeat(${sudokuSize}, 1fr)`, 
+                                          gridTemplateRows: `repeat(${sudokuSize}, 1fr)`,
+                                          gap: '4px', 
+                                          background: '#041026', 
+                                          padding: '8px', 
+                                          borderRadius: '16px', 
+                                          boxSizing: 'border-box',
+                                          width: '100%',
+                                          height: '100%'
+                                        }}
+                                      >
+                                        {sudokuGrid.map((row, rIdx) => 
+                                          row.map((cell, cIdx) => {
+                                            const isClue = sudokuClues[rIdx]?.[cIdx];
+                                            const isSelected = sudokuSelectedCell?.row === rIdx && sudokuSelectedCell?.col === cIdx;
+                                            const hasError = sudokuErrors.some(err => err.r === rIdx && err.c === cIdx);
+                                            const borderStyles = getCellBorderStyles(rIdx, cIdx, sudokuSize, isSelected, hasError);
 
-                                          return (
-                                            <div
-                                              key={`${rIdx}-${cIdx}`}
-                                              onClick={() => {
-                                                if (sudokuSuppressClickRef.current) {
-                                                  sudokuSuppressClickRef.current = false;
-                                                  return;
-                                                }
-                                                if (isClue) return;
-                                                setSudokuSelectedCell({ row: rIdx, col: cIdx });
-                                              }}
-                                              style={{
-                                                aspectRatio: '1',
-                                                display: 'flex',
-                                                alignItems: 'center',
-                                                justifyContent: 'center',
-                                                fontSize: sudokuSize === 6 ? '34px' : '26px',
-                                                borderRadius: '8px',
-                                                cursor: isClue ? 'not-allowed' : 'pointer',
-                                                userSelect: 'none',
-                                                transition: 'all 0.15s ease',
-                                                background: isClue 
-                                                  ? 'rgba(255, 212, 92, 0.06)' 
-                                                  : isSelected 
-                                                    ? 'rgba(255, 212, 92, 0.15)' 
-                                                    : '#091c38',
-                                                border: isSelected 
-                                                  ? '2.5px solid var(--gold)' 
-                                                  : hasError 
-                                                    ? '1.5px solid var(--danger)' 
-                                                    : '1px solid var(--line)',
-                                                boxShadow: isSelected 
-                                                  ? '0 0 10px rgba(255, 212, 92, 0.4)' 
-                                                  : hasError 
-                                                    ? '0 0 8px rgba(255, 100, 100, 0.4)' 
-                                                    : 'none',
-                                                color: isClue ? 'var(--gold)' : '#fff',
-                                                fontWeight: isClue ? 'bold' : 'normal',
-                                                ...borderStyles
-                                              }}
-                                            >
-                                              {cell || ""}
-                                            </div>
-                                          );
-                                        })
-                                      )}
-                                    </div>
-                                    </div>
-
+                                            return (
+                                              <div
+                                                key={`${rIdx}-${cIdx}`}
+                                                onClick={() => {
+                                                  if (isClue) return;
+                                                  setSudokuSelectedCell({ row: rIdx, col: cIdx });
+                                                }}
+                                                style={{
+                                                  aspectRatio: '1',
+                                                  display: 'flex',
+                                                  alignItems: 'center',
+                                                  justifyContent: 'center',
+                                                  fontSize: sudokuSize === 6 ? '34px' : '26px',
+                                                  borderRadius: '8px',
+                                                  cursor: isClue ? 'not-allowed' : 'pointer',
+                                                  userSelect: 'none',
+                                                  transition: 'background 0.15s ease, box-shadow 0.15s ease, border-color 0.15s ease',
+                                                  background: isClue 
+                                                    ? 'rgba(255, 212, 92, 0.06)' 
+                                                    : isSelected 
+                                                      ? 'rgba(255, 212, 92, 0.15)' 
+                                                      : '#091c38',
+                                                  boxShadow: isSelected 
+                                                    ? '0 0 10px rgba(255, 212, 92, 0.4)' 
+                                                    : hasError 
+                                                      ? '0 0 8px rgba(255, 100, 100, 0.4)' 
+                                                      : 'none',
+                                                  color: isClue ? 'var(--gold)' : '#fff',
+                                                  fontWeight: isClue ? 'bold' : 'normal',
+                                                  ...borderStyles
+                                                }}
+                                              >
+                                                {cell || ""}
+                                              </div>
+                                            );
+                                          })
+                                        )}
+                                      </div>
+                                    </GameZoomContainer>
                                     {/* Palette selector */}
                                     <div style={{ marginTop: '20px' }}>
                                       <p style={{ textAlign: 'center', fontSize: '13px', color: 'var(--muted)', marginBottom: '10px' }}>
@@ -5440,176 +5937,178 @@ export default function App() {
                               const isGuessComplete = mmCurrentGuess.every(val => val !== -1);
 
                               return (
-                                <div>
-                                  <div className="notice" style={{ background: '#0a1c3c', fontSize: '13px', lineHeight: '1.4' }}>
-                                    💡 Tik op de Disney-figuren onderaan om de stippen van links naar rechts te vullen. Klik op een stip om die positie handmatig aan te passen.
-                                  </div>
+                                <GameZoomContainer maxHeight="450px" aspectRatio="4 / 5">
+                                  <div style={{ width: '100%', height: '100%', boxSizing: 'border-box', overflowY: 'auto', padding: '8px' }}>
+                                    <div className="notice" style={{ background: '#0a1c3c', fontSize: '13px', lineHeight: '1.4' }}>
+                                      💡 Tik op de Disney-figuren onderaan om de stippen van links naar rechts te vullen. Klik op een stip om die positie handmatig aan te passen.
+                                    </div>
 
-                                  {/* GUESS HISTORY */}
-                                  <div style={{ display: 'grid', gap: '8px', marginBottom: '16px' }}>
-                                    {mmGuesses.map((g, idx) => (
-                                      <div key={idx} style={{ display: 'flex', gap: '12px', alignItems: 'center', background: '#091c38', padding: '10px 14px', borderRadius: '12px', border: '1px solid var(--line)' }}>
-                                        <span style={{ fontSize: '13px', minWidth: '55px', color: 'var(--muted)', fontWeight: 'bold' }}>Rij {idx+1}:</span>
-                                        <div style={{ display: 'flex', gap: '6px', flex: 1 }}>
-                                          {g.guess.map((cIdx, i) => (
-                                            <div key={i} style={{ width: '22px', height: '22px', borderRadius: '50%', background: colors[cIdx].color, border: '1px solid rgba(255,255,255,0.3)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '12px' }}>
+                                    {/* GUESS HISTORY */}
+                                    <div style={{ display: 'grid', gap: '8px', marginBottom: '16px' }}>
+                                      {mmGuesses.map((g, idx) => (
+                                        <div key={idx} style={{ display: 'flex', gap: '12px', alignItems: 'center', background: '#091c38', padding: '10px 14px', borderRadius: '12px', border: '1px solid var(--line)' }}>
+                                          <span style={{ fontSize: '13px', minWidth: '55px', color: 'var(--muted)', fontWeight: 'bold' }}>Rij {idx+1}:</span>
+                                          <div style={{ display: 'flex', gap: '6px', flex: 1 }}>
+                                            {g.guess.map((cIdx, i) => (
+                                              <div key={i} style={{ width: '22px', height: '22px', borderRadius: '50%', background: colors[cIdx].color, border: '1px solid rgba(255,255,255,0.3)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '12px' }}>
+                                                {colors[cIdx].emoji}
+                                              </div>
+                                            ))}
+                                          </div>
+                                          
+                                          {/* Large High Contrast Pegs & Text */}
+                                          <div style={{ display: 'flex', alignItems: 'center', gap: '10px', minWidth: '135px', justifyContent: 'flex-end' }}>
+                                            <div style={{ display: 'flex', gap: '4px' }}>
+                                              {Array.from({ length: g.black }).map((_, i) => (
+                                                <div key={i} style={{ width: '22px', height: '22px', borderRadius: '50%', background: '#000000', border: '2px solid #ffffff', boxShadow: '0 0 3px rgba(255,255,255,0.6)' }} title="Goed"></div>
+                                              ))}
+                                              {Array.from({ length: g.white }).map((_, i) => (
+                                                <div key={i} style={{ width: '22px', height: '22px', borderRadius: '50%', background: '#ffffff', border: '2px solid #000000', boxShadow: '0 0 3px rgba(0,0,0,0.6)' }} title="Bijna goed"></div>
+                                              ))}
+                                            </div>
+                                            <span style={{ fontSize: '13px', fontWeight: 'bold', color: 'var(--gold)', minWidth: '65px', textAlign: 'right' }}>
+                                              {g.black} Goed, {g.white} Kleur
+                                            </span>
+                                          </div>
+                                        </div>
+                                      ))}
+                                    </div>
+
+                                    {/* SOLVED STATE */}
+                                    {mmSolved && (
+                                      <div className="notice green" style={{ padding: '20px', textAlign: 'center' }}>
+                                        <div style={{ fontSize: '24px', marginBottom: '8px' }}>🎉 Gekruist!</div>
+                                        <p style={{ margin: '8px 0', fontSize: '15px' }}>
+                                          Je hebt de code gekraakt in <strong>{mmGuesses.length}</strong> beurten!
+                                        </p>
+                                        <div className="badge" style={{ background: 'var(--gold)', color: '#000', marginBottom: '15px', fontSize: '14px', fontWeight: 'bold', padding: '6px 12px' }}>
+                                          Beoordeling: {rating.label} (+{mmPointsEarned} ★)
+                                        </div>
+                                        <button className="btn primary full" onClick={() => handleMmFinish(mmPointsEarned)}>
+                                          Beëindig & incasseer
+                                        </button>
+                                      </div>
+                                    )}
+
+                                    {/* FAILED STATE */}
+                                    {mmFailed && (
+                                      <div className="notice danger" style={{ padding: '20px', textAlign: 'center' }}>
+                                        <div style={{ fontSize: '24px', marginBottom: '8px' }}>💀 Helaas!</div>
+                                        <p style={{ margin: '8px 0', fontSize: '15px' }}>De beurten zijn op. De geheime code was:</p>
+                                        <div style={{ display: 'flex', gap: '8px', justifyContent: 'center', margin: '14px 0' }}>
+                                          {mmCode.map((cIdx, i) => (
+                                            <div key={i} style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', width: '36px', height: '36px', borderRadius: '50%', background: colors[cIdx].color, fontSize: '20px', border: '1.5px solid rgba(255,255,255,0.4)' }} title={colors[cIdx].label}>
                                               {colors[cIdx].emoji}
                                             </div>
                                           ))}
                                         </div>
-                                        
-                                        {/* Large High Contrast Pegs & Text */}
-                                        <div style={{ display: 'flex', alignItems: 'center', gap: '10px', minWidth: '135px', justifyContent: 'flex-end' }}>
-                                          <div style={{ display: 'flex', gap: '4px' }}>
-                                            {Array.from({ length: g.black }).map((_, i) => (
-                                              <div key={i} style={{ width: '22px', height: '22px', borderRadius: '50%', background: '#000000', border: '2px solid #ffffff', boxShadow: '0 0 3px rgba(255,255,255,0.6)' }} title="Goed"></div>
-                                            ))}
-                                            {Array.from({ length: g.white }).map((_, i) => (
-                                              <div key={i} style={{ width: '22px', height: '22px', borderRadius: '50%', background: '#ffffff', border: '2px solid #000000', boxShadow: '0 0 3px rgba(0,0,0,0.6)' }} title="Bijna goed"></div>
-                                            ))}
+                                        <button className="btn primary full" onClick={() => handleMmFinish(0)}>
+                                          Volgende opdracht
+                                        </button>
+                                      </div>
+                                    )}
+
+                                    {/* INTERACTIVE PLAY INTERFACE */}
+                                    {!mmSolved && !mmFailed && (
+                                      <div>
+                                        {/* CURRENT ROW SLOTS */}
+                                        <div style={{ background: '#091c38', padding: '16px', borderRadius: '16px', border: '1px solid var(--line)', marginBottom: '14px' }}>
+                                          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' }}>
+                                            <span style={{ fontSize: '15px', fontWeight: 'bold' }}>Jouw poging:</span>
+                                            <span style={{ fontSize: '12px', color: 'var(--gold)', fontWeight: 'bold' }}>Positie {mmActiveSlot + 1} geselecteerd</span>
                                           </div>
-                                          <span style={{ fontSize: '13px', fontWeight: 'bold', color: 'var(--gold)', minWidth: '65px', textAlign: 'right' }}>
-                                            {g.black} Goed, {g.white} Kleur
-                                          </span>
-                                        </div>
-                                      </div>
-                                    ))}
-                                  </div>
-
-                                  {/* SOLVED STATE */}
-                                  {mmSolved && (
-                                    <div className="notice green" style={{ padding: '20px', textAlign: 'center' }}>
-                                      <div style={{ fontSize: '24px', marginBottom: '8px' }}>🎉 Gekruist!</div>
-                                      <p style={{ margin: '8px 0', fontSize: '15px' }}>
-                                        Je hebt de code gekraakt in <strong>{mmGuesses.length}</strong> beurten!
-                                      </p>
-                                      <div className="badge" style={{ background: 'var(--gold)', color: '#000', marginBottom: '15px', fontSize: '14px', fontWeight: 'bold', padding: '6px 12px' }}>
-                                        Beoordeling: {rating.label} (+{mmPointsEarned} ★)
-                                      </div>
-                                      <button className="btn primary full" onClick={() => handleMmFinish(mmPointsEarned)}>
-                                        Beëindig & incasseer
-                                      </button>
-                                    </div>
-                                  )}
-
-                                  {/* FAILED STATE */}
-                                  {mmFailed && (
-                                    <div className="notice danger" style={{ padding: '20px', textAlign: 'center' }}>
-                                      <div style={{ fontSize: '24px', marginBottom: '8px' }}>💀 Helaas!</div>
-                                      <p style={{ margin: '8px 0', fontSize: '15px' }}>De beurten zijn op. De geheime code was:</p>
-                                      <div style={{ display: 'flex', gap: '8px', justifyContent: 'center', margin: '14px 0' }}>
-                                        {mmCode.map((cIdx, i) => (
-                                          <div key={i} style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', width: '36px', height: '36px', borderRadius: '50%', background: colors[cIdx].color, fontSize: '20px', border: '1.5px solid rgba(255,255,255,0.4)' }} title={colors[cIdx].label}>
-                                            {colors[cIdx].emoji}
+                                          <div style={{ display: 'flex', gap: '10px', justifyContent: 'center' }}>
+                                            {mmCurrentGuess.map((cIdx, idx) => {
+                                              const isActive = mmActiveSlot === idx;
+                                              const hasValue = cIdx !== -1;
+                                              return (
+                                                <button
+                                                  key={idx}
+                                                  onClick={() => setMmActiveSlot(idx)}
+                                                  style={{
+                                                    width: '46px',
+                                                    height: '46px',
+                                                    borderRadius: '50%',
+                                                    background: hasValue ? colors[cIdx].color : 'transparent',
+                                                    border: isActive ? '3px solid var(--gold)' : '2px dashed var(--line)',
+                                                    boxShadow: isActive ? '0 0 10px var(--gold)' : 'none',
+                                                    cursor: 'pointer',
+                                                    display: 'flex',
+                                                    alignItems: 'center',
+                                                    justifyContent: 'center',
+                                                    fontSize: '22px',
+                                                    transition: 'all 0.15s ease'
+                                                  }}
+                                                >
+                                                  {hasValue ? colors[cIdx].emoji : ''}
+                                                </button>
+                                              );
+                                            })}
                                           </div>
-                                        ))}
-                                      </div>
-                                      <button className="btn primary full" onClick={() => handleMmFinish(0)}>
-                                        Volgende opdracht
-                                      </button>
-                                    </div>
-                                  )}
-
-                                  {/* INTERACTIVE PLAY INTERFACE */}
-                                  {!mmSolved && !mmFailed && (
-                                    <div>
-                                      {/* CURRENT ROW SLOTS */}
-                                      <div style={{ background: '#091c38', padding: '16px', borderRadius: '16px', border: '1px solid var(--line)', marginBottom: '14px' }}>
-                                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' }}>
-                                          <span style={{ fontSize: '15px', fontWeight: 'bold' }}>Jouw poging:</span>
-                                          <span style={{ fontSize: '12px', color: 'var(--gold)', fontWeight: 'bold' }}>Positie {mmActiveSlot + 1} geselecteerd</span>
                                         </div>
-                                        <div style={{ display: 'flex', gap: '10px', justifyContent: 'center' }}>
-                                          {mmCurrentGuess.map((cIdx, idx) => {
-                                            const isActive = mmActiveSlot === idx;
-                                            const hasValue = cIdx !== -1;
-                                            return (
+
+                                        {/* PUSH BUTTONS PALETTE */}
+                                        <div style={{ background: '#091c38', padding: '16px', borderRadius: '16px', border: '1px solid var(--line)', marginBottom: '14px' }}>
+                                          <div style={{ fontSize: '13px', fontWeight: 'bold', marginBottom: '12px', textAlign: 'center', color: 'var(--muted)' }}>
+                                            TIK EEN FIGUUR OM IN TE VULLEN
+                                          </div>
+                                          <div style={{ display: 'grid', gridTemplateColumns: `repeat(${paletteColumns}, 1fr)`, gap: '10px' }}>
+                                            {colors.map((c, i) => (
                                               <button
-                                                key={idx}
-                                                onClick={() => setMmActiveSlot(idx)}
+                                                key={i}
+                                                onClick={() => {
+                                                  const newGuess = [...mmCurrentGuess];
+                                                  newGuess[mmActiveSlot] = i;
+                                                  setMmCurrentGuess(newGuess);
+                                                  // Find next slot (looping)
+                                                  setMmActiveSlot((mmActiveSlot + 1) % mmCodeLength);
+                                                }}
                                                 style={{
-                                                  width: '46px',
-                                                  height: '46px',
-                                                  borderRadius: '50%',
-                                                  background: hasValue ? colors[cIdx].color : 'transparent',
-                                                  border: isActive ? '3px solid var(--gold)' : '2px dashed var(--line)',
-                                                  boxShadow: isActive ? '0 0 10px var(--gold)' : 'none',
-                                                  cursor: 'pointer',
                                                   display: 'flex',
+                                                  flexDirection: 'column',
                                                   alignItems: 'center',
                                                   justifyContent: 'center',
-                                                  fontSize: '22px',
+                                                  padding: '10px 4px',
+                                                  borderRadius: '12px',
+                                                  background: c.color,
+                                                  color: c.text,
+                                                  border: '2px solid rgba(255,255,255,0.55)',
+                                                  cursor: 'pointer',
                                                   transition: 'all 0.15s ease'
                                                 }}
+                                                className="color-btn"
                                               >
-                                                {hasValue ? colors[cIdx].emoji : ''}
+                                                <span style={{ fontSize: '18px', marginBottom: '4px', fontWeight: 900 }}>{c.emoji}</span>
+                                                <span style={{ fontSize: '11px', color: c.text, fontWeight: 'bold', opacity: 0.95 }}>{c.label}</span>
                                               </button>
-                                            );
-                                          })}
+                                            ))}
+                                          </div>
+                                        </div>
+                                        
+                                        <div style={{ display: 'flex', gap: '10px' }}>
+                                          <button 
+                                            className="btn secondary" 
+                                            onClick={() => {
+                                              setMmCurrentGuess(Array(mmCodeLength).fill(-1));
+                                              setMmActiveSlot(0);
+                                            }}
+                                            style={{ flex: 1, padding: '14px', fontSize: '15px' }}
+                                          >
+                                            Wis rij 🔄
+                                          </button>
+                                          <button 
+                                            className="btn primary" 
+                                            disabled={!isGuessComplete}
+                                            onClick={handleMmSubmitGuess}
+                                            style={{ flex: 2, padding: '14px', fontSize: '15px' }}
+                                          >
+                                            Check ({mmGuesses.length + 1}/{mmMaxTurns})
+                                          </button>
                                         </div>
                                       </div>
-
-                                      {/* PUSH BUTTONS PALETTE */}
-                                      <div style={{ background: '#091c38', padding: '16px', borderRadius: '16px', border: '1px solid var(--line)', marginBottom: '14px' }}>
-                                        <div style={{ fontSize: '13px', fontWeight: 'bold', marginBottom: '12px', textAlign: 'center', color: 'var(--muted)' }}>
-                                          TIK EEN FIGUUR OM IN TE VULLEN
-                                        </div>
-                                        <div style={{ display: 'grid', gridTemplateColumns: `repeat(${paletteColumns}, 1fr)`, gap: '10px' }}>
-                                          {colors.map((c, i) => (
-                                            <button
-                                              key={i}
-                                              onClick={() => {
-                                                const newGuess = [...mmCurrentGuess];
-                                                newGuess[mmActiveSlot] = i;
-                                                setMmCurrentGuess(newGuess);
-                                                // Find next slot (looping)
-                                                setMmActiveSlot((mmActiveSlot + 1) % mmCodeLength);
-                                              }}
-                                              style={{
-                                                display: 'flex',
-                                                flexDirection: 'column',
-                                                alignItems: 'center',
-                                                justifyContent: 'center',
-                                                padding: '10px 4px',
-                                                borderRadius: '12px',
-                                                background: c.color,
-                                                color: c.text,
-                                                border: '2px solid rgba(255,255,255,0.55)',
-                                                cursor: 'pointer',
-                                                transition: 'all 0.15s ease'
-                                              }}
-                                              className="color-btn"
-                                            >
-                                              <span style={{ fontSize: '18px', marginBottom: '4px', fontWeight: 900 }}>{c.emoji}</span>
-                                              <span style={{ fontSize: '11px', color: c.text, fontWeight: 'bold', opacity: 0.95 }}>{c.label}</span>
-                                            </button>
-                                          ))}
-                                        </div>
-                                      </div>
-                                      
-                                      <div style={{ display: 'flex', gap: '10px' }}>
-                                        <button 
-                                          className="btn secondary" 
-                                          onClick={() => {
-                                            setMmCurrentGuess(Array(mmCodeLength).fill(-1));
-                                            setMmActiveSlot(0);
-                                          }}
-                                          style={{ flex: 1, padding: '14px', fontSize: '15px' }}
-                                        >
-                                          Wis rij 🔄
-                                        </button>
-                                        <button 
-                                          className="btn primary" 
-                                          disabled={!isGuessComplete}
-                                          onClick={handleMmSubmitGuess}
-                                          style={{ flex: 2, padding: '14px', fontSize: '15px' }}
-                                        >
-                                          Check ({mmGuesses.length + 1}/{mmMaxTurns})
-                                        </button>
-                                      </div>
-                                    </div>
-                                  )}
-                                </div>
+                                    )}
+                                  </div>
+                                </GameZoomContainer>
                               );
                             })()}
 
@@ -5893,7 +6392,7 @@ export default function App() {
               <section className="card hero">
                 <div className="bigicon">🎇🏰🎇</div>
                 <div className="badge">De magie is bereikt</div>
-                <h1>Road Quest Voltooid!</h1>
+                <h1>Road Race Voltooid!</h1>
                 <p>Jullie zijn aangekomen op jullie bestemming!</p>
               </section>
 
@@ -5904,7 +6403,7 @@ export default function App() {
                     .sort((a, b) => b.score - a.score)
                     .map((p, idx) => {
                       const titles = [
-                        "De Hercules van de Road Quest 🏆",
+                        "De Hercules van de Road Race 🏆",
                         "De Buzz Lightyear van de Bijna-Winst 🚀",
                         "De Pain & Panic-combi van de Achterhoede 😈",
                         "De Sidekick 🦌"
@@ -5936,9 +6435,9 @@ export default function App() {
           {/* SCREEN: VERSION INFO */}
           {screen === 'versioninfo' && (
             <div>
-              {renderAppHeader("Versie-info", () => setScreen('home'))}
+              {renderAppHeader("Versie-info", () => setScreen('portal'))}
               <section className="card">
-                <div className="badge">Disney Road Quest · Premium Editie</div>
+                <div className="badge">McQueen's Road Race · Premium Editie</div>
                 <h2 className="sectiontitle" style={{ marginTop: '14px' }}>Nieuw en aangepast</h2>
                 <div className="versionchanges">
                   <div className="versionchange">
