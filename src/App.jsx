@@ -74,7 +74,7 @@ const getArenaGame = (gameId) => ARENA_GAMES.find(game => game.id === gameId);
 const COCO_BANK_KEY = 'disney_coco_coin_bank';
 const COCO_PROFILES_KEY = 'disney_coco_profiles';
 const ACTIVE_PROFILE_KEY = 'disney_active_profile';
-const DEFAULT_COCO_PROFILES = ['Speler 1', 'Speler 2', 'Speler 3', 'Speler 4'];
+const COCO_PROFILE_STORE_CODE = 'COCO-PROFILES-V1';
 
 function CocoCoinIcon({ size = 30, onInspect }) {
   const icon = (
@@ -476,7 +476,7 @@ export default function App() {
     const savedProfiles = Array.isArray(saved) ? saved : [];
     const names = savedProfiles.length
       ? [legacyName, ...savedProfiles].filter(Boolean)
-      : [...DEFAULT_COCO_PROFILES, legacyName].filter(Boolean);
+      : [legacyName].filter(Boolean);
     const seen = new Set();
     return names
       .map(name => String(name).trim())
@@ -495,6 +495,8 @@ export default function App() {
   const [selectedCollectionItem, setSelectedCollectionItem] = useState(null);
   const [coinPopupOpen, setCoinPopupOpen] = useState(false);
   const [coinFlipped, setCoinFlipped] = useState(false);
+  const [cocoProfilesReady, setCocoProfilesReady] = useState(false);
+  const cocoProfileStoreIdRef = useRef(null);
   const [aiLevel, setAiLevel] = useState(() => localStorage.getItem('disney_ai_level') || 'normal');
 
   // Solo mode states and history
@@ -865,8 +867,133 @@ export default function App() {
   };
 
   const getDisplayShopPlayers = () => {
-    return uniqueProfileNames(cocoProfiles.length ? cocoProfiles : DEFAULT_COCO_PROFILES);
+    return uniqueProfileNames(cocoProfiles);
   };
+
+  useEffect(() => {
+    let cancelled = false;
+
+    const mergeCollections = (remoteCollections, localCollections) => {
+      const keys = new Set([...Object.keys(remoteCollections || {}), ...Object.keys(localCollections || {})]);
+      return Object.fromEntries([...keys].map(key => [
+        key,
+        [...new Set([...(remoteCollections?.[key] || []), ...(localCollections?.[key] || [])])]
+      ]));
+    };
+
+    const mergeBank = (remoteBank, localBank) => {
+      const keys = new Set([...Object.keys(remoteBank || {}), ...Object.keys(localBank || {})]);
+      return Object.fromEntries([...keys].map(key => [key, Math.max(Number(remoteBank?.[key]) || 0, Number(localBank?.[key]) || 0)]));
+    };
+
+    const loadSharedProfiles = async () => {
+      const localProfiles = uniqueProfileNames(cocoProfiles);
+      const localState = {
+        coco_profiles: localProfiles,
+        coco_bank: starBank,
+        coco_collections: collections,
+        coco_exclusive_claims: exclusiveClaims
+      };
+
+      try {
+        let { data: store, error } = await supabase
+          .from('rooms')
+          .select('id,current_task_state')
+          .eq('code', COCO_PROFILE_STORE_CODE)
+          .maybeSingle();
+
+        if (error) throw error;
+
+        if (!store) {
+          const { data: createdStore, error: createError } = await supabase
+            .from('rooms')
+            .insert({
+              code: COCO_PROFILE_STORE_CODE,
+              status: 'ended',
+              game_mode: 'profile-store',
+              game_version: 1,
+              rounds_per_player: 0,
+              total_rounds: 0,
+              current_task_state: localState
+            })
+            .select('id,current_task_state')
+            .single();
+
+          if (createError?.code === '23505') {
+            const retry = await supabase
+              .from('rooms')
+              .select('id,current_task_state')
+              .eq('code', COCO_PROFILE_STORE_CODE)
+              .maybeSingle();
+            if (retry.error) throw retry.error;
+            store = retry.data;
+          } else if (createError) {
+            throw createError;
+          } else {
+            store = createdStore;
+          }
+        }
+
+        const remoteState = store?.current_task_state || {};
+        const mergedProfiles = uniqueProfileNames([...(remoteState.coco_profiles || []), ...localProfiles]);
+        const mergedBank = mergeBank(remoteState.coco_bank, starBank);
+        const mergedCollections = mergeCollections(remoteState.coco_collections, collections);
+        const mergedClaims = { ...(exclusiveClaims || {}), ...(remoteState.coco_exclusive_claims || {}) };
+        const mergedState = {
+          coco_profiles: mergedProfiles,
+          coco_bank: mergedBank,
+          coco_collections: mergedCollections,
+          coco_exclusive_claims: mergedClaims
+        };
+
+        if (!cancelled) {
+          cocoProfileStoreIdRef.current = store?.id || null;
+          setCocoProfiles(mergedProfiles);
+          setStarBank(mergedBank);
+          setCollections(mergedCollections);
+          setExclusiveClaims(mergedClaims);
+          localStorage.setItem(COCO_PROFILES_KEY, JSON.stringify(mergedProfiles));
+          localStorage.setItem(COCO_BANK_KEY, JSON.stringify(mergedBank));
+          localStorage.setItem('disney_collections', JSON.stringify(mergedCollections));
+          localStorage.setItem('disney_exclusive_claims', JSON.stringify(mergedClaims));
+        }
+
+        if (store?.id) {
+          await supabase.from('rooms').update({ current_task_state: mergedState }).eq('id', store.id);
+        }
+      } catch (syncError) {
+        console.warn('Coco-profielen konden niet worden gesynchroniseerd.', syncError);
+      } finally {
+        if (!cancelled) setCocoProfilesReady(true);
+      }
+    };
+
+    loadSharedProfiles();
+    return () => { cancelled = true; };
+  }, []);
+
+  useEffect(() => {
+    if (!cocoProfilesReady || !cocoProfileStoreIdRef.current) return;
+
+    const timeoutId = window.setTimeout(() => {
+      supabase
+        .from('rooms')
+        .update({
+          current_task_state: {
+            coco_profiles: uniqueProfileNames(cocoProfiles),
+            coco_bank: starBank,
+            coco_collections: collections,
+            coco_exclusive_claims: exclusiveClaims
+          }
+        })
+        .eq('id', cocoProfileStoreIdRef.current)
+        .then(({ error }) => {
+          if (error) console.warn('Coco-profielen konden niet worden opgeslagen.', error);
+        });
+    }, 250);
+
+    return () => window.clearTimeout(timeoutId);
+  }, [cocoProfiles, cocoProfilesReady, collections, exclusiveClaims, starBank]);
 
   useEffect(() => {
     const dagobertProfile = cocoProfiles.find(name => norm(name) === 'dagobert');
@@ -3352,7 +3479,17 @@ export default function App() {
         </div>
       )}
 
-      {!loading && !activeProfileName && (
+      {!loading && !activeProfileName && !cocoProfilesReady && (
+        <div className="portal-container">
+          <section className="card" style={{ maxWidth: '560px', margin: '40px auto 0', textAlign: 'center' }}>
+            <CocoCoinIcon size={64} />
+            <h2 style={{ margin: '14px 0 8px' }}>Disney-profielen laden</h2>
+            <p style={{ color: 'var(--muted)', margin: 0 }}>Je Coco Coins en Disney Collection worden veilig gesynchroniseerd.</p>
+          </section>
+        </div>
+      )}
+
+      {!loading && !activeProfileName && cocoProfilesReady && (
         <div className="portal-container">
           <section className="card" style={{ maxWidth: '560px', margin: '40px auto 0' }}>
             <div style={{ textAlign: 'center', marginBottom: '18px' }}>
