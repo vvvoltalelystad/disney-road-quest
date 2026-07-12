@@ -1,38 +1,7 @@
--- Disney Music Quest: actuele database-hotfixes
--- Veilig opnieuw uit te voeren in Supabase SQL Editor.
-
-create extension if not exists pgcrypto with schema extensions;
-
-create or replace function public.dmq_create_host_room()
-returns table(room_id uuid, room_code text)
-language plpgsql
-security definer
-set search_path = public, extensions
-as $$
-declare
-  v_room_id uuid;
-  v_code text;
-begin
-  if auth.uid() is null then
-    raise exception 'Niet ingelogd';
-  end if;
-
-  loop
-    v_code := upper(substr(encode(extensions.gen_random_bytes(6), 'hex'), 1, 6));
-    exit when not exists (
-      select 1 from public.dmq_rooms r where r.code = v_code
-    );
-  end loop;
-
-  insert into public.dmq_rooms(code, host_user_id, settings)
-  values (v_code, auth.uid(), '{}'::jsonb)
-  returning id into v_room_id;
-
-  return query select v_room_id, v_code;
-end;
-$$;
-
-grant execute on function public.dmq_create_host_room() to authenticated;
+-- Disney Music Quest v3.2 hotfix
+-- Herstelt het aansluiten van spelers: het outputveld room_id en de tabelkolom
+-- room_id kregen in de vorige functie dezelfde naam en waren daardoor dubbelzinnig.
+-- Veilig opnieuw uit te voeren in de Supabase SQL Editor.
 
 create or replace function public.dmq_join_room_v2(
   p_code text,
@@ -55,7 +24,7 @@ begin
   end if;
 
   select r.* into v_room
-  from public.dmq_rooms r
+  from public.dmq_rooms as r
   where r.code = upper(trim(p_code))
     and r.status = 'lobby';
 
@@ -63,12 +32,12 @@ begin
     raise exception 'Kamer bestaat niet of is al gestart.';
   end if;
 
-  if (select count(*) from public.dmq_players p where p.room_id = v_room.id) >= 6 then
+  if (select count(*) from public.dmq_players as p where p.room_id = v_room.id) >= 6 then
     raise exception 'Deze kamer heeft al zes spelers.';
   end if;
 
   if exists (
-    select 1 from public.dmq_players p
+    select 1 from public.dmq_players as p
     where p.room_id = v_room.id
       and lower(p.name) = lower(trim(p_player_name))
   ) then
@@ -76,14 +45,14 @@ begin
   end if;
 
   if exists (
-    select 1 from public.dmq_players p
+    select 1 from public.dmq_players as p
     where p.room_id = v_room.id and p.color_id = p_color_id
   ) then
     raise exception 'Deze kleur is al gekozen.';
   end if;
 
   if exists (
-    select 1 from public.dmq_players p
+    select 1 from public.dmq_players as p
     where p.room_id = v_room.id and p.avatar_id = p_avatar_id
   ) then
     raise exception 'Deze attractie-avatar is al gekozen.';
