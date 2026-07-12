@@ -61,7 +61,7 @@ const ARENA_GAMES = [
   { id: 'dotsboxes', name: "Rapunzel's Torenkamers", icon: "\u270F\uFE0F", desc: "Origineel: Dots & Boxes. Trek lijntjes en claim de meeste kamertjes.", maxPlayers: 4 },
   { id: 'colorlines', name: "Inside Out Kleurenchaos", icon: "\u{1F534}", desc: "Origineel: Color Lines. Solo puzzel: maak rijen van 5 gelijke bollen.", maxPlayers: 1 },
   { id: 'abalone', name: "Hercules' Olympus Push", icon: "\u{1F41C}", desc: "Origineel: Marble Push / Abalone. Duw de bollen van de tegenstander uit het hex-raster.", maxPlayers: 2 },
-  { id: 'piratesplank', name: "Pirates' Plank", icon: "\u2620\uFE0F", desc: "Origineel: Galgje. Raad Disney-woorden voordat de piraat van de plank loopt.", maxPlayers: 4 },
+  { id: 'piratesplank', name: "Pirates' Plank", icon: "\u2620\uFE0F", desc: "Origineel: Galgje/Wheel of Fortune. Gooi dobbelstenen, koop klinkers en kraak de blanco schatkistcode.", maxPlayers: 4 },
   { id: 'yahtzee', name: "Goofy's Geluksworp", icon: "\u{1F3B2}", desc: "Origineel: Yahtzee. Gooi, houd dobbelstenen vast en vul je magische scorekaart.", maxPlayers: 2 },
   { id: 'qwixx', name: "Mickey's Racekaart", icon: "\u270F\uFE0F", desc: "Origineel: Qwixx. Streep gekleurde rijen af en ontwijk strafvakjes.", maxPlayers: 2 },
   { id: 'mastermind', name: "Yzma's Geheime Code", icon: "\u{1F9E0}", desc: "Origineel: Mastermind. Solo puzzel: kraak de geheime Disney-kleurcode.", maxPlayers: 1 },

@@ -2009,20 +2009,42 @@ const PIRATES_PLANK_WORDS = [
 ];
 
 const PLANK_LETTERS = "ABCDEFGHIJKLMNOPQRSTUVWXYZ".split("");
+const PLANK_VOWELS = ["A", "E", "I", "O", "U"];
+const PLANK_CONSONANTS = PLANK_LETTERS.filter(letter => !PLANK_VOWELS.includes(letter));
+const PLANK_NUMBER_DIE = [1, 1, 2, 2, 3, 3];
+const PLANK_EVENT_DIE = [
+  { id: "neutral-1", name: "Neutraal", icon: "⚓", tone: "#d8e8ff", allowsLetter: true, multiplier: 1 },
+  { id: "neutral-2", name: "Neutraal", icon: "🧭", tone: "#d8e8ff", allowsLetter: true, multiplier: 1 },
+  { id: "double", name: "Dubbel", icon: "🏴‍☠️", tone: "#ffd45c", allowsLetter: true, multiplier: 2 },
+  { id: "curse", name: "Vloek", icon: "💀", tone: "#ff6b6b", allowsLetter: false },
+  { id: "shipwreck", name: "Schipbreuk", icon: "🌊", tone: "#6bd6ff", allowsLetter: false },
+  { id: "chest", name: "Schatkist", icon: "💰", tone: "#ffd45c", allowsLetter: false }
+];
+const PLANK_MAX_STRIKES = 3;
+const PLANK_VOWEL_COST = 5;
+
+const getPlankOccurrenceCount = (word, letter) => word.split("").filter(char => char === letter).length;
+const isPlankWordSolved = (word, guesses) => (
+  word.split("").every(char => char === " " || char === "-" || char === "'" || guesses.includes(char))
+);
 
 function createPiratesPlankState() {
   const entry = PIRATES_PLANK_WORDS[Math.floor(Math.random() * PIRATES_PLANK_WORDS.length)];
   return {
     plankWord: entry.word,
-    plankHint: "",
     plankGuesses: [],
-    plankWrong: 0,
+    plankWrongGuesses: [],
+    plankTreasure: 0,
+    plankStrikes: 0,
+    plankTurns: 0,
+    plankPendingRoll: null,
+    plankLastMove: "Gooi de dobbelstenen om de jacht op buit te starten.",
     plankWinnerId: null,
     plankFailed: false
   };
 }
 
-export function PiratesPlankGame({ mode, room, localPlayer, players, updateRoomState, onFinish }) {
+function LegacyPiratesPlankGame({ mode, room, localPlayer, players, updateRoomState, onFinish }) {
   const isSolo = mode === 'solo' || room.id === 'solo';
   const maxWrong = 6;
   const taskState = room.current_task_state || {};
@@ -2164,6 +2186,366 @@ export function PiratesPlankGame({ mode, room, localPlayer, players, updateRoomS
             </button>
           );
         })}
+      </div>
+    </div>
+  );
+}
+
+export function PiratesPlankGame({ mode, room, localPlayer, players, updateRoomState, onFinish }) {
+  const isSolo = mode === 'solo' || room.id === 'solo';
+  const taskState = room.current_task_state || {};
+  const activeIndex = room.current_player_index || 0;
+  const myIndex = Math.max(0, players.findIndex(p => p.id === localPlayer.id));
+  const myTurn = isSolo || activeIndex === myIndex;
+
+  const word = taskState.plankWord || "";
+  const guesses = taskState.plankGuesses || [];
+  const wrongGuesses = taskState.plankWrongGuesses || [];
+  const treasure = taskState.plankTreasure || 0;
+  const strikes = taskState.plankStrikes || 0;
+  const turns = taskState.plankTurns || 0;
+  const pendingRoll = taskState.plankPendingRoll || null;
+  const lastMove = taskState.plankLastMove || "";
+  const winnerId = taskState.plankWinnerId || null;
+  const failed = taskState.plankFailed || false;
+  const isFinished = Boolean(winnerId) || failed;
+
+  useEffect(() => {
+    if (!taskState.plankWord) {
+      updateRoomState(room.id, {
+        current_player_index: 0,
+        current_task_state: {
+          ...taskState,
+          ...createPiratesPlankState()
+        }
+      });
+    }
+  }, []);
+
+  const visibleWord = word.split("").map(char => {
+    if (char === " " || char === "-" || char === "'") return char;
+    return guesses.includes(char) ? char : "_";
+  });
+
+  const totalPlayers = isSolo ? 1 : players.length;
+  const passTurnIndex = isSolo ? activeIndex : (activeIndex + 1) % totalPlayers;
+  const canAct = Boolean(word) && !isFinished && myTurn;
+  const hasLetterRoll = pendingRoll?.allowsLetter;
+  const shipProgress = Math.min(1, strikes / PLANK_MAX_STRIKES);
+  const treasureColor = treasure < PLANK_VOWEL_COST ? '#ff5b5b' : '#050b16';
+
+  const commitPlankState = (updates, passTurn = true) => {
+    updateRoomState(room.id, {
+      current_player_index: passTurn ? passTurnIndex : activeIndex,
+      current_task_state: {
+        ...taskState,
+        ...updates
+      }
+    });
+  };
+
+  const handleRollDice = () => {
+    if (!canAct || pendingRoll) return;
+    const number = PLANK_NUMBER_DIE[Math.floor(Math.random() * PLANK_NUMBER_DIE.length)];
+    const event = PLANK_EVENT_DIE[Math.floor(Math.random() * PLANK_EVENT_DIE.length)];
+    const baseRoll = {
+      number,
+      eventId: event.id,
+      eventName: event.name,
+      icon: event.icon,
+      tone: event.tone,
+      allowsLetter: event.allowsLetter,
+      multiplier: event.multiplier || 1
+    };
+
+    if (event.id === "curse") {
+      const nextStrikes = Math.min(PLANK_MAX_STRIKES, strikes + 1);
+      commitPlankState({
+        plankPendingRoll: null,
+        plankStrikes: nextStrikes,
+        plankTurns: turns + 1,
+        plankFailed: nextStrikes >= PLANK_MAX_STRIKES,
+        plankLastMove: `Vloek! ${localPlayer.name} krijgt direct een strike.`
+      });
+      return;
+    }
+
+    if (event.id === "shipwreck") {
+      const lost = Math.ceil(treasure / 2);
+      commitPlankState({
+        plankPendingRoll: null,
+        plankTreasure: Math.max(0, treasure - lost),
+        plankTurns: turns + 1,
+        plankLastMove: `Schipbreuk! ${localPlayer.name} verliest ${lost} buit.`
+      });
+      return;
+    }
+
+    if (event.id === "chest") {
+      commitPlankState({
+        plankPendingRoll: null,
+        plankTreasure: treasure + 5,
+        plankTurns: turns + 1,
+        plankLastMove: `Schatkist! ${localPlayer.name} vindt 5 buit, maar kiest geen letter.`
+      });
+      return;
+    }
+
+    commitPlankState({
+      plankPendingRoll: baseRoll,
+      plankLastMove: `${localPlayer.name} gooide ${number} + ${event.name}. Kies een medeklinker.`
+    }, false);
+  };
+
+  const handleConsonantGuess = (letter) => {
+    if (!canAct || !hasLetterRoll || guesses.includes(letter) || !PLANK_CONSONANTS.includes(letter)) return;
+
+    const count = getPlankOccurrenceCount(word, letter);
+    const nextGuesses = [...guesses, letter];
+    const earned = count * pendingRoll.number * (pendingRoll.multiplier || 1);
+    const nextTreasure = treasure + earned;
+    const nextStrikes = count > 0 ? strikes : Math.min(PLANK_MAX_STRIKES, strikes + 1);
+    const solved = count > 0 && isPlankWordSolved(word, nextGuesses);
+    const nextFailed = nextStrikes >= PLANK_MAX_STRIKES && !solved;
+
+    commitPlankState({
+      plankGuesses: nextGuesses,
+      plankWrongGuesses: count > 0 ? wrongGuesses : [...wrongGuesses, letter],
+      plankTreasure: nextTreasure,
+      plankStrikes: nextStrikes,
+      plankTurns: turns + 1,
+      plankPendingRoll: null,
+      plankWinnerId: solved ? localPlayer.id : null,
+      plankFailed: nextFailed,
+      plankLastMove: count > 0
+        ? `${letter} zit er ${count}x in: +${earned} buit.`
+        : `${letter} zit er niet in: strike ${nextStrikes}/${PLANK_MAX_STRIKES}.`
+    });
+  };
+
+  const handleBuyVowel = (letter) => {
+    if (!canAct || pendingRoll || guesses.includes(letter) || treasure < PLANK_VOWEL_COST) return;
+
+    const count = getPlankOccurrenceCount(word, letter);
+    const nextGuesses = [...guesses, letter];
+    const nextTreasure = Math.max(0, treasure - PLANK_VOWEL_COST);
+    const nextStrikes = count > 0 ? strikes : Math.min(PLANK_MAX_STRIKES, strikes + 1);
+    const solved = count > 0 && isPlankWordSolved(word, nextGuesses);
+    const nextFailed = nextStrikes >= PLANK_MAX_STRIKES && !solved;
+
+    commitPlankState({
+      plankGuesses: nextGuesses,
+      plankWrongGuesses: count > 0 ? wrongGuesses : [...wrongGuesses, letter],
+      plankTreasure: nextTreasure,
+      plankStrikes: nextStrikes,
+      plankTurns: turns + 1,
+      plankWinnerId: solved ? localPlayer.id : null,
+      plankFailed: nextFailed,
+      plankLastMove: count > 0
+        ? `${localPlayer.name} koopt ${letter}. De klinker staat ${count}x in de oplossing.`
+        : `${localPlayer.name} koopt ${letter}, maar die staat er niet in: strike ${nextStrikes}/${PLANK_MAX_STRIKES}.`
+    });
+  };
+
+  const handleSolve = () => {
+    if (!canAct) return;
+    const attempt = window.prompt('Wat is de volledige oplossing?')?.trim().toUpperCase();
+    if (!attempt) return;
+
+    const normalizedAttempt = attempt.replace(/\s+/g, ' ');
+    const normalizedWord = word.replace(/\s+/g, ' ');
+    const solved = normalizedAttempt === normalizedWord;
+    const nextStrikes = solved ? strikes : Math.min(PLANK_MAX_STRIKES, strikes + 2);
+    const nextFailed = !solved && nextStrikes >= PLANK_MAX_STRIKES;
+    const revealedLetters = solved
+      ? Array.from(new Set(word.split("").filter(char => PLANK_LETTERS.includes(char))))
+      : guesses;
+
+    commitPlankState({
+      plankGuesses: revealedLetters,
+      plankStrikes: nextStrikes,
+      plankTurns: turns + 1,
+      plankPendingRoll: null,
+      plankWinnerId: solved ? localPlayer.id : null,
+      plankFailed: nextFailed,
+      plankLastMove: solved
+        ? `${localPlayer.name} lost de schatkistcode op!`
+        : `Foute oplossing: +2 strikes (${nextStrikes}/${PLANK_MAX_STRIKES}).`
+    });
+  };
+
+  const handleFinish = () => {
+    const won = winnerId === localPlayer.id || (isSolo && winnerId);
+    const boughtVowels = guesses.filter(letter => PLANK_VOWELS.includes(letter)).length;
+    const speedBonus = turns <= 5 ? 2 : turns <= 8 ? 1 : 0;
+    const strikeBonus = strikes === 0 ? 2 : strikes === 1 ? 1 : 0;
+    const thriftBonus = boughtVowels === 0 ? 1 : 0;
+    const treasureBonus = Math.min(1, Math.floor(treasure / 10));
+    const pts = won ? Math.min(6, 1 + speedBonus + strikeBonus + thriftBonus + treasureBonus) : 0;
+    const detail = winnerId
+      ? `Pirates' Plank opgelost: ${word} (${treasure} munten, ${strikes} strikes, ${turns} beurten)`
+      : `Pirates' Plank gezonken: ${word}`;
+    onFinish(pts, detail);
+  };
+
+  const winnerName = winnerId
+    ? (players.find(p => p.id === winnerId)?.name || (isSolo ? "Jij" : "Speler"))
+    : null;
+
+  const ShipImage = ({ type, style }) => {
+    const [broken, setBroken] = useState(false);
+    const src = type === 'blackPearl'
+      ? `${import.meta.env.BASE_URL}pirates/black-pearl.png`
+      : type === 'sinking'
+        ? `${import.meta.env.BASE_URL}pirates/boat-sinking.png`
+        : `${import.meta.env.BASE_URL}pirates/boat.png`;
+    if (broken) {
+      return <span style={{ fontSize: type === 'blackPearl' ? '30px' : '34px', ...style }}>{type === 'blackPearl' ? '🏴‍☠️' : type === 'sinking' ? '⛵' : '🚤'}</span>;
+    }
+    return <img src={src} alt="" onError={() => setBroken(true)} style={{ width: type === 'blackPearl' ? '58px' : '48px', height: 'auto', objectFit: 'contain', ...style }} />;
+  };
+
+  const renderLetterButton = (letter, kind) => {
+    const used = guesses.includes(letter);
+    const correct = used && word.includes(letter);
+    const disabled = kind === 'vowel'
+      ? used || !canAct || Boolean(pendingRoll) || treasure < PLANK_VOWEL_COST
+      : used || !canAct || !hasLetterRoll;
+    return (
+      <button
+        key={letter}
+        type="button"
+        className={`btn mini ${correct ? 'primary' : 'ghost'}`}
+        disabled={disabled}
+        onClick={() => kind === 'vowel' ? handleBuyVowel(letter) : handleConsonantGuess(letter)}
+        style={{
+          minWidth: 0,
+          padding: '8px 0',
+          opacity: used && !correct ? 0.35 : disabled ? 0.45 : 1,
+          color: used && !correct ? 'var(--muted)' : undefined
+        }}
+      >
+        {letter}
+      </button>
+    );
+  };
+
+  return (
+    <div style={{ textAlign: 'center' }}>
+      {failed && (
+        <div
+          role="dialog"
+          aria-modal="true"
+          style={{
+            position: 'fixed',
+            inset: 0,
+            zIndex: 10000,
+            background: 'rgba(0, 0, 0, 0.72)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            padding: '18px'
+          }}
+        >
+          <div style={{ width: 'min(92vw, 360px)', background: '#07152c', border: '2px solid var(--danger)', borderRadius: '16px', padding: '18px', boxShadow: '0 20px 60px rgba(0,0,0,0.45)' }}>
+            <div style={{ height: '150px', display: 'flex', alignItems: 'center', justifyContent: 'center', overflow: 'hidden' }}>
+              <ShipImage type="sinking" style={{ width: '150px', transform: 'rotate(17deg) translateY(24px)', filter: 'drop-shadow(0 12px 18px rgba(0,0,0,0.5))' }} />
+            </div>
+            <h2 style={{ color: 'var(--danger)', margin: '8px 0' }}>Gezonken!</h2>
+            <p style={{ color: 'var(--muted)', margin: '0 0 14px' }}>The Black Pearl heeft je boot bereikt. De oplossing was <strong style={{ color: '#fff' }}>{word}</strong>.</p>
+            <button className="btn primary full" onClick={handleFinish}>Score opslaan & terug</button>
+          </div>
+        </div>
+      )}
+
+      <div style={{ display: 'grid', gap: '10px' }}>
+        <div style={{ position: 'relative', height: '76px', maxWidth: '360px', width: '100%', margin: '0 auto' }}>
+          <div style={{ position: 'absolute', left: '24px', right: '24px', top: '35px', borderTop: '3px dashed rgba(216,232,255,0.35)' }} />
+          <div style={{ position: 'absolute', left: `${Math.min(82, shipProgress * 82)}%`, top: '10px', transform: 'translateX(-50%)', transition: 'left 0.35s ease' }}>
+            <ShipImage type="blackPearl" />
+          </div>
+          <div style={{ position: 'absolute', right: '0', top: '15px' }}>
+            <ShipImage type="boat" />
+          </div>
+        </div>
+
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '8px' }}>
+          <div className="badge" style={{ justifyContent: 'center' }}>
+            Munten: <strong style={{ color: treasureColor, background: treasure < PLANK_VOWEL_COST ? 'transparent' : '#fff', borderRadius: '8px', padding: '1px 7px' }}>{treasure}</strong>
+          </div>
+          <div className="badge" style={{ justifyContent: 'center' }}>Strikes: {strikes}/{PLANK_MAX_STRIKES}</div>
+          <div className="badge" style={{ justifyContent: 'center' }}>Beurten: {turns}</div>
+        </div>
+
+        <div style={{
+          margin: '8px auto',
+          padding: '14px',
+          width: '100%',
+          maxWidth: '380px',
+          background: '#081730',
+          border: '1px solid var(--line)',
+          borderRadius: '12px',
+          fontFamily: 'Outfit, Inter, sans-serif',
+          fontSize: '24px',
+          letterSpacing: '4px',
+          color: '#fff',
+          wordBreak: 'break-word'
+        }}>
+          {visibleWord.join(" ")}
+        </div>
+
+        <div style={{ color: 'var(--muted)', fontSize: '12px', minHeight: '18px' }}>{lastMove}</div>
+
+        {isFinished ? (
+          <div style={{ display: 'grid', gap: '10px', justifyItems: 'center' }}>
+            <strong style={{ color: winnerId ? 'var(--gold)' : 'var(--danger)' }}>
+              {winnerId ? `${winnerName} heeft de schatkistcode gekraakt!` : "The Black Pearl heeft je boot bereikt!"}
+            </strong>
+            <div style={{ color: 'var(--muted)' }}>Het woord was: <strong style={{ color: '#fff' }}>{word}</strong></div>
+            {!failed && <button className="btn primary" onClick={handleFinish}>Score opslaan & terug</button>}
+          </div>
+        ) : (
+          <div style={{ display: 'grid', gap: '10px' }}>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px', maxWidth: '320px', margin: '0 auto' }}>
+              <div style={{ background: '#fff', color: '#07152c', borderRadius: '12px', padding: '10px', fontWeight: 900, fontSize: '28px', minHeight: '58px', display: 'grid', placeItems: 'center' }}>
+                {pendingRoll ? pendingRoll.number : '?'}
+              </div>
+              <div style={{ background: '#8f1f2d', color: pendingRoll?.tone || '#fff', borderRadius: '12px', padding: '10px', fontWeight: 900, fontSize: '24px', minHeight: '58px', display: 'grid', placeItems: 'center' }}>
+                {pendingRoll ? pendingRoll.icon : '?'}
+                {pendingRoll && <span style={{ display: 'block', color: '#fff', fontSize: '10px', marginTop: '2px' }}>{pendingRoll.eventName}</span>}
+              </div>
+            </div>
+
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px', maxWidth: '360px', margin: '0 auto' }}>
+              <button className="btn primary" disabled={!canAct || Boolean(pendingRoll)} onClick={handleRollDice}>
+                Gooi dobbelstenen
+              </button>
+              <button className="btn danger" disabled={!canAct} onClick={handleSolve}>
+                Los op (+2 strikes bij fout)
+              </button>
+            </div>
+
+            <div>
+              <div style={{ color: 'var(--gold)', fontWeight: 800, fontSize: '12px', marginBottom: '6px' }}>Medeklinkers</div>
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)', gap: '6px', maxWidth: '380px', margin: '0 auto' }}>
+                {PLANK_CONSONANTS.map(letter => renderLetterButton(letter, 'consonant'))}
+              </div>
+            </div>
+
+            <div>
+              <div style={{ color: 'var(--gold)', fontWeight: 800, fontSize: '12px', marginBottom: '6px' }}>Klinkers kopen: {PLANK_VOWEL_COST} buit</div>
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(5, 1fr)', gap: '6px', maxWidth: '260px', margin: '0 auto' }}>
+                {PLANK_VOWELS.map(letter => renderLetterButton(letter, 'vowel'))}
+              </div>
+            </div>
+
+            {wrongGuesses.length > 0 && (
+              <div style={{ color: 'var(--muted)', fontSize: '12px' }}>
+                Foute letters: {wrongGuesses.join(", ")}
+              </div>
+            )}
+          </div>
+        )}
       </div>
     </div>
   );
@@ -3638,16 +4020,17 @@ const MINI_GAME_RULES = {
   },
   piratesplank: {
     title: "Pirates' Plank",
-    intro: "Origineel: Galgje. Raad het Disney-woord voordat de piraat van de plank loopt.",
+    intro: "Origineel: Galgje/Wheel of Fortune. Kraak een volledig blanco Disney/Pixar-code voordat The Black Pearl je bereikt.",
     rules: [
-      "Gebruik de hint om het verborgen Disney/Pixar woord te raden.",
-      "Kies per beurt een letter.",
-      "Een goede letter verschijnt overal in het woord.",
-      "Een foute letter schuift de piraat dichter naar de rand van de plank.",
-      "Los het woord op voordat je zeven foute letters hebt."
+      "Er is geen hint en geen categorie: je ziet alleen lege vakjes.",
+      "Gooi eerst twee dobbelstenen: een witte buit-dobbelsteen en een rode gebeurtenis-dobbelsteen.",
+      "Bij Neutraal of Dubbel kies je een medeklinker. Een juiste letter levert buit op; een foute letter geeft een strike.",
+      "Klinkers kosten 5 buit en mogen gekocht worden zodra je genoeg buit hebt.",
+      "Bij 3 strikes bereikt The Black Pearl je boot en verlies je direct.",
+      "Los op is streng: een fout antwoord geeft meteen 2 strikes."
     ],
-    solo: "Solo: probeer het woord met zo min mogelijk foute letters te raden.",
-    duel: "Duel: spelers raden om de beurt. Een goede letter geeft nog een beurt; de speler die het woord afmaakt wint."
+    solo: "Solo: verzamel buit, koop slim klinkers en los de code zo strak mogelijk op.",
+    duel: "Duel: spelers spelen om de beurt. Degene die de volledige oplossing kraakt wint."
   },
   yahtzee: {
     title: "Goofy's Geluksworp",
