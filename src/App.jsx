@@ -700,6 +700,7 @@ export default function App() {
   // Arcade Arena states
   const [selectedArcadeGame, setSelectedArcadeGame] = useState(null);
   const [arcadePlayMode, setArcadePlayMode] = useState(null); // 'solo' or 'duel'
+  const [arcadeOptionsOpen, setArcadeOptionsOpen] = useState(false);
   const [arcadeLobbyCode, setArcadeLobbyCode] = useState('');
   const [arenaToolbar, setArenaToolbar] = useState(null);
 
@@ -4424,8 +4425,13 @@ export default function App() {
                         key={game.id}
                         onClick={() => {
                           if (game.comingSoon) return;
-                          setSelectedArcadeGame(game.id);
-                          setArcadePlayMode(null);
+                          if (isSelected) {
+                            setArcadeOptionsOpen(true);
+                          } else {
+                            setSelectedArcadeGame(game.id);
+                            setArcadePlayMode(null);
+                            setArcadeOptionsOpen(false);
+                          }
                         }}
                         className={`category-item ${isSelected ? 'checked' : ''}`}
                         style={{
@@ -4458,8 +4464,32 @@ export default function App() {
                 </div>
               </section>
 
-              {selectedArcadeGame && (
-                <section className="card animate-fade-in">
+              {selectedArcadeGame && arcadeOptionsOpen && (
+                <div
+                  role="presentation"
+                  onClick={() => {
+                    setArcadeOptionsOpen(false);
+                    setArcadePlayMode(null);
+                  }}
+                  style={{
+                    position: 'fixed',
+                    inset: 0,
+                    zIndex: 1200,
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    padding: '18px',
+                    background: 'rgba(2, 8, 20, 0.72)'
+                  }}
+                >
+                <section
+                  className="card animate-fade-in"
+                  role="dialog"
+                  aria-modal="true"
+                  aria-label="Spelopties"
+                  onClick={(event) => event.stopPropagation()}
+                  style={{ width: 'min(520px, 100%)', maxHeight: '84dvh', overflowY: 'auto', margin: 0 }}
+                >
                   <h2 className="sectiontitle">🚀 Spelopties</h2>
                   <p style={{ fontSize: '13px', color: 'var(--muted)', marginBottom: '15px' }}>
                     Geselecteerd spel: <strong>{
@@ -4583,6 +4613,7 @@ export default function App() {
                     </div>
                   )}
                 </section>
+                </div>
               )}
 
               {false && (
