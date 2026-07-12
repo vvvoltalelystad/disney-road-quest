@@ -3311,7 +3311,7 @@ export default function App() {
                 aria-label={coinFlipped ? 'Bekijk voorkant van Coco Coin' : 'Bekijk achterkant van Coco Coin'}
               >
                 <span className="coin-flip-face coin-flip-front">
-                  <img src={assetPath('collectables/coco-coin.png')} alt="Voorkant van de Coco Coin" />
+                  <img src={assetPath('collectables/coco-coin-front.png')} alt="Voorkant van de Coco Coin" />
                 </span>
                 <span className="coin-flip-face coin-flip-back">
                   <img src={assetPath('collectables/coco-coin-back.png')} alt="Achterkant van de Coco Coin" />
