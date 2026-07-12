@@ -1264,7 +1264,6 @@ export default function App() {
       if (
         gameTypeNorm === 'Othello' || 
         gameTypeNorm === 'Rapunzel\'s Torenkamers' || 
-        gameTypeNorm === 'Color Lines' || 
         gameTypeNorm === 'Ricochet Shot' || 
         gameTypeNorm === 'Curling Duel' || 
         gameTypeNorm === 'Marble Push (Abalone)'
@@ -5057,7 +5056,7 @@ export default function App() {
                                   players={players}
                                   updateRoomState={updateRoomState}
                                   onFinish={async (score, detail) => {
-                                    const isScoreBased = t.gameId === 'colorlines' || t.gameId === 'ricochet';
+                                    const isScoreBased = t.gameId === 'ricochet';
                                     const coinsEarned = isScoreBased ? score : (score === 3 ? 2 : (score === 2 ? 1 : 0));
                                     const gameTitle = {
                                       othello: "Othello",
