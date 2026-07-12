@@ -3672,7 +3672,7 @@ export default function App() {
                 const donationTargets = shopNames.filter(name => getCollectorKey(name) !== activeKey);
                 const selectedDonationTarget = donationTargetName || donationTargets[0] || '';
                 return (
-                  <section className="card" style={{ marginTop: '20px' }}>
+                  <section id="coco-shop-section" className="card portal-shop-panel" style={{ marginTop: '20px' }}>
                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '12px', marginBottom: '12px', flexWrap: 'wrap' }}>
                       <div>
                         <h2 className="sectiontitle" style={{ margin: 0 }}>Coco Coins Shop</h2>
