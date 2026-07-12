@@ -4416,7 +4416,11 @@ export default function App() {
               {renderAppHeader("Hercules' Duel Arena", () => setScreen('portal'))}
 
               <section className="card">
-                <h2 className="sectiontitle">🎮 Kies een Arena Spel</h2>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '10px', margin: '2px 0 16px' }}>
+                  <span style={{ height: '1px', flex: 1, background: 'linear-gradient(90deg, transparent, #bd53ed)' }} />
+                  <h2 className="sectiontitle" style={{ margin: 0, color: 'var(--gold)', fontSize: '21px', whiteSpace: 'nowrap' }}>Arena Spellen</h2>
+                  <span style={{ height: '1px', flex: 1, background: 'linear-gradient(90deg, #bd53ed, transparent)' }} />
+                </div>
                 <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '10px', marginTop: '14px' }}>
                   {ARENA_GAMES.map(game => {
                     const isSelected = selectedArcadeGame === game.id;
@@ -4539,15 +4543,15 @@ export default function App() {
                             justifyItems: 'center',
                             gap: '8px',
                             borderRadius: '14px',
-                            background: arcadePlayMode === 'solo' ? '#224b76' : '#071a35',
-                            border: arcadePlayMode === 'solo' ? '2px solid #74d7ff' : '1px solid var(--line)',
-                            boxShadow: arcadePlayMode === 'solo' ? '0 0 18px rgba(116, 215, 255, 0.32)' : 'none',
+                            background: arcadePlayMode === 'solo' ? '#39245e' : '#071a35',
+                            border: arcadePlayMode === 'solo' ? '2px solid #d689ff' : '1px solid var(--line)',
+                            boxShadow: arcadePlayMode === 'solo' ? '0 0 20px rgba(214, 137, 255, 0.42)' : 'none',
                             color: '#fff'
                           }}
                         >
                           <img src={assetPath('arena/games/prince ali.png')} alt="Prince Ali Ababwa" style={{ width: '100%', height: '100px', objectFit: 'contain', filter: 'drop-shadow(0 5px 8px rgba(0, 0, 0, 0.35))' }} />
                           <span style={{ fontSize: '13px', fontWeight: 900, lineHeight: 1.25, textAlign: 'center' }}>
-                            Tegen Prince <span style={{ color: '#74d7ff' }}>A</span>l<span style={{ color: '#74d7ff' }}>i</span> Ababwa
+                            Tegen Prince <span style={{ color: 'var(--gold)', textShadow: '0 0 9px rgba(255, 212, 92, 0.75)' }}>A</span>l<span style={{ color: 'var(--gold)', textShadow: '0 0 9px rgba(255, 212, 92, 0.75)' }}>i</span> Ababwa
                           </span>
                         </button>
                         <button
