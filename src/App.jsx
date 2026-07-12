@@ -4140,10 +4140,15 @@ export default function App() {
                 <div 
                   onClick={(e) => {
                     e.stopPropagation();
-                    setSelectedPortalGame(null);
-                    setShowPortalShop(true);
+                    if (selectedPortalGame === 'coin_shop') {
+                      setSelectedPortalGame(null);
+                      setShowPortalShop(true);
+                    } else {
+                      setSelectedPortalGame('coin_shop');
+                    }
                   }}
-                  className="portal-card coin-shop-card"
+                  className={`portal-card coin-shop-card ${selectedPortalGame === 'coin_shop' ? 'selected-glow' : ''}`}
+                  style={selectedPortalGame === 'coin_shop' ? { border: '3.5px solid #ff9800', boxShadow: '0 0 25px rgba(255, 152, 0, 0.75)', transform: 'scale(1.03)', transition: 'all 0.25s ease' } : { transition: 'all 0.25s ease' }}
                   role="button" 
                   tabIndex={0}
                 >
@@ -4159,7 +4164,9 @@ export default function App() {
                     <p>Wissel je zuurverdiende Coco Coins in voor magische stickers en exclusieve verzamelobjecten. Vul je persoonlijke Disney Collection aan!</p>
                   </div>
                   <div className="portal-card-footer">
-                    <span className="btn-play shop">Open Shop ➔</span>
+                    <span className="btn-play shop">
+                      {selectedPortalGame === 'coin_shop' ? 'Klik nogmaals om te openen ➔' : 'Selecteer Shop ➔'}
+                    </span>
                   </div>
                 </div>
 
