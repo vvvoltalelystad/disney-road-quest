@@ -4490,7 +4490,7 @@ export default function App() {
                   onClick={(event) => event.stopPropagation()}
                   style={{ width: 'min(520px, 100%)', maxHeight: '84dvh', overflowY: 'auto', margin: 0 }}
                 >
-                  <h2 className="sectiontitle">🚀 Spelopties</h2>
+                  <h2 className="sectiontitle">Spelopties</h2>
                   <p style={{ fontSize: '13px', color: 'var(--muted)', marginBottom: '15px' }}>
                     Geselecteerd spel: <strong>{
                       {
@@ -4524,18 +4524,54 @@ export default function App() {
                     </button>
                   ) : (
                     <div>
-                      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px', marginBottom: '20px' }}>
+                      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px', marginBottom: '20px' }}>
                         <button
-                          className={`btn ${arcadePlayMode === 'solo' ? 'primary' : 'secondary'}`}
+                          type="button"
                           onClick={() => setArcadePlayMode('solo')}
+                          aria-pressed={arcadePlayMode === 'solo'}
+                          title="Speel tegen Prince Ali Ababwa"
+                          style={{
+                            minHeight: '164px',
+                            padding: '12px 8px',
+                            display: 'grid',
+                            gridTemplateRows: '100px auto',
+                            alignItems: 'center',
+                            justifyItems: 'center',
+                            gap: '8px',
+                            borderRadius: '14px',
+                            background: arcadePlayMode === 'solo' ? '#224b76' : '#071a35',
+                            border: arcadePlayMode === 'solo' ? '2px solid #74d7ff' : '1px solid var(--line)',
+                            boxShadow: arcadePlayMode === 'solo' ? '0 0 18px rgba(116, 215, 255, 0.32)' : 'none',
+                            color: '#fff'
+                          }}
                         >
-                          👤 Tegen Computer
+                          <img src={assetPath('arena/games/prince ali.png')} alt="Prince Ali Ababwa" style={{ width: '100%', height: '100px', objectFit: 'contain', filter: 'drop-shadow(0 5px 8px rgba(0, 0, 0, 0.35))' }} />
+                          <span style={{ fontSize: '13px', fontWeight: 900, lineHeight: 1.25, textAlign: 'center' }}>
+                            Tegen Prince <span style={{ color: '#74d7ff' }}>A</span>l<span style={{ color: '#74d7ff' }}>i</span> Ababwa
+                          </span>
                         </button>
                         <button
-                          className={`btn ${arcadePlayMode === 'duel' ? 'primary' : 'secondary'}`}
+                          type="button"
                           onClick={() => setArcadePlayMode('duel')}
+                          aria-pressed={arcadePlayMode === 'duel'}
+                          title="Start een realtime duel"
+                          style={{
+                            minHeight: '164px',
+                            padding: '12px 8px',
+                            display: 'grid',
+                            gridTemplateRows: '100px auto',
+                            alignItems: 'center',
+                            justifyItems: 'center',
+                            gap: '8px',
+                            borderRadius: '14px',
+                            background: arcadePlayMode === 'duel' ? '#5b2437' : '#071a35',
+                            border: arcadePlayMode === 'duel' ? '2px solid #ff7b8b' : '1px solid var(--line)',
+                            boxShadow: arcadePlayMode === 'duel' ? '0 0 18px rgba(255, 123, 139, 0.28)' : 'none',
+                            color: '#fff'
+                          }}
                         >
-                          ⚔️ Realtime Duel
+                          <img src={assetPath('arena/games/Sword.png')} alt="Zwaard" style={{ width: '100%', height: '100px', objectFit: 'contain', filter: 'drop-shadow(0 5px 8px rgba(0, 0, 0, 0.35))' }} />
+                          <span style={{ fontSize: '13px', fontWeight: 900, lineHeight: 1.25, textAlign: 'center' }}>Realtime Duel</span>
                         </button>
                       </div>
 
