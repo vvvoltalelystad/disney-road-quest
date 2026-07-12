@@ -65,7 +65,7 @@ const ARENA_GAMES = [
   { id: 'yahtzee', name: "Goofy's Geluksworp", icon: "\u{1F3B2}", image: 'arena/games/Goofy.png', desc: "Origineel: Yahtzee. Gooi, houd dobbelstenen vast en vul je magische scorekaart.", maxPlayers: 2 },
   { id: 'qwixx', name: "Mike's Wazowski-Board", icon: "\u270F\uFE0F", image: 'arena/games/Mike.png', desc: "Origineel: Qwixx. Streep gekleurde rijen af en ontwijk strafvakjes.", maxPlayers: 2 },
   { id: 'mastermind', name: "Yzma's Poison Struggle", icon: "\u{1F9E0}", image: 'arena/games/Yzma.png', desc: "Origineel: Mastermind. Solo puzzel: kraak de geheime Disney-kleurcode.", maxPlayers: 1 },
-  { id: 'sudoku6', name: "Tinker Bell Sudoku", icon: "\u2728", desc: "Origineel: Sudoku 6x6. Solo puzzel met Disney-symbolen.", maxPlayers: 1 },
+  { id: 'tictactinker', name: "Tic Tac Tinker Bell", icon: "\u2728", image: 'arena/games/Tinker Bell.png', desc: "Origineel: Ultimate Tic Tac Toe. Win kleine borden om het grote bord te veroveren.", maxPlayers: 2, comingSoon: true },
   { id: 'sudoku9', name: "Zazu's Sudoku", icon: "\u{1F3F0}", image: 'arena/games/Zazu.png', desc: "Origineel: Sudoku 9x9. Klassiek raster met Disney-symbolen.", maxPlayers: 1 }
 ];
 
@@ -1636,6 +1636,7 @@ export default function App() {
   };
 
   const handleStartArcadeSolo = (gameId) => {
+    if (getArenaGame(gameId)?.comingSoon) return;
     const name = activeProfileName || playerNameInput.trim() || localStorage.getItem('disney_player_name') || 'Solo Speler';
     localStorage.setItem('disney_player_name', name);
     localStorage.setItem('disney_ai_level', aiLevel);
@@ -1686,6 +1687,7 @@ export default function App() {
   };
 
   const handleCreateArcadeDuel = async (gameId) => {
+    if (getArenaGame(gameId)?.comingSoon) return;
     const profileName = activeProfileName || playerNameInput.trim();
     if (!profileName) {
       setError("Voer een naam in om te kunnen starten.");
@@ -2045,7 +2047,7 @@ export default function App() {
         yahtzee: "Goofy's Geluksworp",
         qwixx: "Mike's Wazowski-Board",
         mastermind: "Yzma's Poison Struggle",
-        sudoku6: "Tinker Bell Sudoku",
+        tictactinker: "Tic Tac Tinker Bell",
         sudoku9: "Zazu's Sudoku"
       };
       return {
@@ -3263,11 +3265,14 @@ export default function App() {
   const renderAppHeader = (title = "McQueen's Road Race", backAction = null) => {
     const key = getCollectorKey(activeProfileName);
     const balance = starBank[key] || 0;
+    const isArenaHeader = title === "Hercules' Duel Arena";
 
     return (
       <div className="topbar">
         <div className="brand">
-          <span className="castle">🏰</span>
+          <span className="castle">
+            {isArenaHeader ? <img src={assetPath('portal/Hercules.png')} alt="Hercules" /> : '🏰'}
+          </span>
           <span>{title}</span>
         </div>
         <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
@@ -4399,22 +4404,7 @@ export default function App() {
           {/* SCREEN: ARCADE SELECT */}
           {screen === 'arcade_select' && (
             <div>
-              {renderAppHeader("Disney Duel Arena", () => setScreen('portal'))}
-
-              <section className="card">
-                <h2 className="sectiontitle">👤 Spelersinstellingen</h2>
-                <div style={{ marginBottom: '15px' }}>
-                  <label style={{ display: 'block', marginBottom: '8px', fontSize: '14px', fontWeight: 'bold' }}>Jouw Spelersnaam:</label>
-                  <input
-                    type="text"
-                    value={activeProfileName || playerNameInput}
-                    readOnly={!!activeProfileName}
-                    onChange={(e) => setPlayerNameInput(e.target.value)}
-                    placeholder="Voer je naam in..."
-                    style={{ width: '100%', boxSizing: 'border-box' }}
-                  />
-                </div>
-              </section>
+              {renderAppHeader("Hercules' Duel Arena", () => setScreen('portal'))}
 
               <section className="card">
                 <h2 className="sectiontitle">🎮 Kies een Arena Spel</h2>
@@ -4425,6 +4415,7 @@ export default function App() {
                       <div
                         key={game.id}
                         onClick={() => {
+                          if (game.comingSoon) return;
                           setSelectedArcadeGame(game.id);
                           setArcadePlayMode(null);
                         }}
@@ -4435,10 +4426,11 @@ export default function App() {
                           alignItems: 'center',
                           padding: '16px 12px',
                           textAlign: 'center',
-                          cursor: 'pointer',
+                          cursor: game.comingSoon ? 'default' : 'pointer',
                           borderRadius: '12px',
                           background: isSelected ? '#122d56' : '#081730',
                           border: isSelected ? '2px solid var(--gold)' : '2px solid var(--line)',
+                          opacity: game.comingSoon ? 0.65 : 1,
                           transition: 'all 0.15s ease'
                         }}
                       >
@@ -4448,8 +4440,8 @@ export default function App() {
                           <span style={{ fontSize: '32px', marginBottom: '8px' }}>{game.icon}</span>
                         )}
                         <strong style={{ fontSize: '15px', color: '#fff', marginBottom: '4px' }}>{game.name}</strong>
-                        <span style={{ fontSize: '10px', color: getArenaGame(game.id)?.maxPlayers === 4 ? 'var(--ok)' : 'var(--gold)', fontWeight: 'bold', marginBottom: '5px' }}>
-                          {getArenaGame(game.id)?.maxPlayers === 1 ? 'solo' : getArenaGame(game.id)?.maxPlayers === 4 ? 'max 4 spelers' : '2 spelers'}
+                        <span style={{ fontSize: '10px', color: game.comingSoon ? 'var(--muted)' : getArenaGame(game.id)?.maxPlayers === 4 ? 'var(--ok)' : 'var(--gold)', fontWeight: 'bold', marginBottom: '5px' }}>
+                          {game.comingSoon ? 'binnenkort' : getArenaGame(game.id)?.maxPlayers === 1 ? 'solo' : getArenaGame(game.id)?.maxPlayers === 4 ? 'max 4 spelers' : '2 spelers'}
                         </span>
                         <span style={{ fontSize: '11px', color: 'var(--muted)', lineHeight: '1.3' }}>{game.desc}</span>
                       </div>
@@ -4472,7 +4464,7 @@ export default function App() {
                         yahtzee: "Goofy's Geluksworp",
                         qwixx: "Mike's Wazowski-Board",
                         mastermind: "Yzma's Poison Struggle",
-                        sudoku6: "Tinker Bell Sudoku",
+                        tictactinker: "Tic Tac Tinker Bell",
                         sudoku9: "Zazu's Sudoku"
                       }[selectedArcadeGame]
                     }</strong>
@@ -4585,6 +4577,8 @@ export default function App() {
                 </section>
               )}
 
+              {false && (
+                <>
               {/* Dedicated Arcade history log */}
               <section className="card" style={{ marginTop: '20px' }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '10px' }}>
@@ -4628,6 +4622,8 @@ export default function App() {
                   })()}
                 </div>
               </section>
+                </>
+              )}
             </div>
           )}
 
@@ -4641,7 +4637,6 @@ export default function App() {
                 <div style={{ display: 'grid', gridTemplateColumns: 'repeat(1, 1fr)', gap: '12px', marginTop: '14px' }}>
                   {[
                     { cat: "Yzma's Poison Struggle", icon: "🧠", name: "Yzma's Poison Struggle", desc: "Origineel: Mastermind. Kleurcode kraken (4, 5 of 6 stippen)", active: true },
-                    { cat: "Tinker Bell Sudoku", icon: "✨", name: "Tinker Bell Sudoku", desc: "Origineel: Sudoku 6x6. Makkelijker raster met 6 symbolen.", active: true },
                     { cat: "Zazu's Sudoku", icon: "🏰", name: "Zazu's Sudoku", desc: "Origineel: Sudoku 9x9. Klassiek raster met 9 symbolen.", active: true },
                     { cat: "Disney Dagboek", icon: "📔", name: "Disney Dagboek (Geheim)", desc: "Binnenkort beschikbaar", active: false }
                   ].map(game => (
