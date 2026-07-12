@@ -831,4 +831,142 @@ body.night-theme {
   color: #bd53ed;
 }
 
+/* Captain's Log Parchment Styles */
+.captains-log-modal {
+  position: fixed;
+  inset: 0;
+  z-index: 1200;
+  background: rgba(0, 0, 0, 0.85);
+  backdrop-filter: blur(5px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 16px;
+  animation: fadeIn 0.25s ease-out;
+}
 
+.captains-log-paper {
+  background: #f4ecd8;
+  color: #3e2723;
+  width: 100%;
+  max-width: 500px;
+  border-radius: 12px;
+  border: 12px solid #5d4037;
+  box-shadow: 0 10px 30px rgba(0,0,0,0.6), inset 0 0 40px rgba(139,114,83,0.3);
+  padding: 24px;
+  box-sizing: border-box;
+  font-family: 'Georgia', serif;
+  display: flex;
+  flex-direction: column;
+  max-height: 85vh;
+  position: relative;
+}
+
+.captains-log-header {
+  border-bottom: 2px dashed #8d6e63;
+  padding-bottom: 12px;
+  margin-bottom: 16px;
+  text-align: center;
+}
+
+.captains-log-title {
+  font-family: 'Times New Roman', serif;
+  font-size: 24px;
+  font-weight: bold;
+  color: #5d4037;
+  margin: 0;
+  letter-spacing: 1px;
+}
+
+.captains-log-subtitle {
+  font-size: 13px;
+  font-style: italic;
+  color: #8d6e63;
+  margin: 4px 0 0 0;
+}
+
+.captains-log-content {
+  flex: 1;
+  overflow-y: auto;
+  padding-right: 6px;
+  margin-bottom: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+/* Custom scrollbar for logbook parchment */
+.captains-log-content::-webkit-scrollbar {
+  width: 6px;
+}
+.captains-log-content::-webkit-scrollbar-track {
+  background: rgba(139,114,83,0.1);
+}
+.captains-log-content::-webkit-scrollbar-thumb {
+  background: #8d6e63;
+  border-radius: 3px;
+}
+
+.captains-log-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding-bottom: 10px;
+  border-bottom: 1px dotted rgba(141, 110, 99, 0.4);
+}
+
+.captains-log-desc {
+  font-size: 14px;
+  font-weight: 600;
+  line-height: 1.3;
+}
+
+.captains-log-meta {
+  font-size: 11px;
+  color: #8d6e63;
+  margin-top: 4px;
+}
+
+.captains-log-coins {
+  font-family: 'Outfit', 'Inter', sans-serif;
+  font-size: 15px;
+  font-weight: 900;
+  white-space: nowrap;
+}
+.captains-log-coins.earn {
+  color: #2e7d32;
+}
+.captains-log-coins.spend {
+  color: #c62828;
+}
+
+.captains-log-close-btn {
+  background: #5d4037;
+  color: #f4ecd8;
+  border: 2px solid #8d6e63;
+  padding: 10px 16px;
+  font-size: 14px;
+  font-weight: bold;
+  border-radius: 8px;
+  cursor: pointer;
+  width: 100%;
+  transition: all 0.2s ease;
+  font-family: 'Georgia', serif;
+}
+.captains-log-close-btn:hover {
+  background: #4e342e;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.3);
+}
+
+/* Coco's Coin Shop Portal Card Styles */
+.portal-glow-shop::before {
+  background: radial-gradient(circle, rgba(230, 81, 0, 0.78) 0%, rgba(230, 81, 0, 0.24) 42%, transparent 72%);
+}
+.portal-card-badge.shop {
+  background: rgba(230, 81, 0, 0.1);
+  border: 1px solid rgba(230, 81, 0, 0.3);
+  color: #ff9800;
+}
+.btn-play.shop {
+  color: #ff9800;
+}
