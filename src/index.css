@@ -715,7 +715,8 @@ hr{border:0;border-top:1px solid var(--line);margin:18px 0}
   inset: 0;
   display: grid;
   place-items: center;
-  padding: 12px;
+  padding: 0;
+  overflow: hidden;
   border: 1px solid rgba(255, 212, 92, 0.52);
   border-radius: 50%;
   background: radial-gradient(circle, rgba(255, 237, 161, 0.25), rgba(139, 87, 17, 0.16) 62%, rgba(0, 0, 0, 0.2));
@@ -734,6 +735,11 @@ hr{border:0;border-top:1px solid var(--line);margin:18px 0}
   object-fit: contain;
   border-radius: 50%;
   filter: drop-shadow(0 10px 14px rgba(0, 0, 0, 0.42));
+}
+
+.coin-flip-front img {
+  transform: scale(1.48);
+  filter: sepia(0.56) saturate(1.32) hue-rotate(-14deg) brightness(0.84) contrast(1.1) drop-shadow(0 10px 14px rgba(0, 0, 0, 0.42));
 }
 
 .coin-flip-inner:focus-visible {
