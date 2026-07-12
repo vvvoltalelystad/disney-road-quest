@@ -2763,6 +2763,30 @@ export default function App() {
     });
   };
 
+  const handleHardRefresh = async () => {
+    const shouldRefresh = window.confirm(
+      'De game wordt volledig ververst. Je profiel, Coco Coins en scores blijven bewaard, maar een open kamer moet je daarna opnieuw openen.'
+    );
+    if (!shouldRefresh) return;
+
+    setLoading(true);
+    try {
+      if ('serviceWorker' in navigator) {
+        const registrations = await navigator.serviceWorker.getRegistrations();
+        await Promise.all(registrations.map(registration => registration.update()));
+      }
+
+      if ('caches' in window) {
+        const cacheNames = await caches.keys();
+        await Promise.all(cacheNames.map(cacheName => caches.delete(cacheName)));
+      }
+    } finally {
+      const nextUrl = new URL(window.location.href);
+      nextUrl.searchParams.set('refresh', Date.now().toString());
+      window.location.replace(nextUrl.toString());
+    }
+  };
+
   // --- RENDERING HELPERS ---
 
   const renderAppHeader = (title = "Disney Road Quest", backAction = null) => {
@@ -2773,6 +2797,14 @@ export default function App() {
           <span>{title}</span>
         </div>
         <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+          <button
+            className="iconbtn"
+            onClick={handleHardRefresh}
+            aria-label="Game volledig verversen"
+            title="Game volledig verversen"
+          >
+            ⟳
+          </button>
           {room?.code && (
             <button className="btn secondary mini" onClick={handleForceSync} style={{ padding: '4px 8px', fontSize: '11px' }}>
               🔄 Herlaad
@@ -3330,7 +3362,16 @@ export default function App() {
 
       {!loading && !activeProfileName && (
         <div className="portal-container">
-          <section className="card" style={{ maxWidth: '560px', margin: '40px auto 0' }}>
+          <section className="card" style={{ maxWidth: '560px', margin: '40px auto 0', position: 'relative' }}>
+            <button
+              className="iconbtn"
+              onClick={handleHardRefresh}
+              aria-label="Game volledig verversen"
+              title="Game volledig verversen"
+              style={{ position: 'absolute', top: '14px', right: '14px' }}
+            >
+              ⟳
+            </button>
             <div style={{ textAlign: 'center', marginBottom: '18px' }}>
               <div style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', marginBottom: '10px' }}>
                 <CocoCoinIcon size={74} onInspect={() => { setCoinFlipped(false); setCoinPopupOpen(true); }} />
