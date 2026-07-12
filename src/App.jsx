@@ -3661,6 +3661,29 @@ export default function App() {
                     <span className="btn-play arcade">Start Arena ➔</span>
                   </div>
                 </div>
+
+                {/* Game 4: Coco's Coin Shop */}
+                <div
+                  className="portal-card coin-shop-card"
+                  onClick={() => document.getElementById('coco-shop-section')?.scrollIntoView({ behavior: 'smooth' })}
+                  role="button"
+                  tabIndex={0}
+                >
+                  <div className="portal-card-header">
+                    <div className="portal-card-media portal-glow-shop">
+                      <img src={assetPath('portal/Coco_png.png')} onLoad={removeBg} className="portal-media-img" alt="Coco Coin" />
+                    </div>
+                    <span className="portal-card-badge shop">Shop</span>
+                  </div>
+                  <div className="portal-card-body">
+                    <h3>Coco's Coin Shop</h3>
+                    <p style={{ color: '#ff9800', fontSize: '12px', marginTop: '-4px' }}>Stickers & Magische Items</p>
+                    <p>Wissel Coco Coins in voor stickers en exclusieve verzamelobjecten voor je Disney Collection.</p>
+                  </div>
+                  <div className="portal-card-footer">
+                    <span className="btn-play shop">Open Shop &#8594;</span>
+                  </div>
+                </div>
               </div>
 
               {(() => {
