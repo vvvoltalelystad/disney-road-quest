@@ -4028,6 +4028,8 @@ export default function App() {
           {/* SCREEN: PORTAL */}
           {screen === 'portal' && (
             <div className="portal-container" onClick={() => setSelectedPortalGame(null)}>
+              {!showPortalShop && (
+                <>
               <div className="portal-header">
                 <div className="portal-logo-glow"></div>
                 <div className="portal-badge">✨ MAGIC GAME PORTAL</div>
@@ -4138,15 +4140,10 @@ export default function App() {
                 <div 
                   onClick={(e) => {
                     e.stopPropagation();
-                    if (selectedPortalGame === 'coin_shop') {
-                      document.getElementById('coco-shop-section')?.scrollIntoView({ behavior: 'smooth' });
-                      setSelectedPortalGame(null);
-                    } else {
-                      setSelectedPortalGame('coin_shop');
-                    }
+                    setSelectedPortalGame(null);
+                    setShowPortalShop(true);
                   }}
-                  className={`portal-card coin-shop-card ${selectedPortalGame === 'coin_shop' ? 'selected-glow' : ''}`}
-                  style={selectedPortalGame === 'coin_shop' ? { border: '3.5px solid #ff9800', boxShadow: '0 0 25px rgba(255, 152, 0, 0.75)', transform: 'scale(1.03)', transition: 'all 0.25s ease' } : { transition: 'all 0.25s ease' }}
+                  className="portal-card coin-shop-card"
                   role="button" 
                   tabIndex={0}
                 >
@@ -4162,36 +4159,18 @@ export default function App() {
                     <p>Wissel je zuurverdiende Coco Coins in voor magische stickers en exclusieve verzamelobjecten. Vul je persoonlijke Disney Collection aan!</p>
                   </div>
                   <div className="portal-card-footer">
-                    <span className="btn-play shop">
-                      {selectedPortalGame === 'coin_shop' ? 'Klik nogmaals om te openen ➔' : 'Selecteer Shop ➔'}
-                    </span>
+                    <span className="btn-play shop">Open Shop ➔</span>
                   </div>
                 </div>
 
-                {/* Game 4: Coco's Coin Shop */}
-                <div
-                  className="portal-card coin-shop-card"
-                  onClick={() => document.getElementById('coco-shop-section')?.scrollIntoView({ behavior: 'smooth' })}
-                  role="button"
-                  tabIndex={0}
-                >
-                  <div className="portal-card-header">
-                    <div className="portal-card-media portal-glow-shop">
-                      <img src={assetPath('portal/Coco_png.png')} onLoad={removeBg} className="portal-media-img" alt="Coco Coin" />
-                    </div>
-                    <span className="portal-card-badge shop">Shop</span>
-                  </div>
-                  <div className="portal-card-body">
-                    <h3>Coco's Coin Shop</h3>
-                    <p style={{ color: '#ff9800', fontSize: '12px', marginTop: '-4px' }}>Stickers & Magische Items</p>
-                    <p>Wissel Coco Coins in voor stickers en exclusieve verzamelobjecten voor je Disney Collection.</p>
-                  </div>
-                  <div className="portal-card-footer">
-                    <span className="btn-play shop">Open Shop &#8594;</span>
-                  </div>
-                </div>
               </div>
 
+                </>
+              )}
+
+              {showPortalShop && (
+                <>
+                  {renderAppHeader("Coco's Coin Shop", () => setShowPortalShop(false))}
               {(() => {
                 const shopNames = getDisplayShopPlayers();
                 const activeName = activeProfileName || shopPlayerName.trim() || shopNames[0] || 'Speler 1';
@@ -4201,7 +4180,7 @@ export default function App() {
                 const donationTargets = shopNames.filter(name => getCollectorKey(name) !== activeKey);
                 const selectedDonationTarget = donationTargetName || donationTargets[0] || '';
                 return (
-                  <section id="coco-shop-section" className="card portal-shop-panel" style={{ marginTop: '20px' }}>
+                  <section className="card" style={{ marginTop: '20px' }}>
                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '12px', marginBottom: '12px', flexWrap: 'wrap' }}>
                       <div>
                         <h2 className="sectiontitle" style={{ margin: 0 }}>Coco Coins Shop</h2>
@@ -4385,7 +4364,11 @@ export default function App() {
                   </section>
                 );
               })()}
+                </>
+              )}
 
+              {!showPortalShop && (
+                <>
               <div className="portal-info-box">
                 <div className="info-icon">ℹ️</div>
                 <div className="info-text">
@@ -4401,6 +4384,8 @@ export default function App() {
               >
                 ⟳ Game volledig verversen
               </button>
+                </>
+              )}
             </div>
           )}
 

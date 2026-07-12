@@ -300,21 +300,10 @@ hr{border:0;border-top:1px solid var(--line);margin:18px 0}
   gap: 20px;
 }
 
-.portal-shop-panel {
-  width: calc(50% - 10px);
-  margin-left: calc(50% + 10px);
-  box-sizing: border-box;
-}
-
 @media (max-width: 600px) {
   .portal-grid {
     grid-template-columns: 1fr;
     gap: 16px;
-  }
-
-  .portal-shop-panel {
-    width: 100%;
-    margin-left: 0;
   }
 }
 
