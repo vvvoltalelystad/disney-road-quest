@@ -499,7 +499,10 @@ export default function App() {
   const [sudokuSolvedStats, setSudokuSolvedStats] = useState(null);
   const [sudokuHintsUsed, setSudokuHintsUsed] = useState(0);
   const [sudokuZoom, setSudokuZoom] = useState(1);
-  const sudokuPinchRef = useRef(null);
+  const [sudokuPan, setSudokuPan] = useState({ x: 0, y: 0 });
+  const sudokuViewportRef = useRef(null);
+  const sudokuTouchRef = useRef(null);
+  const sudokuSuppressClickRef = useRef(false);
 
   const checkSudokuConflicts = (grid, size) => {
     const conflicts = [];
@@ -656,6 +659,7 @@ export default function App() {
     setSudokuSolvedStats(null);
     setSudokuHintsUsed(0);
     setSudokuZoom(1);
+    setSudokuPan({ x: 0, y: 0 });
   };
 
   const isSudokuSolvedGrid = (grid) => (
@@ -719,21 +723,93 @@ export default function App() {
     return Math.hypot(a.clientX - b.clientX, a.clientY - b.clientY);
   };
 
+  const clampSudokuZoom = (value) => Math.min(2.4, Math.max(1, value));
+
+  const clampSudokuPan = (pan, zoom = sudokuZoom) => {
+    if (zoom <= 1) return { x: 0, y: 0 };
+    const rect = sudokuViewportRef.current?.getBoundingClientRect();
+    if (!rect) return pan;
+
+    const maxX = Math.max(0, (rect.width * (zoom - 1)) / 2);
+    const maxY = Math.max(0, (rect.height * (zoom - 1)) / 2);
+    return {
+      x: Math.min(maxX, Math.max(-maxX, pan.x)),
+      y: Math.min(maxY, Math.max(-maxY, pan.y))
+    };
+  };
+
+  const applySudokuZoom = (value) => {
+    const nextZoom = clampSudokuZoom(value);
+    setSudokuZoom(nextZoom);
+    setSudokuPan(prev => nextZoom <= 1 ? { x: 0, y: 0 } : clampSudokuPan(prev, nextZoom));
+  };
+
   const handleSudokuTouchStart = (e) => {
     if (e.touches.length === 2) {
-      sudokuPinchRef.current = {
+      sudokuTouchRef.current = {
+        mode: 'pinch',
         distance: getTouchDistance(e.touches),
-        zoom: sudokuZoom
+        zoom: sudokuZoom,
+        pan: sudokuPan
+      };
+      return;
+    }
+
+    if (e.touches.length === 1) {
+      const touch = e.touches[0];
+      sudokuTouchRef.current = {
+        mode: 'pan',
+        startX: touch.clientX,
+        startY: touch.clientY,
+        pan: sudokuPan,
+        moved: false
       };
     }
   };
 
   const handleSudokuTouchMove = (e) => {
-    if (e.touches.length !== 2 || !sudokuPinchRef.current) return;
+    const gesture = sudokuTouchRef.current;
+    if (!gesture) return;
+
+    if (e.touches.length === 2 && gesture.mode === 'pinch') {
+      e.preventDefault();
+      const nextZoom = clampSudokuZoom(gesture.zoom * (getTouchDistance(e.touches) / gesture.distance));
+      setSudokuZoom(nextZoom);
+      setSudokuPan(nextZoom <= 1 ? { x: 0, y: 0 } : clampSudokuPan(gesture.pan, nextZoom));
+      return;
+    }
+
+    if (e.touches.length !== 1 || gesture.mode !== 'pan' || sudokuZoom <= 1) return;
     e.preventDefault();
-    const nextZoom = sudokuPinchRef.current.zoom * (getTouchDistance(e.touches) / sudokuPinchRef.current.distance);
-    setSudokuZoom(Math.min(2.4, Math.max(0.9, nextZoom)));
+    const touch = e.touches[0];
+    const dx = touch.clientX - gesture.startX;
+    const dy = touch.clientY - gesture.startY;
+    if (Math.abs(dx) + Math.abs(dy) > 6) {
+      gesture.moved = true;
+      sudokuSuppressClickRef.current = true;
+    }
+    setSudokuPan(clampSudokuPan({ x: gesture.pan.x + dx, y: gesture.pan.y + dy }, sudokuZoom));
   };
+
+  const handleSudokuTouchEnd = () => {
+    const wasMoved = sudokuTouchRef.current?.moved;
+    sudokuTouchRef.current = null;
+    setSudokuPan(prev => clampSudokuPan(prev, sudokuZoom));
+    if (wasMoved) {
+      window.setTimeout(() => {
+        sudokuSuppressClickRef.current = false;
+      }, 250);
+    }
+  };
+
+  useEffect(() => {
+    const keepSudokuInView = () => {
+      setSudokuPan(prev => clampSudokuPan(prev, sudokuZoom));
+    };
+    keepSudokuInView();
+    window.addEventListener('resize', keepSudokuInView);
+    return () => window.removeEventListener('resize', keepSudokuInView);
+  }, [sudokuZoom, sudokuSize]);
 
   const getCollectorKey = (name) => norm(name || 'speler') || 'speler';
 
@@ -4216,44 +4292,55 @@ export default function App() {
                                       <button className="btn secondary mini" onClick={handleSudokuHint}>
                                         Hint (-1 ster)
                                       </button>
-                                      <button className="btn secondary mini" onClick={() => setSudokuZoom(z => Math.max(0.9, +(z - 0.15).toFixed(2)))}>
+                                      <button className="btn secondary mini" onClick={() => applySudokuZoom(+(sudokuZoom - 0.15).toFixed(2))}>
                                         -
                                       </button>
                                       <span style={{ color: 'var(--muted)', fontSize: '12px', minWidth: '44px', textAlign: 'center' }}>{Math.round(sudokuZoom * 100)}%</span>
-                                      <button className="btn secondary mini" onClick={() => setSudokuZoom(z => Math.min(2.4, +(z + 0.15).toFixed(2)))}>
+                                      <button className="btn secondary mini" onClick={() => applySudokuZoom(+(sudokuZoom + 0.15).toFixed(2))}>
                                         +
                                       </button>
                                     </div>
 
                                     {/* The Sudoku Grid */}
                                     <div
+                                      ref={sudokuViewportRef}
                                       onTouchStart={handleSudokuTouchStart}
                                       onTouchMove={handleSudokuTouchMove}
-                                      onTouchEnd={() => { sudokuPinchRef.current = null; }}
+                                      onTouchEnd={handleSudokuTouchEnd}
+                                      onTouchCancel={handleSudokuTouchEnd}
                                       style={{
                                         width: '100%',
-                                        maxWidth: 'min(94vw, 760px)',
-                                        maxHeight: 'min(76vh, 760px)',
-                                        overflow: 'auto',
+                                        maxWidth: '760px',
+                                        aspectRatio: '1 / 1',
+                                        overflow: 'hidden',
                                         margin: '10px auto',
                                         padding: '6px',
+                                        borderRadius: '18px',
+                                        border: '2px solid var(--line)',
+                                        background: '#041026',
+                                        display: 'flex',
+                                        alignItems: 'center',
+                                        justifyContent: 'center',
                                         touchAction: 'none',
-                                        WebkitOverflowScrolling: 'touch'
+                                        boxSizing: 'border-box'
                                       }}
                                     >
                                     <div 
                                       style={{ 
                                         display: 'grid', 
                                         gridTemplateColumns: `repeat(${sudokuSize}, 1fr)`, 
+                                        gridTemplateRows: `repeat(${sudokuSize}, 1fr)`,
                                         gap: '4px', 
-                                        width: sudokuSize === 6 ? 'min(92vw, 560px)' : 'min(94vw, 720px)',
-                                        margin: '0 auto', 
+                                        width: '100%',
+                                        height: '100%',
+                                        margin: '0 auto',
                                         background: '#041026', 
                                         padding: '8px', 
                                         borderRadius: '16px', 
-                                        border: '2px solid var(--line)',
-                                        transform: `scale(${sudokuZoom})`,
-                                        transformOrigin: 'top center'
+                                        boxSizing: 'border-box',
+                                        transform: `translate(${sudokuPan.x}px, ${sudokuPan.y}px) scale(${sudokuZoom})`,
+                                        transformOrigin: 'center center',
+                                        willChange: 'transform'
                                       }}
                                     >
                                       {sudokuGrid.map((row, rIdx) => 
@@ -4267,6 +4354,10 @@ export default function App() {
                                             <div
                                               key={`${rIdx}-${cIdx}`}
                                               onClick={() => {
+                                                if (sudokuSuppressClickRef.current) {
+                                                  sudokuSuppressClickRef.current = false;
+                                                  return;
+                                                }
                                                 if (isClue) return;
                                                 setSudokuSelectedCell({ row: rIdx, col: cIdx });
                                               }}
