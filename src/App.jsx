@@ -4161,8 +4161,8 @@ export default function App() {
                     e.stopPropagation();
                     if (selectedPortalGame === 'music_match') {
                       window.location.href = room?.code
-                        ? `./music/index.html?room=${room.code}&v=73`
-                        : './music/index.html?v=73';
+                        ? `./music/index.html?room=${room.code}&v=74`
+                        : './music/index.html?v=74';
                     } else {
                       setSelectedPortalGame('music_match');
                     }
@@ -4811,15 +4811,23 @@ export default function App() {
           {/* SCREEN: HOME */}
           {screen === 'home' && (
             <div>
-              {renderAppHeader('', () => setScreen('portal'), {
-                brandImage: 'portal/Lightning_mc_queen.png',
-                brandAlt: "McQueen's Road Race",
-                brandAction: () => setScreen('portal')
-              })}
-              <section className="card hero">
+              <section className="card hero road-home-hero">
+                <button type="button" className="road-portal-hero-mark" onClick={() => setScreen('portal')} aria-label="Terug naar Portal">
+                  <img src={assetPath('portal/Lightning_mc_queen.png')} onLoad={removeBg} alt="McQueen's Road Race" />
+                </button>
                 <div className="badge">Multiplayer Edition · Real-time</div>
+                <h1>McQueen's <span className="gold">Road Race</span></h1>
                 <p>Speel samen op je eigen telefoon tijdens de rit naar Disneyland Parijs!</p>
-                
+              </section>
+
+              <section className="card road-hostcard">
+                <h2 className="sectiontitle">Spel organiseren</h2>
+                <p>Jij maakt een nieuwe kamer aan en bepaalt daarna de spelonderdelen.</p>
+                <button className="btn primary full" onClick={() => setScreen('setup')}>Nieuwe Kamer starten</button>
+              </section>
+
+              <section className="card">
+                <h2 className="sectiontitle">Meedoen</h2>
                 <div className="field">
                   <label htmlFor="joinCode">Kamercode</label>
                   <input 
@@ -4842,24 +4850,7 @@ export default function App() {
 
                 {error && <p style={{ color: 'var(--danger)', fontSize: '13px' }}>⚠️ {error}</p>}
 
-                <div className="btnrow" style={{ marginTop: '20px' }}>
-                  <button className="btn primary" onClick={handleJoinRoom}>Deelnemen</button>
-                  <button className="btn secondary" onClick={() => setScreen('setup')}>Nieuwe Kamer</button>
-                </div>
-                <button 
-                  className="btn primary" 
-                  style={{ background: 'var(--gold)', color: '#000', width: '100%', marginTop: '12px' }} 
-                  onClick={() => setScreen('arcade_select')}
-                >
-                  Solo puzzels in Duel Arena
-                </button>
-                <button 
-                  className="btn secondary" 
-                  style={{ width: '100%', marginTop: '10px' }} 
-                  onClick={() => setScreen('arcade_select')}
-                >
-                  Duel Arena Solo & Duel
-                </button>
+                <button className="btn primary full" style={{ marginTop: '20px' }} onClick={handleJoinRoom}>Deelnemen</button>
               </section>
 
             </div>
