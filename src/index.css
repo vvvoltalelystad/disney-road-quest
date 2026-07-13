@@ -757,9 +757,9 @@ hr{border:0;border-top:1px solid var(--line);margin:18px 0}
 }
 
 .collectable-flip-stage {
-  width: 174px;
-  height: 174px;
-  margin: 10px auto 18px;
+  width: min(292px, 100%);
+  height: 248px;
+  margin: 4px auto 18px;
   perspective: 1000px;
 }
 
@@ -786,9 +786,9 @@ hr{border:0;border-top:1px solid var(--line);margin:18px 0}
   display: grid;
   place-items: center;
   overflow: hidden;
-  padding: 12px;
+  padding: 8px;
   border: 1px solid rgba(255, 212, 92, 0.52);
-  border-radius: 28px;
+  border-radius: 30px;
   background: radial-gradient(circle, rgba(255, 212, 92, 0.28), rgba(9, 29, 61, 0.84));
   box-shadow: 0 0 34px rgba(255, 196, 71, 0.28);
   backface-visibility: hidden;
@@ -810,6 +810,13 @@ hr{border:0;border-top:1px solid var(--line);margin:18px 0}
   outline: 3px solid var(--gold);
   outline-offset: 6px;
   border-radius: 28px;
+}
+
+@media (max-width: 380px) {
+  .collectable-flip-stage {
+    width: min(268px, 100%);
+    height: 230px;
+  }
 }
 
 body.night-theme {

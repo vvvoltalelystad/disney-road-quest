@@ -3937,9 +3937,6 @@ export default function App() {
             <div className="badge" style={{ alignSelf: 'center', marginBottom: '8px' }}>Coco Coin</div>
             <h2>De munt van Coco</h2>
             <p>Klik op de munt om hem om te draaien.</p>
-            <button type="button" className="btn primary full" onClick={() => setCoinFlipped(prev => !prev)}>
-              {coinFlipped ? 'Bekijk voorkant' : 'Draai Coco Coin om'}
-            </button>
           </div>
         </div>
       )}
@@ -4061,13 +4058,8 @@ export default function App() {
                 </div>
                 <h2>{selectedCollectionItem.name}</h2>
                 <p>{selectedCollectionItem.backImage ? 'Klik op het logo om de voor- en achterkant te bekijken.' : selectedCollectionItem.desc}</p>
-                {selectedCollectionItem.backImage && (
-                  <button type="button" className="btn primary full" onClick={() => setSelectedCollectionFlipped(prev => !prev)}>
-                    {selectedCollectionFlipped ? 'Bekijk voorkant' : 'Bekijk achterkant'}
-                  </button>
-                )}
                 <div className="collection-popup-price">
-                  <CocoCoinIcon size={28} onInspect={() => { setCoinFlipped(false); setCoinPopupOpen(true); }} />
+                  <CocoCoinIcon size={28} />
                   <span>{formatCocoCoins(selectedCollectionItem.cost)}</span>
                 </div>
               </div>
