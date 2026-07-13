@@ -241,6 +241,10 @@ function organizerPanel(){
 }
 
 function validateCardsCount(){
+  if(state.lobbySettings.answerTimeLimit==='none'){
+    state.lobbySettings.cards_per_player=2;
+    return;
+  }
   const count=state.lobbySettings.cards_per_player||3;
   const maxAllowed=maxPowerCardsPerPlayer();
   if(count>maxAllowed){
@@ -289,13 +293,13 @@ function renderLobby(){
       <small class="muted">Automatisch: 1-2 antwoorden 30 sec., 3 antwoorden 45 sec. en 4 antwoorden 60 sec.</small>
     </div>
     <div class="grid2" style="margin-top:10px">
-      <div class="field"><label>Krachten per speler</label>
+      ${state.lobbySettings.answerTimeLimit==='none'?`<div class="field"><label>Krachten per speler</label><div class="notice blue" style="margin:0">2 kaarten: 1 individuele kracht + 1 andere kracht.</div></div>`:`<div class="field"><label>Krachten per speler</label>
         <select id="cardsPerPlayer" onchange="state.lobbySettings.cards_per_player = Number(this.value); validateCardsCount(); renderLobby();">
           <option value="1" ${state.lobbySettings.cards_per_player === 1?'selected':''}>1 kaart</option>
           <option value="2" ${state.lobbySettings.cards_per_player === 2?'selected':''}>2 kaarten</option>
           <option value="3" ${(state.lobbySettings.cards_per_player === 3 || !state.lobbySettings.cards_per_player)?'selected':''}${state.players.length>=5?' disabled':''}>3 kaarten (max 4 spl)</option>
         </select>
-      </div>
+      </div>`}
       <div class="field"><label>Spelleider</label>
         <select id="leaderMode" onchange="state.lobbySettings.leaderMode = this.value; renderLobby();">
           <option value="rotating" ${state.lobbySettings.leaderMode === 'rotating'?'selected':''}>Roulerend</option>
@@ -316,7 +320,7 @@ function renderLobby(){
     ${toggle('stats','Extra statistiektitels',state.lobbySettings.stat_titles,'stat_titles')}
     ${toggle('bet','Geheime inzet finale',state.lobbySettings.final_bet,'final_bet')}
     ${toggle('anim','Feestelijke animaties',state.lobbySettings.animations,'animations')}
-    ${state.lobbySettings.answerTimeLimit==='none'?'<div class="notice blue">Zonder tijdsdruk worden Tweede Val, Lichtsnelheid en Turbo Boost niet uitgedeeld.</div>':''}
+    ${state.lobbySettings.answerTimeLimit==='none'?'<div class="notice blue">Zonder tijdsdruk krijgt iedereen precies 2 kaarten: altijd 1 individuele kracht en maximaal 1 gezamenlijke kracht. Tweede Val, Lichtsnelheid en Turbo Boost vallen weg.</div>':''}
     <div class="notice ${activeCount>=state.lobbySettings.roundCount?'green':'red'}"><strong>${activeCount} actieve songs beschikbaar.</strong> Voor ${state.lobbySettings.roundCount} rondes zijn minimaal ${state.lobbySettings.roundCount} actieve songs met titel, film, jaar en Spotify-link/scancode nodig.</div>
     ${state.startError?`<div class="notice red"><strong>Starten lukt niet:</strong> ${esc(state.startError)}</div>`:''}
     <div class="notice blue">Na starten kun jij naar Hitster wisselen.</div>
@@ -370,7 +374,7 @@ async function startGame(){
       animations:state.lobbySettings.animations,
       leader_mode:lm,
       fixed_leader_player_id:lm==='fixed'?(state.lobbySettings.fixedLeader||state.players[0]?.id||null):null,
-      cards_per_player:state.lobbySettings.cards_per_player||3
+      cards_per_player:answerTimeLimit==='none'?2:(state.lobbySettings.cards_per_player||3)
     };
     loading('Game starten…');
     const r=await state.sb.rpc('dmq_start_game_v2',{p_room_id:state.room.id,p_total_rounds:total,p_game_mode:mode,p_song_sequence:songs.map(s=>s.song_number),p_question_sequence:songs.map(s=>qtype(mode,s)),p_settings:set});

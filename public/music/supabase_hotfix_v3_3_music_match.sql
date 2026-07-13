@@ -56,6 +56,7 @@ declare
   v_remaining text[];
   v_combined_pool text[];
   v_player_cards text[];
+  v_second_card text;
   v_player record;
   v_idx integer := 1;
   v_available integer;
@@ -78,13 +79,17 @@ begin
     -- The three timing cards are intentionally omitted.
     v_individual := array['hyperdrive','wild_ride','temple_run','hidden_treasure','small_world','spider_bot'];
     v_special := array['ghost_whisper','ingredient_theft','laser_block'];
+    v_cards_count := 2;
   else
     v_individual := array['hyperdrive','wild_ride','temple_run','lightspeed','hidden_treasure','small_world'];
     v_special := array['ghost_whisper','second_drop','ingredient_theft','laser_block','spider_bot','turbo_boost'];
   end if;
 
   v_available := cardinality(v_individual) + cardinality(v_special);
-  if v_cards_count < 1 or n * v_cards_count > v_available then
+  if v_no_time and n > cardinality(v_individual) then
+    raise exception 'Te weinig individuele krachten voor dit aantal spelers.';
+  end if;
+  if not v_no_time and (v_cards_count < 1 or n * v_cards_count > v_available) then
     raise exception 'Te weinig passende krachten voor dit aantal spelers en kaarten. Kies minder kaarten per speler.';
   end if;
 
@@ -100,7 +105,16 @@ begin
   for v_player in
     select id from dmq_players where room_id = p_room_id order by joined_at
   loop
-    if v_cards_count = 1 then
+    if v_no_time then
+      -- The first card is always individual. The second is different and may
+      -- be individual or shared, so no player can receive two shared cards.
+      select candidate into v_second_card
+      from unnest(v_individual || v_special) as candidate
+      where candidate <> v_ind_pool[v_idx]
+      order by random()
+      limit 1;
+      v_player_cards := array[v_ind_pool[v_idx], v_second_card];
+    elsif v_cards_count = 1 then
       v_player_cards := array[v_ind_pool[v_idx]];
     elsif v_cards_count = 2 then
       v_player_cards := array[v_ind_pool[v_idx], v_combined_pool[v_idx]];
