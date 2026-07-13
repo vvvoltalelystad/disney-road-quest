@@ -3288,6 +3288,15 @@ export default function App() {
     }
   };
 
+  const handleOpenProfileManagement = () => {
+    setSelectedPortalGame(null);
+    setShowPortalShop(false);
+    setActiveProfileName('');
+    setPlayerNameInput('');
+    localStorage.removeItem(ACTIVE_PROFILE_KEY);
+    localStorage.removeItem('disney_player_name');
+  };
+
   // --- RENDERING HELPERS ---
 
   const renderAppHeader = (title = "McQueen's Road Race", backAction = null) => {
@@ -4361,16 +4370,42 @@ export default function App() {
               )}
 
               {!showPortalShop && (
-                <>
-              <button
-                type="button"
-                className="btn secondary full"
-                onClick={handleHardRefresh}
-                style={{ marginTop: '16px' }}
-              >
-                ⟳ Game volledig verversen
-              </button>
-                </>
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px', marginTop: '16px' }}>
+                  <button
+                    type="button"
+                    className="btn secondary full"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      if (selectedPortalGame === 'hard_refresh') {
+                        handleHardRefresh();
+                      } else {
+                        setSelectedPortalGame('hard_refresh');
+                      }
+                    }}
+                    style={selectedPortalGame === 'hard_refresh'
+                      ? { borderColor: '#ff6a6a', boxShadow: '0 0 20px rgba(255, 66, 66, 0.85)', background: '#4b1824' }
+                      : { borderColor: '#a83e4c', boxShadow: '0 0 12px rgba(255, 66, 66, 0.45)' }}
+                  >
+                    {selectedPortalGame === 'hard_refresh' ? 'Nogmaals: volledig verversen' : '⟳ Game volledig verversen'}
+                  </button>
+                  <button
+                    type="button"
+                    className="btn secondary full"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      if (selectedPortalGame === 'profile_management') {
+                        handleOpenProfileManagement();
+                      } else {
+                        setSelectedPortalGame('profile_management');
+                      }
+                    }}
+                    style={selectedPortalGame === 'profile_management'
+                      ? { borderColor: '#50e889', boxShadow: '0 0 20px rgba(80, 232, 137, 0.85)', background: '#123d2a' }
+                      : { borderColor: '#319b5e', boxShadow: '0 0 12px rgba(80, 232, 137, 0.45)' }}
+                  >
+                    {selectedPortalGame === 'profile_management' ? 'Nogmaals: open profielbeheer' : 'Profielbeheer'}
+                  </button>
+                </div>
               )}
             </div>
           )}
