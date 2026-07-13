@@ -136,6 +136,7 @@ const DISNEY_SHOP_ITEMS = [
   { id: 'pixie-dust', name: 'Tinkelstof Zakjes', icon: 'TZ', image: 'collectables/pixie-dust-bags.png', cost: 1, type: 'everyone', desc: 'Een voorraadje magie voor onderweg.' },
   { id: 'golden-fastpass', name: 'Royal Access Pass', icon: 'RA', image: 'collectables/royal-access-pass.png', cost: 5, type: 'exclusive', desc: 'Exclusief: maar een speler kan deze claimen.' },
   { id: 'captains-compass', name: "Jack Sparrow's Compass", icon: 'JS', image: 'collectables/jack-sparrows-compass.png', cost: 7, type: 'exclusive', desc: 'Exclusief verzamelitem voor wie altijd de juiste route vindt.' },
+  { id: 'disney-pin-trading', name: 'Disney Pin Trading Logo', icon: 'PT', image: 'collectables/disney-pin-trading-front.png', backImage: 'collectables/disney-pin-trading-back.png', cost: 1, type: 'everyone', desc: 'Een officieel Pin Trading-logo voor je Disney Collection.' },
   { id: 'crystal-castle', name: 'Swarovski Pluto', icon: 'SP', image: 'collectables/swarovski-pluto.png', cost: 8, type: 'exclusive', desc: 'Een fonkelend pronkstuk voor de Collection.' },
   { id: 'swarovski-beauty-set', name: 'Swarovski Beauty Set', icon: 'SB', image: 'collectables/swarovski-beauty-set.png', cost: 12, type: 'exclusive', desc: 'Een luxe set voor de speler met de meeste Coco Coin-discipline.' }
 ];
@@ -687,6 +688,7 @@ export default function App() {
   const [donationTargetName, setDonationTargetName] = useState('');
   const [donationAmount, setDonationAmount] = useState('');
   const [selectedCollectionItem, setSelectedCollectionItem] = useState(null);
+  const [selectedCollectionFlipped, setSelectedCollectionFlipped] = useState(false);
   const [coinPopupOpen, setCoinPopupOpen] = useState(false);
   const [coinFlipped, setCoinFlipped] = useState(false);
   const [cocoProfilesReady, setCocoProfilesReady] = useState(false);
@@ -1400,6 +1402,7 @@ export default function App() {
     localStorage.setItem('disney_collections', JSON.stringify(nextCollections));
     localStorage.setItem('disney_exclusive_claims', JSON.stringify(nextClaims));
     logCaptainMutation(name, -item.cost, 'spend', `Gekocht in shop: ${item.name}`, nextBank[key]);
+    setSelectedCollectionFlipped(false);
     setSelectedCollectionItem(item);
   };
 
@@ -4022,24 +4025,47 @@ export default function App() {
           {selectedCollectionItem && (
             <div
               className="collection-popup-backdrop"
-              onClick={() => setSelectedCollectionItem(null)}
+              onClick={() => { setSelectedCollectionItem(null); setSelectedCollectionFlipped(false); }}
             >
               <div className="collection-popup-card" onClick={(e) => e.stopPropagation()}>
                 <button
                   className="collection-popup-close"
-                  onClick={() => setSelectedCollectionItem(null)}
+                  onClick={() => { setSelectedCollectionItem(null); setSelectedCollectionFlipped(false); }}
                   aria-label="Sluiten"
                 >
                   ×
                 </button>
-                <div className="collection-popup-visual">
-                  {renderCollectableVisual(selectedCollectionItem, 'collection-popup-image')}
-                </div>
+                {selectedCollectionItem.backImage ? (
+                  <div className={`collectable-flip-stage ${selectedCollectionFlipped ? 'is-flipped' : ''}`}>
+                    <button
+                      type="button"
+                      className="collectable-flip-inner"
+                      onClick={() => setSelectedCollectionFlipped(prev => !prev)}
+                      aria-label={selectedCollectionFlipped ? `Bekijk voorkant van ${selectedCollectionItem.name}` : `Bekijk achterkant van ${selectedCollectionItem.name}`}
+                    >
+                      <span className="collectable-flip-face collectable-flip-front">
+                        <img src={assetPath(selectedCollectionItem.image)} alt={`Voorkant van ${selectedCollectionItem.name}`} />
+                      </span>
+                      <span className="collectable-flip-face collectable-flip-back">
+                        <img src={assetPath(selectedCollectionItem.backImage)} alt={`Achterkant van ${selectedCollectionItem.name}`} />
+                      </span>
+                    </button>
+                  </div>
+                ) : (
+                  <div className="collection-popup-visual">
+                    {renderCollectableVisual(selectedCollectionItem, 'collection-popup-image')}
+                  </div>
+                )}
                 <div className="badge" style={{ alignSelf: 'center', marginBottom: '8px' }}>
                   Disney Collection
                 </div>
                 <h2>{selectedCollectionItem.name}</h2>
-                <p>{selectedCollectionItem.desc}</p>
+                <p>{selectedCollectionItem.backImage ? 'Klik op het logo om de voor- en achterkant te bekijken.' : selectedCollectionItem.desc}</p>
+                {selectedCollectionItem.backImage && (
+                  <button type="button" className="btn primary full" onClick={() => setSelectedCollectionFlipped(prev => !prev)}>
+                    {selectedCollectionFlipped ? 'Bekijk voorkant' : 'Bekijk achterkant'}
+                  </button>
+                )}
                 <div className="collection-popup-price">
                   <CocoCoinIcon size={28} onInspect={() => { setCoinFlipped(false); setCoinPopupOpen(true); }} />
                   <span>{formatCocoCoins(selectedCollectionItem.cost)}</span>
@@ -4380,7 +4406,7 @@ export default function App() {
                                 key={item.id}
                                 type="button"
                                 className="badge collection-item-button"
-                                onClick={() => setSelectedCollectionItem(item)}
+                                onClick={() => { setSelectedCollectionFlipped(false); setSelectedCollectionItem(item); }}
                                 style={{ background: '#10264c', color: '#fff' }}
                               >
                                 {renderCollectableVisual(item, 'collection-badge-image')} {item.name}
