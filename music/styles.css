@@ -60,6 +60,8 @@ p{line-height:1.45}
 .topbar-actions{display:flex;gap:8px;align-items:center}
 .music-portal-mark{width:44px;height:44px;padding:2px;border:1px solid rgba(116,215,255,0.38);border-radius:15px;background:rgba(16,43,85,0.7);box-shadow:0 0 16px rgba(116,215,255,0.3);display:grid;place-items:center;overflow:hidden}
 .music-portal-mark img{display:block;width:100%;height:100%;object-fit:contain;filter:drop-shadow(0 2px 5px rgba(0,0,0,0.48))}
+.music-hero-mark{width:88px;height:88px;padding:5px;margin:0 auto 14px;border:1px solid rgba(116,215,255,0.42);border-radius:24px;background:rgba(16,43,85,0.7);box-shadow:0 0 28px rgba(116,215,255,0.38);display:grid;place-items:center;overflow:hidden}
+.music-hero-mark img{display:block;width:100%;height:100%;object-fit:contain;filter:drop-shadow(0 4px 8px rgba(0,0,0,0.48))}
 .music-home-hero h1{font-family:'Plus Jakarta Sans',Inter,ui-rounded,system-ui,sans-serif;font-size:clamp(29px,8vw,40px);letter-spacing:0;margin:10px 0 12px}
 .music-accent{color:var(--blue);text-shadow:0 0 18px rgba(116,215,255,0.35)}
 .iconbtn{
@@ -69,7 +71,7 @@ p{line-height:1.45}
 }
 .iconbtn:active{transform:scale(0.92)}
 
-@media (max-width:380px){.topbar{grid-template-columns:40px minmax(0,1fr) auto;gap:6px}.music-portal-mark,.iconbtn{min-width:40px;width:40px;height:40px}.topbar-actions{gap:6px}.topbar h1{font-size:18px}}
+@media (max-width:380px){.topbar{grid-template-columns:40px minmax(0,1fr) auto;gap:6px}.music-portal-mark,.iconbtn{min-width:40px;width:40px;height:40px}.music-hero-mark{width:78px;height:78px}.topbar-actions{gap:6px}.topbar h1{font-size:18px}}
 .btn{
   border:1px solid transparent;border-radius:16px;padding:13px 15px;
   font-weight:900;min-height:48px;color:white;background:#173663;
