@@ -3303,14 +3303,19 @@ export default function App() {
 
   // --- RENDERING HELPERS ---
 
-  const renderAppHeader = (title = "McQueen's Road Race", backAction = null) => {
+  const renderAppHeader = (title = "McQueen's Road Race", backAction = null, options = {}) => {
     const key = getCollectorKey(activeProfileName);
     const balance = starBank[key] || 0;
     const isArenaHeader = title === "Hercules' Duel Arena" || title === 'Duel Arena';
+    const { brandImage, brandAlt = '', brandAction = backAction } = options;
 
     return (
       <div className="topbar">
-        {!isArenaHeader && (
+        {!isArenaHeader && brandImage ? (
+          <button type="button" className="app-header-mark" onClick={brandAction} aria-label={brandAlt || 'Terug naar Portal'}>
+            <img src={assetPath(brandImage)} onLoad={removeBg} alt={brandAlt} />
+          </button>
+        ) : !isArenaHeader && title && (
           <div className="brand">
             <span className="castle">🏰</span>
             <span>{title}</span>
@@ -4156,8 +4161,8 @@ export default function App() {
                     e.stopPropagation();
                     if (selectedPortalGame === 'music_match') {
                       window.location.href = room?.code
-                        ? `./music/index.html?room=${room.code}&v=71`
-                        : './music/index.html?v=71';
+                        ? `./music/index.html?room=${room.code}&v=73`
+                        : './music/index.html?v=73';
                     } else {
                       setSelectedPortalGame('music_match');
                     }
@@ -4806,30 +4811,13 @@ export default function App() {
           {/* SCREEN: HOME */}
           {screen === 'home' && (
             <div>
-              {renderAppHeader("McQueen's Road Race", () => setScreen('portal'))}
+              {renderAppHeader('', () => setScreen('portal'), {
+                brandImage: 'portal/Lightning_mc_queen.png',
+                brandAlt: "McQueen's Road Race",
+                brandAction: () => setScreen('portal')
+              })}
               <section className="card hero">
                 <div className="badge">Multiplayer Edition · Real-time</div>
-                <div style={{ display: 'flex', justifyContent: 'center', width: '100%', overflow: 'visible', margin: '15px 0' }}>
-                  <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', width: 'max-content', maxWidth: '100%' }}>
-                    <img 
-                      src={assetPath("header-logo.png")} 
-                      style={{ 
-                        width: '120%', 
-                        height: 'auto', 
-                        aspectRatio: '16/9',
-                        maxWidth: '100%', 
-                        margin: '0 auto 10px', 
-                        display: 'block', 
-                        filter: 'drop-shadow(0 8px 20px rgba(0, 0, 0, 0.4))',
-                        borderRadius: '16px'
-                      }} 
-                      alt="McQueen's Road Race Logo" 
-                    />
-                    <h1 style={{ margin: '8px 0 12px', whiteSpace: 'nowrap' }}>
-                      McQueen's <span className="gold">Road Race</span>
-                    </h1>
-                  </div>
-                </div>
                 <p>Speel samen op je eigen telefoon tijdens de rit naar Disneyland Parijs!</p>
                 
                 <div className="field">
@@ -4874,20 +4862,6 @@ export default function App() {
                 </button>
               </section>
 
-              <section className="card">
-                <h2 className="sectiontitle">Spelopties</h2>
-                <div className="btnrow stack">
-                  <button className="btn ghost" onClick={toggleSound}>
-                    🔊 Geluidseffecten: {sound ? "Aan" : "Uit"}
-                  </button>
-                  <button className="btn ghost" onClick={() => setScreen('versioninfo')}>
-                    ℹ️ Versie-info
-                  </button>
-                </div>
-                <div className="notice" style={{ marginTop: '14px' }}>
-                  <strong>Realtime multiplayer:</strong> Eén iemand maakt een kamer aan (de host). De anderen vullen de code in om direct mee te spelen!
-                </div>
-              </section>
             </div>
           )}
 
