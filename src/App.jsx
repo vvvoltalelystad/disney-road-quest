@@ -642,7 +642,11 @@ export default function App() {
 
   const [localPlayer, setLocalPlayer] = useState(null);
   const [roomCodeInput, setRoomCodeInput] = useState('');
-  const [activeProfileName, setActiveProfileName] = useState('');
+  const [activeProfileName, setActiveProfileName] = useState(() => {
+    const params = new URLSearchParams(window.location.search);
+    if (params.get('portal') !== '1') return '';
+    return localStorage.getItem(ACTIVE_PROFILE_KEY) || localStorage.getItem('disney_player_name') || '';
+  });
   const [logPopupOpen, setLogPopupOpen] = useState(false);
   const [logProfileName, setLogProfileName] = useState('');
   const [selectedPortalGame, setSelectedPortalGame] = useState(null);
