@@ -597,6 +597,12 @@ img.emoji {
   -webkit-text-fill-color: transparent;
   z-index: 1;
 }
+
+.score-crown {
+  display: inline-block;
+  margin-left: 8px;
+  vertical-align: baseline;
+}
 .winner-title-large {
   font-size: 14px;
   font-weight: 800;
