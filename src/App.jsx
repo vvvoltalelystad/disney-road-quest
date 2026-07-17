@@ -653,6 +653,10 @@ export default function App() {
   const [showPortalShop, setShowPortalShop] = useState(false);
   const [playerNameInput, setPlayerNameInput] = useState(() => localStorage.getItem(ACTIVE_PROFILE_KEY) || localStorage.getItem('disney_player_name') || '');
 
+  useEffect(() => {
+    window.scrollTo({ top: 0, left: 0, behavior: 'auto' });
+  }, [screen, showPortalShop]);
+
   const [setupMode, setSetupMode] = useState('mix');
   const [setupVersion, setSetupVersion] = useState(1);
   const [roundsPerPlayer, setRoundsPerPlayer] = useState(10);
@@ -3375,6 +3379,32 @@ export default function App() {
     );
   };
 
+  const renderPortalDestinationHero = ({
+    image,
+    imageAlt,
+    badge,
+    title,
+    accentTitle,
+    description,
+    onBack,
+    theme = 'gold',
+    imageClass = ''
+  }) => (
+    <section className={`card hero portal-destination-hero portal-destination-${theme}`}>
+      <button
+        type="button"
+        className={`portal-destination-mark ${imageClass}`.trim()}
+        onClick={onBack}
+        aria-label="Terug naar Portal"
+      >
+        <img src={assetPath(image)} alt={imageAlt} />
+      </button>
+      <div className="badge">{badge}</div>
+      <h1><span>{title}</span> <span className="portal-destination-accent">{accentTitle}</span></h1>
+      <p>{description}</p>
+    </section>
+  );
+
   const renderScoreBar = () => {
     return (
       <div className="scorebar">
@@ -3949,18 +3979,18 @@ export default function App() {
             >
               ×
             </button>
-            <div className={`coin-flip-stage ${coinFlipped ? 'is-flipped' : ''}`}>
+            <div className="coin-flip-stage">
               <button
                 type="button"
                 className="coin-flip-inner"
                 onClick={() => setCoinFlipped(prev => !prev)}
                 aria-label={coinFlipped ? 'Bekijk voorkant van Coco Coin' : 'Bekijk achterkant van Coco Coin'}
               >
-                <span className="coin-flip-face coin-flip-front">
-                  <img src={assetPath('collectables/coco-coin-front.png')} alt="Voorkant van de Coco Coin" />
-                </span>
-                <span className="coin-flip-face coin-flip-back">
-                  <img src={assetPath('collectables/coco-coin-back.png')} alt="Achterkant van de Coco Coin" />
+                <span className="coin-flip-face">
+                  <img
+                    src={assetPath(coinFlipped ? 'collectables/coco-coin-back.png' : 'collectables/coco-coin-front.png')}
+                    alt={coinFlipped ? 'Achterkant van de Coco Coin' : 'Voorkant van de Coco Coin'}
+                  />
                 </span>
               </button>
             </div>
@@ -4113,7 +4143,7 @@ export default function App() {
 
           {/* SCREEN: PORTAL */}
           {screen === 'portal' && (
-            <div className="portal-container" onClick={() => setSelectedPortalGame(null)}>
+            <div className={`portal-container ${showPortalShop ? 'portal-destination-page' : ''}`} onClick={() => setSelectedPortalGame(null)}>
               {!showPortalShop && (
                 <>
               <div className="portal-header">
@@ -4140,7 +4170,7 @@ export default function App() {
                 >
                   <div className="portal-card-header">
                     <div className="portal-card-media portal-glow-quest">
-                      <img src={assetPath("portal/Lightning_mc_queen.png")} onLoad={removeBg} className="portal-media-img" alt="Lightning McQueen" />
+                      <img src={assetPath("portal/Lightning_mc_queen.png")} className="portal-media-img" alt="Lightning McQueen" />
                     </div>
                     <span className="portal-card-badge">Aanbevolen</span>
                   </div>
@@ -4174,7 +4204,7 @@ export default function App() {
                 >
                   <div className="portal-card-header">
                     <div className="portal-card-media portal-glow-music">
-                      <img src={assetPath("portal/mickey_singing.png")} onLoad={removeBg} className="portal-media-img" alt="Mickey Singing" />
+                      <img src={assetPath("portal/mickey_singing.png")} className="portal-media-img" alt="Mickey Singing" />
                     </div>
                     <span className="portal-card-badge music">Hitster Editie</span>
                   </div>
@@ -4207,7 +4237,7 @@ export default function App() {
                 >
                   <div className="portal-card-header">
                     <div className="portal-card-media portal-glow-duel">
-                      <img src={assetPath("portal/Hercules.png")} onLoad={removeBg} className="portal-media-img" alt="Hercules" />
+                      <img src={assetPath("portal/Hercules.png")} className="portal-media-img" alt="Hercules" />
                     </div>
                     <span className="portal-card-badge arcade">10 Spellen</span>
                   </div>
@@ -4241,7 +4271,7 @@ export default function App() {
                 >
                   <div className="portal-card-header">
                     <div className="portal-card-media portal-glow-shop">
-                      <img src={assetPath("portal/Coco_png.png")} onLoad={removeBg} className="portal-media-img" alt="Coco Coins" />
+                      <img src={assetPath("portal/Coco_png.png")} className="portal-media-img" alt="Coco Coins" />
                     </div>
                     <span className="portal-card-badge shop">Shop</span>
                   </div>
@@ -4264,6 +4294,20 @@ export default function App() {
 
               {showPortalShop && (
                 <>
+              {renderPortalDestinationHero({
+                image: 'portal/Coco_png.png',
+                imageAlt: "Coco's Coin Shop",
+                badge: 'Stickers & Magische Items',
+                title: "Coco's Coin",
+                accentTitle: 'Shop',
+                description: 'Wissel je Coco Coins in voor magische stickers en exclusieve verzamelobjecten.',
+                onBack: () => {
+                  setSelectedPortalGame(null);
+                  setShowPortalShop(false);
+                },
+                theme: 'shop',
+                imageClass: 'portal-mark-coco'
+              })}
               {(() => {
                 const shopNames = getDisplayShopPlayers();
                 const activeName = activeProfileName || shopPlayerName.trim() || shopNames[0] || 'Speler 1';
@@ -4273,8 +4317,20 @@ export default function App() {
                 const donationTargets = shopNames.filter(name => getCollectorKey(name) !== activeKey);
                 const selectedDonationTarget = donationTargetName || donationTargets[0] || '';
                 return (
-                  <section className="card" style={{ marginTop: '20px' }}>
-                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 110px auto', gap: '8px', alignItems: 'end', marginBottom: '14px', padding: '10px', background: '#061225', border: '1px solid var(--line)', borderRadius: '10px' }}>
+                  <section className="card portal-shop-content">
+                    <div className="portal-shop-heading">
+                      <div>
+                        <span className="portal-section-kicker">Jouw Disney-profiel</span>
+                        <h2>Shop voor {activeName}</h2>
+                        <p>Bekijk je saldo, deel Coco Coins en breid je persoonlijke collection uit.</p>
+                      </div>
+                      <div className="portal-shop-balance" aria-label={`${formatCocoCoins(balance)} beschikbaar`}>
+                        <CocoCoinIcon size={30} />
+                        <strong>{balance}</strong>
+                      </div>
+                    </div>
+
+                    <div className="shop-donation-panel">
                       <div>
                         <label style={{ display: 'block', marginBottom: '6px', fontSize: '12px', fontWeight: 'bold' }}>Coco Coins doneren aan</label>
                         <select
@@ -4311,14 +4367,14 @@ export default function App() {
                       </button>
                     </div>
 
-                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '8px' }}>
+                    <div className="shop-product-grid">
                       {DISNEY_SHOP_ITEMS.map(item => {
                         const itemOwned = owned.includes(item.id);
                         const exclusiveOwner = exclusiveClaims[item.id];
                         const lockedByOther = item.type === 'exclusive' && exclusiveOwner && exclusiveOwner !== activeKey;
                         const canBuy = !itemOwned && !lockedByOther && balance >= item.cost;
                         return (
-                          <div key={item.id} style={{ background: '#07152c', border: '1px solid var(--line)', borderRadius: '10px', padding: '10px' }}>
+                          <div key={item.id} className="shop-product-card">
                             <div style={{ display: 'flex', gap: '8px', alignItems: 'center', marginBottom: '6px' }}>
                               <span className="shop-item-visual">
                                 {renderCollectableVisual(item, 'shop-item-image')}
@@ -4424,7 +4480,20 @@ export default function App() {
           {/* SCREEN: ARCADE SELECT */}
           {screen === 'arcade_select' && (
             <div>
-              {renderAppHeader("Hercules' Duel Arena", () => setScreen('portal'))}
+              {renderPortalDestinationHero({
+                image: 'portal/Hercules.png',
+                imageAlt: "Hercules' Duel Arena",
+                badge: '10 Disney Duelspellen',
+                title: "Hercules' Duel",
+                accentTitle: 'Arena',
+                description: 'Kies een solo-uitdaging of speel een realtime duel op je eigen telefoon.',
+                onBack: () => {
+                  setSelectedPortalGame(null);
+                  setScreen('portal');
+                },
+                theme: 'duel',
+                imageClass: 'portal-mark-hercules'
+              })}
 
               <section className="card">
                 <div style={{ display: 'flex', alignItems: 'center', gap: '10px', margin: '2px 0 16px' }}>
@@ -4811,14 +4880,20 @@ export default function App() {
           {/* SCREEN: HOME */}
           {screen === 'home' && (
             <div>
-              <section className="card hero road-home-hero">
-                <button type="button" className="road-portal-hero-mark" onClick={() => setScreen('portal')} aria-label="Terug naar Portal">
-                  <img src={assetPath('portal/Lightning_mc_queen.png')} onLoad={removeBg} alt="McQueen's Road Race" />
-                </button>
-                <div className="badge">Multiplayer Edition · Real-time</div>
-                <h1>McQueen's <span className="gold">Road Race</span></h1>
-                <p>Speel samen op je eigen telefoon tijdens de rit naar Disneyland Parijs!</p>
-              </section>
+              {renderPortalDestinationHero({
+                image: 'portal/Lightning_mc_queen.png',
+                imageAlt: "McQueen's Road Race",
+                badge: 'Multiplayer Edition · Real-time',
+                title: "McQueen's Road",
+                accentTitle: 'Race',
+                description: 'Speel samen op je eigen telefoon tijdens de rit naar Disneyland Parijs!',
+                onBack: () => {
+                  setSelectedPortalGame(null);
+                  setScreen('portal');
+                },
+                theme: 'gold',
+                imageClass: 'portal-mark-mcqueen'
+              })}
 
               <section className="card road-hostcard">
                 <h2 className="sectiontitle">Spel organiseren</h2>
