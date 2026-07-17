@@ -4298,8 +4298,8 @@ export default function App() {
                 image: 'portal/Coco_png.png',
                 imageAlt: "Coco's Coin Shop",
                 badge: 'Stickers & Magische Items',
-                title: "Coco's Coin",
-                accentTitle: 'Shop',
+                title: "Coco's",
+                accentTitle: 'Coin Shop',
                 description: 'Wissel je Coco Coins in voor magische stickers en exclusieve verzamelobjecten.',
                 onBack: () => {
                   setSelectedPortalGame(null);
@@ -4484,8 +4484,8 @@ export default function App() {
                 image: 'portal/Hercules.png',
                 imageAlt: "Hercules' Duel Arena",
                 badge: '10 Disney Duelspellen',
-                title: "Hercules' Duel",
-                accentTitle: 'Arena',
+                title: "Hercules'",
+                accentTitle: 'Duel Arena',
                 description: 'Kies een solo-uitdaging of speel een realtime duel op je eigen telefoon.',
                 onBack: () => {
                   setSelectedPortalGame(null);
@@ -4884,8 +4884,8 @@ export default function App() {
                 image: 'portal/Lightning_mc_queen.png',
                 imageAlt: "McQueen's Road Race",
                 badge: 'Multiplayer Edition · Real-time',
-                title: "McQueen's Road",
-                accentTitle: 'Race',
+                title: "McQueen's",
+                accentTitle: 'Road Race',
                 description: 'Speel samen op je eigen telefoon tijdens de rit naar Disneyland Parijs!',
                 onBack: () => {
                   setSelectedPortalGame(null);
