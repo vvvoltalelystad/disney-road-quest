@@ -2986,34 +2986,78 @@ function createQwixxScores() {
 function isQwixxValueOpen(row, marks = [], value, lockedRows = []) {
   if (lockedRows.includes(row.id) || !row.values.includes(value) || marks.includes(value)) return false;
   const valueIndex = row.values.indexOf(value);
+  if (valueIndex === row.values.length - 1 && marks.length < 5) return false;
   const furthestIndex = marks.reduce((max, markedValue) => Math.max(max, row.values.indexOf(markedValue)), -1);
   return valueIndex > furthestIndex;
 }
 
-function getQwixxOptions(dice, marks, lockedRows) {
+function getQwixxWhiteOptions(dice, marks, lockedRows) {
   if (!dice) return [];
   const whiteSum = dice.white1 + dice.white2;
   const options = [];
 
   QWIXX_ROWS.forEach(row => {
     const rowMarks = marks?.[row.id] || [];
-    const candidates = [
-      { value: whiteSum, source: "witte som" },
-      { value: dice.white1 + dice[row.id], source: "wit + kleur" },
-      { value: dice.white2 + dice[row.id], source: "wit + kleur" }
-    ];
+    if (isQwixxValueOpen(row, rowMarks, whiteSum, lockedRows)) {
+      options.push({ key: `${row.id}-${whiteSum}`, rowId: row.id, value: whiteSum, source: "witte som" });
+    }
+  });
 
-    candidates.forEach(candidate => {
-      if (isQwixxValueOpen(row, rowMarks, candidate.value, lockedRows)) {
-        const key = `${row.id}-${candidate.value}`;
+  return options;
+}
+
+function getQwixxColorOptions(dice, marks, lockedRows) {
+  if (!dice) return [];
+  const options = [];
+
+  QWIXX_ROWS.forEach(row => {
+    const rowMarks = marks?.[row.id] || [];
+    [dice.white1 + dice[row.id], dice.white2 + dice[row.id]].forEach(value => {
+      if (isQwixxValueOpen(row, rowMarks, value, lockedRows)) {
+        const key = `${row.id}-${value}`;
         if (!options.some(option => option.key === key)) {
-          options.push({ key, rowId: row.id, value: candidate.value, source: candidate.source });
+          options.push({ key, rowId: row.id, value, source: "wit + kleur" });
         }
       }
     });
   });
 
   return options;
+}
+
+function addQwixxMark(allMarks, playerIndex, rowId, value) {
+  return allMarks.map((playerMarks, index) => {
+    if (index !== playerIndex) return playerMarks;
+    return {
+      ...playerMarks,
+      [rowId]: [...(playerMarks[rowId] || []), value]
+    };
+  });
+}
+
+function getQwixxNextLockedRows(lockedRows, row, previousMarks, value) {
+  const isFinalNumber = row.values.indexOf(value) === row.values.length - 1;
+  // A player needs five earlier crosses before the final box can lock a colour.
+  if (!isFinalNumber || previousMarks.length < 5 || lockedRows.includes(row.id)) return lockedRows;
+  return [...lockedRows, row.id];
+}
+
+function chooseQwixxAiOption(options, marks, aiLevel) {
+  if (!options.length) return null;
+  const scored = options.map(option => {
+    const row = QWIXX_ROWS.find(item => item.id === option.rowId);
+    const rowIndex = row.values.indexOf(option.value);
+    const canLock = rowIndex === row.values.length - 1 && (marks[row.id] || []).length >= 5;
+    return {
+      ...option,
+      row,
+      priority: rowIndex
+        + (canLock ? (aiLevel === 'hard' ? 12 : 7) : 0)
+        + (aiLevel === 'hard' && (marks[option.rowId] || []).length >= 4 ? 3 : 0)
+    };
+  });
+  if (aiLevel === 'easy') return scored[Math.floor(Math.random() * scored.length)];
+  return scored.sort((a, b) => b.priority - a.priority)[0];
 }
 
 function scoreQwixxMarks(count) {
@@ -3027,14 +3071,12 @@ function getQwixxPlayerTotal(marks = createQwixxMarks(), penalties = 0) {
 
 function isQwixxComplete(nextState) {
   return (nextState.qwixxLockedRows || []).length >= 2
-    || (nextState.qwixxPenalties || []).some(value => value >= 4)
-    || (nextState.qwixxRound || 1) > 16;
+    || (nextState.qwixxPenalties || []).some(value => value >= 4);
 }
 
 function getQwixxEndReason(nextState) {
   if ((nextState.qwixxLockedRows || []).length >= 2) return "Er zijn twee kleurrijen gesloten.";
   if ((nextState.qwixxPenalties || []).some(value => value >= 4)) return "Een speler heeft vier strafvakjes.";
-  if ((nextState.qwixxRound || 1) > 16) return "De ronde-limiet is bereikt.";
   return "";
 }
 
@@ -3055,6 +3097,9 @@ export function DisneyQwixxGame({ mode, room, localPlayer, players, updateRoomSt
   const rolled = Boolean(taskState.qwixxRolled);
   const round = taskState.qwixxRound || 1;
   const lockedRows = taskState.qwixxLockedRows || [];
+  const phase = taskState.qwixxPhase || (rolled ? 'white' : 'roll');
+  const whiteDone = Array.isArray(taskState.qwixxWhiteDone) ? taskState.qwixxWhiteDone : [false, false];
+  const activeMarked = Boolean(taskState.qwixxActiveMarked);
   const complete = Boolean(taskState.qwixxComplete);
   const endReason = taskState.qwixxEndReason || "";
   const myTurn = activeIndex === myIndex && !complete;
@@ -3072,6 +3117,9 @@ export function DisneyQwixxGame({ mode, room, localPlayer, players, updateRoomSt
           qwixxRolled: false,
           qwixxRound: 1,
           qwixxLockedRows: [],
+          qwixxPhase: 'roll',
+          qwixxWhiteDone: [false, false],
+          qwixxActiveMarked: false,
           qwixxComplete: false,
           qwixxLastMove: null
         }
@@ -3079,7 +3127,12 @@ export function DisneyQwixxGame({ mode, room, localPlayer, players, updateRoomSt
     }
   }, []);
 
-  const currentOptions = getQwixxOptions(dice, marks[activeIndex] || createQwixxMarks(), lockedRows);
+  const visibleMarks = marks[myIndex] || createQwixxMarks();
+  const whiteOptions = getQwixxWhiteOptions(dice, visibleMarks, lockedRows);
+  const colorOptions = getQwixxColorOptions(dice, visibleMarks, lockedRows);
+  const canChooseWhite = rolled && phase === 'white' && !whiteDone[myIndex] && !complete;
+  const canChooseColor = rolled && phase === 'color' && myTurn && !complete;
+  const currentOptions = phase === 'white' ? whiteOptions : colorOptions;
 
   const finishTurn = (nextMarks, nextPenalties, nextLockedRows, lastMove) => {
     const nextRound = activeIndex === 1 ? round + 1 : round;
@@ -3091,6 +3144,9 @@ export function DisneyQwixxGame({ mode, room, localPlayer, players, updateRoomSt
       qwixxRolled: false,
       qwixxRound: nextRound,
       qwixxLockedRows: nextLockedRows,
+      qwixxPhase: 'roll',
+      qwixxWhiteDone: [false, false],
+      qwixxActiveMarked: false,
       qwixxLastMove: lastMove
     };
     const nextComplete = isQwixxComplete(nextState);
@@ -3119,29 +3175,54 @@ export function DisneyQwixxGame({ mode, room, localPlayer, players, updateRoomSt
           blue: rollQwixxDie()
         },
         qwixxRolled: true,
+        qwixxPhase: 'white',
+        qwixxWhiteDone: [false, false],
+        qwixxActiveMarked: false,
         qwixxLastMove: null
       }
     });
   };
 
-  const handleMark = (rowId, value) => {
-    if (!myTurn || !rolled || complete) return;
+  const updateWhiteChoice = (rowId, value) => {
+    if (!canChooseWhite) return;
+    const option = value === undefined
+      ? null
+      : whiteOptions.find(item => item.rowId === rowId && item.value === value);
+    if (value !== undefined && !option) return;
+
+    const row = option ? QWIXX_ROWS.find(item => item.id === rowId) : null;
+    const nextMarks = option ? addQwixxMark(marks, myIndex, rowId, value) : marks;
+    const nextLockedRows = option
+      ? getQwixxNextLockedRows(lockedRows, row, visibleMarks[rowId] || [], value)
+      : lockedRows;
+    const nextWhiteDone = whiteDone.map((done, index) => index === myIndex ? true : done);
+    const nextPhase = nextWhiteDone.every(Boolean) ? 'color' : 'white';
+    const nextActiveMarked = activeMarked || (myIndex === activeIndex && Boolean(option));
+    const actionText = option
+      ? `${playerNames[myIndex]} streepte witte som ${dice.white1 + dice.white2} af in ${row.name}.`
+      : `${playerNames[myIndex]} sloeg de witte som over.`;
+
+    updateRoomState(room.id, {
+      current_task_state: {
+        ...taskState,
+        qwixxMarks: nextMarks,
+        qwixxLockedRows: nextLockedRows,
+        qwixxWhiteDone: nextWhiteDone,
+        qwixxActiveMarked: nextActiveMarked,
+        qwixxPhase: nextPhase,
+        qwixxLastMove: actionText
+      }
+    });
+  };
+
+  const handleColorMark = (rowId, value) => {
+    if (!canChooseColor) return;
     const row = QWIXX_ROWS.find(item => item.id === rowId);
-    const option = currentOptions.find(item => item.rowId === rowId && item.value === value);
+    const option = colorOptions.find(item => item.rowId === rowId && item.value === value);
     if (!row || !option) return;
 
-    const nextMarks = marks.map((playerMarks, index) => {
-      if (index !== activeIndex) return playerMarks;
-      return {
-        ...playerMarks,
-        [rowId]: [...(playerMarks[rowId] || []), value]
-      };
-    });
-    const rowMarksCount = nextMarks[activeIndex][rowId].length;
-    const isLastValue = row.values.indexOf(value) === row.values.length - 1;
-    const nextLockedRows = isLastValue && rowMarksCount >= 5 && !lockedRows.includes(rowId)
-      ? [...lockedRows, rowId]
-      : lockedRows;
+    const nextMarks = addQwixxMark(marks, activeIndex, rowId, value);
+    const nextLockedRows = getQwixxNextLockedRows(lockedRows, row, visibleMarks[rowId] || [], value);
 
     finishTurn(
       nextMarks,
@@ -3151,22 +3232,28 @@ export function DisneyQwixxGame({ mode, room, localPlayer, players, updateRoomSt
     );
   };
 
-  const handlePass = () => {
-    if (!myTurn || !rolled || complete) return;
-    const nextPenalties = penalties.map((value, index) => index === activeIndex ? value + 1 : value);
+  const handleColorSkip = () => {
+    if (!canChooseColor) return;
+    const nextPenalties = penalties.map((value, index) => index === activeIndex && !activeMarked ? value + 1 : value);
     finishTurn(
       marks,
       nextPenalties,
       lockedRows,
-      `${playerNames[activeIndex]} paste en kreeg een strafvakje.`
+      activeMarked
+        ? `${playerNames[activeIndex]} sloeg actie 2 over.`
+        : `${playerNames[activeIndex]} streepte niets af en kreeg een strafvakje.`
     );
   };
 
   useEffect(() => {
-    if (!isSolo || activeIndex !== 1 || complete || !taskState.qwixxMarks) return;
+    if (!isSolo || complete || !taskState.qwixxMarks) return;
 
-    const aiKey = `${round}-${rolled}-${JSON.stringify(dice)}-${JSON.stringify(marks[1])}-${penalties[1]}`;
+    const aiIndex = 1;
+    const aiKey = `${activeIndex}-${phase}-${rolled}-${JSON.stringify(dice)}-${JSON.stringify(marks[aiIndex])}-${JSON.stringify(whiteDone)}-${activeMarked}`;
     if (aiTurnRef.current === aiKey) return;
+    if (!rolled && activeIndex !== aiIndex) return;
+    if (rolled && phase === 'white' && whiteDone[aiIndex]) return;
+    if (rolled && phase === 'color' && activeIndex !== aiIndex) return;
     aiTurnRef.current = aiKey;
 
     const timer = setTimeout(() => {
@@ -3183,57 +3270,64 @@ export function DisneyQwixxGame({ mode, room, localPlayer, players, updateRoomSt
               blue: rollQwixxDie()
             },
             qwixxRolled: true,
+            qwixxPhase: 'white',
+            qwixxWhiteDone: [false, false],
+            qwixxActiveMarked: false,
             qwixxLastMove: "Computer gooit de dobbelstenen."
           }
         });
         return;
       }
 
-      const aiOptions = getQwixxOptions(dice, marks[1] || createQwixxMarks(), lockedRows);
-      const scoredAiOptions = aiOptions
-        .map(option => {
-          const row = QWIXX_ROWS.find(item => item.id === option.rowId);
-          return {
-            ...option,
-            row,
-            priority: row.values.indexOf(option.value)
-              + (row.values.indexOf(option.value) === row.values.length - 1 ? (aiLevel === 'hard' ? 8 : 4) : 0)
-              + (aiLevel === 'hard' && (marks[1]?.[option.rowId] || []).length >= 4 ? 3 : 0)
-          };
+      const aiMarks = marks[aiIndex] || createQwixxMarks();
+      if (phase === 'white') {
+        const bestOption = chooseQwixxAiOption(getQwixxWhiteOptions(dice, aiMarks, lockedRows), aiMarks, aiLevel);
+        const row = bestOption ? QWIXX_ROWS.find(item => item.id === bestOption.rowId) : null;
+        const nextMarks = bestOption ? addQwixxMark(marks, aiIndex, bestOption.rowId, bestOption.value) : marks;
+        const nextLockedRows = bestOption
+          ? getQwixxNextLockedRows(lockedRows, row, aiMarks[bestOption.rowId] || [], bestOption.value)
+          : lockedRows;
+        const nextWhiteDone = whiteDone.map((done, index) => index === aiIndex ? true : done);
+        updateRoomState(room.id, {
+          current_task_state: {
+            ...taskState,
+            qwixxMarks: nextMarks,
+            qwixxLockedRows: nextLockedRows,
+            qwixxWhiteDone: nextWhiteDone,
+            qwixxActiveMarked: activeMarked || (activeIndex === aiIndex && Boolean(bestOption)),
+            qwixxPhase: nextWhiteDone.every(Boolean) ? 'color' : 'white',
+            qwixxLastMove: bestOption
+              ? `Computer streepte witte som ${dice.white1 + dice.white2} af in ${row.name}.`
+              : "Computer sloeg de witte som over."
+          }
         });
-      const bestOption = aiLevel === 'easy'
-        ? scoredAiOptions[Math.floor(Math.random() * scoredAiOptions.length)]
-        : scoredAiOptions.sort((a, b) => b.priority - a.priority)[0];
-
-      if (!bestOption) {
-        const nextPenalties = penalties.map((value, index) => index === 1 ? value + 1 : value);
-        finishTurn(marks, nextPenalties, lockedRows, "Computer paste en kreeg een strafvakje.");
         return;
       }
 
-      const nextMarks = marks.map((playerMarks, index) => {
-        if (index !== 1) return playerMarks;
-        return {
-          ...playerMarks,
-          [bestOption.rowId]: [...(playerMarks[bestOption.rowId] || []), bestOption.value]
-        };
-      });
-      const rowMarksCount = nextMarks[1][bestOption.rowId].length;
-      const isLastValue = bestOption.row.values.indexOf(bestOption.value) === bestOption.row.values.length - 1;
-      const nextLockedRows = isLastValue && rowMarksCount >= 5 && !lockedRows.includes(bestOption.rowId)
-        ? [...lockedRows, bestOption.rowId]
-        : lockedRows;
+      const bestOption = chooseQwixxAiOption(getQwixxColorOptions(dice, aiMarks, lockedRows), aiMarks, aiLevel);
+      if (!bestOption) {
+        const nextPenalties = penalties.map((value, index) => index === aiIndex && !activeMarked ? value + 1 : value);
+        finishTurn(
+          marks,
+          nextPenalties,
+          lockedRows,
+          activeMarked ? "Computer sloeg actie 2 over." : "Computer streepte niets af en kreeg een strafvakje."
+        );
+        return;
+      }
 
-      finishTurn(
-        nextMarks,
-        penalties,
-        nextLockedRows,
-        `Computer streepte ${bestOption.value} af in ${bestOption.row.name}.`
+      const nextMarks = addQwixxMark(marks, aiIndex, bestOption.rowId, bestOption.value);
+      const nextLockedRows = getQwixxNextLockedRows(
+        lockedRows,
+        bestOption.row,
+        aiMarks[bestOption.rowId] || [],
+        bestOption.value
       );
+      finishTurn(nextMarks, penalties, nextLockedRows, `Computer streepte ${bestOption.value} af in ${bestOption.row.name}.`);
     }, rolled ? 850 : 650);
 
     return () => clearTimeout(timer);
-  }, [isSolo, activeIndex, complete, rolled, dice, round, taskState.qwixxMarks]);
+  }, [isSolo, activeIndex, complete, rolled, phase, dice, round, taskState.qwixxMarks, taskState.qwixxWhiteDone, activeMarked]);
 
   const handleFinish = () => {
     const myTotal = getQwixxPlayerTotal(marks[myIndex] || marks[0], penalties[myIndex] || 0);
@@ -3286,11 +3380,23 @@ export function DisneyQwixxGame({ mode, room, localPlayer, players, updateRoomSt
               {endReason && <span style={{ display: 'block', marginTop: '3px' }}>Einde spel: {endReason}</span>}
             </span>
           )
-          : activeIndex === 1 && isSolo
-            ? "Computer speelt..."
-            : myTurn
-              ? rolled ? "Kies een geldig vakje of pas." : "Jouw beurt: gooi de dobbelstenen."
-              : `Wachten op ${playerNames[activeIndex]}...`}
+          : !rolled
+            ? myTurn
+              ? "Jouw beurt: gooi de dobbelstenen."
+              : activeIndex === 1 && isSolo
+                ? "Computer gooit de dobbelstenen..."
+                : `Wachten op ${playerNames[activeIndex]}...`
+            : phase === 'white'
+              ? canChooseWhite
+                ? `Actie 1: kies de witte som ${dice.white1 + dice.white2} of sla hem over.`
+                : whiteDone[myIndex]
+                  ? "Jouw keuze voor de witte som staat vast."
+                  : "Wachten op de witte-somkeuze van de andere speler."
+              : canChooseColor
+                ? "Actie 2: kies wit + kleur, of sla deze actie over."
+                : activeIndex === 1 && isSolo
+                  ? "Computer speelt actie 2..."
+                  : `Wachten op ${playerNames[activeIndex]}...`}
         {taskState.qwixxLastMove && (
           <div style={{ marginTop: '4px' }}>{taskState.qwixxLastMove}</div>
         )}
@@ -3326,20 +3432,25 @@ export function DisneyQwixxGame({ mode, room, localPlayer, players, updateRoomSt
         ))}
       </div>
 
-      <div style={{ display: 'grid', gridTemplateColumns: rolled ? '1fr 1fr' : '1fr', gap: '8px', marginBottom: '12px' }}>
+      <div style={{ display: 'grid', gridTemplateColumns: rolled && (canChooseWhite || canChooseColor) ? '1fr 1fr' : '1fr', gap: '8px', marginBottom: '12px' }}>
         <button className="btn primary full" onClick={handleRoll} disabled={!myTurn || rolled || complete}>
           Gooi dobbelstenen
         </button>
-        {rolled && (
-          <button className="btn secondary full" onClick={handlePass} disabled={!myTurn || complete}>
-            Pas (-5)
+        {canChooseWhite && (
+          <button className="btn secondary full" onClick={() => updateWhiteChoice()}>
+            Witte som overslaan
+          </button>
+        )}
+        {canChooseColor && (
+          <button className="btn secondary full" onClick={handleColorSkip}>
+            {activeMarked ? 'Actie 2 overslaan' : 'Actie 2 overslaan (-5)'}
           </button>
         )}
       </div>
 
       <div style={{ display: 'grid', gap: '8px' }}>
         {QWIXX_ROWS.map(row => {
-          const rowMarks = marks[activeIndex]?.[row.id] || [];
+          const rowMarks = visibleMarks[row.id] || [];
           const rowLocked = lockedRows.includes(row.id);
           return (
             <div key={row.id} style={{ background: '#07152c', border: '1px solid var(--line)', borderRadius: '12px', padding: '8px' }}>
@@ -3353,21 +3464,22 @@ export function DisneyQwixxGame({ mode, room, localPlayer, players, updateRoomSt
                 {row.values.map(value => {
                   const marked = rowMarks.includes(value);
                   const playable = currentOptions.some(option => option.rowId === row.id && option.value === value);
+                  const canMark = playable && (canChooseWhite || canChooseColor);
                   return (
                     <button
                       key={value}
                       type="button"
                       className="btn mini"
-                      disabled={!myTurn || !rolled || complete || !playable}
-                      onClick={() => handleMark(row.id, value)}
+                      disabled={!canMark}
+                      onClick={() => phase === 'white' ? updateWhiteChoice(row.id, value) : handleColorMark(row.id, value)}
                       style={{
                         minWidth: 0,
                         padding: '7px 0',
                         borderRadius: '8px',
-                        background: marked ? row.color : playable ? '#12345f' : '#061225',
-                        border: playable ? `1px solid ${row.color}` : '1px solid var(--line)',
+                        background: marked ? row.color : canMark ? '#12345f' : '#061225',
+                        border: canMark ? `1px solid ${row.color}` : '1px solid var(--line)',
                         color: marked ? (row.id === 'yellow' ? '#07152c' : '#fff') : '#fff',
-                        opacity: marked ? 1 : playable ? 1 : 0.58,
+                        opacity: marked ? 1 : canMark ? 1 : 0.58,
                         fontSize: '11px',
                         fontWeight: 900
                       }}
@@ -4306,13 +4418,16 @@ const MINI_GAME_RULES = {
     intro: "Origineel: Qwixx. Streep getallen af in gekleurde Disney-rijen en pak zoveel mogelijk punten.",
     rules: [
       "Gooi twee witte en vier gekleurde dobbelstenen.",
+      "Actie 1: alle spelers mogen precies een vakje met de som van de twee witte dobbelstenen afstrepen, of overslaan.",
+      "Actie 2: alleen de actieve speler mag een witte en een gekleurde dobbelsteen combineren en nog een vakje afstrepen.",
       "Je mag alleen getallen afstrepen die verder naar rechts staan dan je eerdere kruisjes in die rij.",
       "De rode en gele rij lopen van 2 naar 12; de groene en blauwe rij lopen van 12 naar 2.",
-      "Een beurt eindigt nadat je een geldig vakje kiest of past.",
-      "Passen levert een strafvakje op van min vijf punten."
+      "Sluit een kleur alleen met het laatste getal wanneer je daarvoor al minstens vijf kruisjes in die rij hebt.",
+      "Alleen de actieve speler krijgt een strafvakje van min vijf als die in beide acties niets afstreept.",
+      "Het spel eindigt direct bij twee gesloten kleuren of vier strafvakjes; elke rij met n kruisjes is n x (n + 1) / 2 punten waard."
     ],
-    solo: "Solo: jij speelt tegen de computer. De computer kiest automatisch een geldig vakje of past.",
-    duel: "Duel: spelers gooien om de beurt. De gedeelde scorekaart wordt realtime bijgewerkt."
+    solo: "Solo: jij en de computer kiezen allebei bij de witte som; alleen de actieve speler krijgt daarna de kleuractie.",
+    duel: "Duel: beide scorebladen worden realtime bijgewerkt. Bij de witte som kiest ieder op het eigen scherm."
   },
   tictactinker: {
     title: "Tic Tac Tinker Bell",
