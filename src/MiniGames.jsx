@@ -2801,7 +2801,7 @@ export function DisneyYahtzeeGame({ mode, room, localPlayer, players, updateRoom
     const otherTotal = getYahtzeeTotal(scores[otherIndex] || {});
     const won = myTotal > otherTotal;
     const tie = myTotal === otherTotal;
-    const points = won ? 3 : tie ? 2 : 1;
+    const points = won ? 2 : tie ? 1 : 0;
     const detail = won
       ? `Goofy's Geluksworp gewonnen: ${myTotal}-${otherTotal}`
       : tie
@@ -3562,8 +3562,8 @@ export function DisneyQwixxGame({ mode, room, localPlayer, players, updateRoomSt
     ? "Gelijkspel"
     : `${playerNames[totals[0] > totals[1] ? 0 : 1]} wint!`;
   const projectedStars = totals[0] === totals[1]
-    ? [2, 2]
-    : totals[0] > totals[1] ? [3, 1] : [1, 3];
+    ? [1, 1]
+    : totals[0] > totals[1] ? [2, 0] : [0, 2];
   const opponentActions = actionLog.filter(action => action.playerIndex !== myIndex).slice(-2);
   const visibleRecentMarks = actionLog
     .filter(action => action.kind === 'mark' && action.playerIndex === viewedPlayerIndex)

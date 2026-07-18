@@ -5235,8 +5235,8 @@ export default function App() {
                                   showRules={!isTinkerGame}
                                   onToolbarChange={isTinkerGame || t.gameId === 'qwixx' ? setArenaToolbar : undefined}
                                   onFinish={async (score, detail) => {
-                                    const isScoreBased = t.gameId === 'ricochet';
-                                    const coinsEarned = isScoreBased ? score : (score === 3 ? 2 : (score === 2 ? 1 : 0));
+                                    const usesDirectReward = t.gameId === 'ricochet' || t.gameId === 'qwixx';
+                                    const coinsEarned = usesDirectReward ? score : (score === 3 ? 2 : (score === 2 ? 1 : 0));
                                     const gameTitle = {
                                       othello: "Othello",
                                       dotsboxes: "Rapunzel's Torenkamers",
