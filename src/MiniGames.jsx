@@ -3042,6 +3042,19 @@ function getQwixxNextLockedRows(lockedRows, row, previousMarks, value) {
   return [...lockedRows, row.id];
 }
 
+function getQwixxNextClosedBy(closedBy, previousLockedRows, nextLockedRows, rowId, playerIndex) {
+  if (previousLockedRows.includes(rowId) || !nextLockedRows.includes(rowId)) return closedBy;
+  return { ...closedBy, [rowId]: playerIndex };
+}
+
+function appendQwixxAction(actionLog, action) {
+  if (!action?.text) return Array.isArray(actionLog) ? actionLog.slice(-8) : [];
+  return [...(Array.isArray(actionLog) ? actionLog : []), {
+    id: `${Date.now()}-${action.playerIndex ?? 'game'}-${action.rowId || 'none'}-${action.value ?? 'none'}`,
+    ...action
+  }].slice(-8);
+}
+
 function chooseQwixxAiOption(options, marks, aiLevel) {
   if (!options.length) return null;
   const scored = options.map(option => {
@@ -3064,8 +3077,11 @@ function scoreQwixxMarks(count) {
   return (count * (count + 1)) / 2;
 }
 
-function getQwixxPlayerTotal(marks = createQwixxMarks(), penalties = 0) {
-  const rowScore = QWIXX_ROWS.reduce((sum, row) => sum + scoreQwixxMarks((marks[row.id] || []).length), 0);
+function getQwixxPlayerTotal(marks = createQwixxMarks(), penalties = 0, closedBy = {}, playerIndex = -1) {
+  const rowScore = QWIXX_ROWS.reduce((sum, row) => {
+    const lockBonus = closedBy[row.id] === playerIndex ? 1 : 0;
+    return sum + scoreQwixxMarks((marks[row.id] || []).length + lockBonus);
+  }, 0);
   return rowScore - penalties * 5;
 }
 
@@ -3102,8 +3118,13 @@ export function DisneyQwixxGame({ mode, room, localPlayer, players, updateRoomSt
   const activeMarked = Boolean(taskState.qwixxActiveMarked);
   const complete = Boolean(taskState.qwixxComplete);
   const endReason = taskState.qwixxEndReason || "";
+  const closedBy = taskState.qwixxClosedBy || {};
+  const actionLog = Array.isArray(taskState.qwixxActionLog) ? taskState.qwixxActionLog : [];
   const myTurn = activeIndex === myIndex && !complete;
   const aiTurnRef = useRef("");
+  const [viewedPlayerIndex, setViewedPlayerIndex] = useState(myIndex);
+  const [boardZoom, setBoardZoom] = useState(1);
+  const playerColors = ['#5bbcff', '#ff7b8b'];
 
   useEffect(() => {
     if (!taskState.qwixxMarks) {
@@ -3121,20 +3142,23 @@ export function DisneyQwixxGame({ mode, room, localPlayer, players, updateRoomSt
           qwixxWhiteDone: [false, false],
           qwixxActiveMarked: false,
           qwixxComplete: false,
+          qwixxClosedBy: {},
+          qwixxActionLog: [],
           qwixxLastMove: null
         }
       });
     }
   }, []);
 
-  const visibleMarks = marks[myIndex] || createQwixxMarks();
-  const whiteOptions = getQwixxWhiteOptions(dice, visibleMarks, lockedRows);
-  const colorOptions = getQwixxColorOptions(dice, visibleMarks, lockedRows);
+  const myMarks = marks[myIndex] || createQwixxMarks();
+  const visibleMarks = marks[viewedPlayerIndex] || createQwixxMarks();
+  const whiteOptions = getQwixxWhiteOptions(dice, myMarks, lockedRows);
+  const colorOptions = getQwixxColorOptions(dice, myMarks, lockedRows);
   const canChooseWhite = rolled && phase === 'white' && !whiteDone[myIndex] && !complete;
   const canChooseColor = rolled && phase === 'color' && myTurn && !complete;
   const currentOptions = phase === 'white' ? whiteOptions : colorOptions;
 
-  const finishTurn = (nextMarks, nextPenalties, nextLockedRows, lastMove) => {
+  const finishTurn = (nextMarks, nextPenalties, nextLockedRows, action, nextClosedBy = closedBy) => {
     const nextRound = activeIndex === 1 ? round + 1 : round;
     const nextState = {
       ...taskState,
@@ -3147,7 +3171,9 @@ export function DisneyQwixxGame({ mode, room, localPlayer, players, updateRoomSt
       qwixxPhase: 'roll',
       qwixxWhiteDone: [false, false],
       qwixxActiveMarked: false,
-      qwixxLastMove: lastMove
+      qwixxClosedBy: nextClosedBy,
+      qwixxActionLog: appendQwixxAction(actionLog, action),
+      qwixxLastMove: action?.text || null
     };
     const nextComplete = isQwixxComplete(nextState);
 
@@ -3193,8 +3219,11 @@ export function DisneyQwixxGame({ mode, room, localPlayer, players, updateRoomSt
     const row = option ? QWIXX_ROWS.find(item => item.id === rowId) : null;
     const nextMarks = option ? addQwixxMark(marks, myIndex, rowId, value) : marks;
     const nextLockedRows = option
-      ? getQwixxNextLockedRows(lockedRows, row, visibleMarks[rowId] || [], value)
+      ? getQwixxNextLockedRows(lockedRows, row, myMarks[rowId] || [], value)
       : lockedRows;
+    const nextClosedBy = option
+      ? getQwixxNextClosedBy(closedBy, lockedRows, nextLockedRows, rowId, myIndex)
+      : closedBy;
     const nextWhiteDone = whiteDone.map((done, index) => index === myIndex ? true : done);
     const nextPhase = nextWhiteDone.every(Boolean) ? 'color' : 'white';
     const nextActiveMarked = activeMarked || (myIndex === activeIndex && Boolean(option));
@@ -3210,6 +3239,14 @@ export function DisneyQwixxGame({ mode, room, localPlayer, players, updateRoomSt
         qwixxWhiteDone: nextWhiteDone,
         qwixxActiveMarked: nextActiveMarked,
         qwixxPhase: nextPhase,
+        qwixxClosedBy: nextClosedBy,
+        qwixxActionLog: appendQwixxAction(actionLog, {
+          text: actionText,
+          playerIndex: myIndex,
+          rowId: option ? rowId : null,
+          value: option ? value : null,
+          kind: option ? 'mark' : 'skip'
+        }),
         qwixxLastMove: actionText
       }
     });
@@ -3222,13 +3259,16 @@ export function DisneyQwixxGame({ mode, room, localPlayer, players, updateRoomSt
     if (!row || !option) return;
 
     const nextMarks = addQwixxMark(marks, activeIndex, rowId, value);
-    const nextLockedRows = getQwixxNextLockedRows(lockedRows, row, visibleMarks[rowId] || [], value);
+    const nextLockedRows = getQwixxNextLockedRows(lockedRows, row, myMarks[rowId] || [], value);
+    const nextClosedBy = getQwixxNextClosedBy(closedBy, lockedRows, nextLockedRows, rowId, activeIndex);
+    const actionText = `${playerNames[activeIndex]} streepte ${value} af in ${row.name}.`;
 
     finishTurn(
       nextMarks,
       penalties,
       nextLockedRows,
-      `${playerNames[activeIndex]} streepte ${value} af in ${row.name}.`
+      { text: actionText, playerIndex: activeIndex, rowId, value, kind: 'mark' },
+      nextClosedBy
     );
   };
 
@@ -3239,9 +3279,13 @@ export function DisneyQwixxGame({ mode, room, localPlayer, players, updateRoomSt
       marks,
       nextPenalties,
       lockedRows,
-      activeMarked
-        ? `${playerNames[activeIndex]} sloeg actie 2 over.`
-        : `${playerNames[activeIndex]} streepte niets af en kreeg een strafvakje.`
+      {
+        text: activeMarked
+          ? `${playerNames[activeIndex]} sloeg actie 2 over.`
+          : `${playerNames[activeIndex]} streepte niets af en kreeg een strafvakje.`,
+        playerIndex: activeIndex,
+        kind: activeMarked ? 'skip' : 'penalty'
+      }
     );
   };
 
@@ -3287,7 +3331,13 @@ export function DisneyQwixxGame({ mode, room, localPlayer, players, updateRoomSt
         const nextLockedRows = bestOption
           ? getQwixxNextLockedRows(lockedRows, row, aiMarks[bestOption.rowId] || [], bestOption.value)
           : lockedRows;
+        const nextClosedBy = bestOption
+          ? getQwixxNextClosedBy(closedBy, lockedRows, nextLockedRows, bestOption.rowId, aiIndex)
+          : closedBy;
         const nextWhiteDone = whiteDone.map((done, index) => index === aiIndex ? true : done);
+        const actionText = bestOption
+          ? `Computer streepte witte som ${dice.white1 + dice.white2} af in ${row.name}.`
+          : "Computer sloeg de witte som over.";
         updateRoomState(room.id, {
           current_task_state: {
             ...taskState,
@@ -3296,9 +3346,15 @@ export function DisneyQwixxGame({ mode, room, localPlayer, players, updateRoomSt
             qwixxWhiteDone: nextWhiteDone,
             qwixxActiveMarked: activeMarked || (activeIndex === aiIndex && Boolean(bestOption)),
             qwixxPhase: nextWhiteDone.every(Boolean) ? 'color' : 'white',
-            qwixxLastMove: bestOption
-              ? `Computer streepte witte som ${dice.white1 + dice.white2} af in ${row.name}.`
-              : "Computer sloeg de witte som over."
+            qwixxClosedBy: nextClosedBy,
+            qwixxActionLog: appendQwixxAction(actionLog, {
+              text: actionText,
+              playerIndex: aiIndex,
+              rowId: bestOption?.rowId || null,
+              value: bestOption?.value ?? null,
+              kind: bestOption ? 'mark' : 'skip'
+            }),
+            qwixxLastMove: actionText
           }
         });
         return;
@@ -3311,7 +3367,11 @@ export function DisneyQwixxGame({ mode, room, localPlayer, players, updateRoomSt
           marks,
           nextPenalties,
           lockedRows,
-          activeMarked ? "Computer sloeg actie 2 over." : "Computer streepte niets af en kreeg een strafvakje."
+          {
+            text: activeMarked ? "Computer sloeg actie 2 over." : "Computer streepte niets af en kreeg een strafvakje.",
+            playerIndex: aiIndex,
+            kind: activeMarked ? 'skip' : 'penalty'
+          }
         );
         return;
       }
@@ -3323,16 +3383,29 @@ export function DisneyQwixxGame({ mode, room, localPlayer, players, updateRoomSt
         aiMarks[bestOption.rowId] || [],
         bestOption.value
       );
-      finishTurn(nextMarks, penalties, nextLockedRows, `Computer streepte ${bestOption.value} af in ${bestOption.row.name}.`);
+      const nextClosedBy = getQwixxNextClosedBy(closedBy, lockedRows, nextLockedRows, bestOption.rowId, aiIndex);
+      finishTurn(
+        nextMarks,
+        penalties,
+        nextLockedRows,
+        {
+          text: `Computer streepte ${bestOption.value} af in ${bestOption.row.name}.`,
+          playerIndex: aiIndex,
+          rowId: bestOption.rowId,
+          value: bestOption.value,
+          kind: 'mark'
+        },
+        nextClosedBy
+      );
     }, rolled ? 850 : 650);
 
     return () => clearTimeout(timer);
-  }, [isSolo, activeIndex, complete, rolled, phase, dice, round, taskState.qwixxMarks, taskState.qwixxWhiteDone, activeMarked]);
+  }, [isSolo, activeIndex, complete, rolled, phase, dice, round, taskState.qwixxMarks, taskState.qwixxWhiteDone, activeMarked, closedBy, actionLog]);
 
   const handleFinish = () => {
-    const myTotal = getQwixxPlayerTotal(marks[myIndex] || marks[0], penalties[myIndex] || 0);
+    const myTotal = getQwixxPlayerTotal(marks[myIndex] || marks[0], penalties[myIndex] || 0, closedBy, myIndex);
     const otherIndex = myIndex === 0 ? 1 : 0;
-    const otherTotal = getQwixxPlayerTotal(marks[otherIndex] || {}, penalties[otherIndex] || 0);
+    const otherTotal = getQwixxPlayerTotal(marks[otherIndex] || {}, penalties[otherIndex] || 0, closedBy, otherIndex);
     const won = myTotal > otherTotal;
     const tie = myTotal === otherTotal;
     const points = won ? 3 : tie ? 2 : 1;
@@ -3345,32 +3418,52 @@ export function DisneyQwixxGame({ mode, room, localPlayer, players, updateRoomSt
   };
 
   const totals = [
-    getQwixxPlayerTotal(marks[0], penalties[0]),
-    getQwixxPlayerTotal(marks[1], penalties[1])
+    getQwixxPlayerTotal(marks[0], penalties[0], closedBy, 0),
+    getQwixxPlayerTotal(marks[1], penalties[1], closedBy, 1)
   ];
   const winnerText = totals[0] === totals[1]
     ? "Gelijkspel"
     : `${playerNames[totals[0] > totals[1] ? 0 : 1]} wint!`;
+  const opponentActions = actionLog.filter(action => action.playerIndex !== myIndex).slice(-2);
+  const visibleRecentMarks = actionLog
+    .filter(action => action.kind === 'mark' && action.playerIndex === viewedPlayerIndex)
+    .slice(-2);
 
   return (
     <div className="qwixx-game" style={{ textAlign: 'center' }}>
       <div className="qwixx-scoreboard" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px', marginBottom: '12px' }}>
         {[0, 1].map(index => (
-          <div
+          <button
             key={index}
+            type="button"
             className="qwixx-player-score"
+            aria-pressed={viewedPlayerIndex === index}
+            onClick={() => setViewedPlayerIndex(index)}
             style={{
               padding: '10px',
               borderRadius: '12px',
               background: activeIndex === index && !complete ? '#10264c' : '#07152c',
-              border: activeIndex === index && !complete ? '2px solid var(--gold)' : '1px solid var(--line)'
+              border: viewedPlayerIndex === index ? `2px solid ${playerColors[index]}` : '1px solid var(--line)',
+              boxShadow: viewedPlayerIndex === index ? `0 0 0 2px ${playerColors[index]}33` : 'none',
+              color: '#fff'
             }}
           >
-            <div style={{ fontWeight: 800, fontSize: '13px', color: index === 0 ? '#5bbcff' : '#ff5b5b' }}>{playerNames[index]}</div>
+            <div style={{ fontWeight: 800, fontSize: '13px', color: playerColors[index] }}>{playerNames[index]}</div>
             <div style={{ fontSize: '24px', fontWeight: 900 }}>{totals[index]}</div>
-            <div style={{ fontSize: '11px', color: 'var(--muted)' }}>Straf: {penalties[index] || 0}/4</div>
-          </div>
+            <div style={{ fontSize: '11px', color: viewedPlayerIndex === index ? playerColors[index] : 'var(--muted)' }}>
+              Straf: {penalties[index] || 0}/4 {viewedPlayerIndex === index ? '· in beeld' : ''}
+            </div>
+          </button>
         ))}
+      </div>
+
+      <div className="qwixx-viewbar" style={{ borderColor: playerColors[viewedPlayerIndex] }}>
+        <strong style={{ color: playerColors[viewedPlayerIndex] }}>Kaart van {playerNames[viewedPlayerIndex]}</strong>
+        <div className="qwixx-zoom-controls" aria-label="Zoom scorekaart">
+          <button type="button" onClick={() => setBoardZoom(value => Math.max(1, +(value - 0.15).toFixed(2)))} disabled={boardZoom <= 1} aria-label="Scorekaart verkleinen">A−</button>
+          <span>{Math.round(boardZoom * 100)}%</span>
+          <button type="button" onClick={() => setBoardZoom(value => Math.min(1.6, +(value + 0.15).toFixed(2)))} disabled={boardZoom >= 1.6} aria-label="Scorekaart vergroten">A+</button>
+        </div>
       </div>
 
       <div className="qwixx-status" style={{ margin: '8px 0 12px', minHeight: '22px', color: 'var(--muted)', fontSize: '13px' }}>
@@ -3398,9 +3491,20 @@ export function DisneyQwixxGame({ mode, room, localPlayer, players, updateRoomSt
                 : activeIndex === 1 && isSolo
                   ? "Computer speelt actie 2..."
                   : `Wachten op ${playerNames[activeIndex]}...`}
-        {taskState.qwixxLastMove && (
-          <div style={{ marginTop: '4px' }}>{taskState.qwixxLastMove}</div>
-        )}
+      </div>
+
+      <div className="qwixx-action-log" aria-live="polite">
+        <strong>Laatste acties tegenstander</strong>
+        {opponentActions.length ? (
+          <ol>
+            {[...opponentActions].reverse().map(action => (
+              <li key={action.id}>
+                <span style={{ background: playerColors[action.playerIndex] || 'var(--gold)' }} />
+                {action.text}
+              </li>
+            ))}
+          </ol>
+        ) : <p>Nog geen acties van de tegenstander.</p>}
       </div>
 
       <div className="qwixx-dice" style={{ display: 'grid', gridTemplateColumns: 'repeat(6, 1fr)', gap: '6px', margin: '0 auto 12px', maxWidth: '360px' }}>
@@ -3450,28 +3554,35 @@ export function DisneyQwixxGame({ mode, room, localPlayer, players, updateRoomSt
         )}
       </div>
 
-      <div className="qwixx-board" style={{ display: 'grid', gap: '8px' }}>
+      <div className="qwixx-board-viewport">
+      <div className="qwixx-board" style={{ display: 'grid', gap: '8px', zoom: boardZoom }}>
         {QWIXX_ROWS.map(row => {
           const rowMarks = visibleMarks[row.id] || [];
           const rowLocked = lockedRows.includes(row.id);
+          const hasLockBonus = closedBy[row.id] === viewedPlayerIndex;
+          const rowPoints = scoreQwixxMarks(rowMarks.length + (hasLockBonus ? 1 : 0));
           return (
             <div key={row.id} className="qwixx-row" style={{ background: '#07152c', border: '1px solid var(--line)', borderRadius: '12px', padding: '8px' }}>
               <div className="qwixx-row-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '6px' }}>
                 <strong style={{ color: row.color, fontSize: '13px' }}>{row.name}</strong>
                 <span style={{ color: 'var(--muted)', fontSize: '11px' }}>
-                  {rowMarks.length} kruisjes {rowLocked ? "· gesloten" : ""}
+                  {rowMarks.length + (hasLockBonus ? 1 : 0)} kruisjes · {rowPoints} punten {rowLocked ? "· gesloten" : ""}
                 </span>
               </div>
-              <div className="qwixx-row-cells" style={{ display: 'grid', gridTemplateColumns: 'repeat(11, 1fr)', gap: '4px' }}>
+              <div className="qwixx-row-cells" style={{ display: 'grid', gridTemplateColumns: 'repeat(12, 1fr)', gap: '4px' }}>
                 {row.values.map(value => {
                   const marked = rowMarks.includes(value);
                   const playable = currentOptions.some(option => option.rowId === row.id && option.value === value);
-                  const canMark = playable && (canChooseWhite || canChooseColor);
+                  const canMark = viewedPlayerIndex === myIndex && playable && (canChooseWhite || canChooseColor);
+                  const recentIndex = [...visibleRecentMarks].reverse().findIndex(action => (
+                    action.rowId === row.id && action.value === value
+                  ));
+                  const recentClass = recentIndex === 0 ? ' is-latest' : recentIndex === 1 ? ' is-previous' : '';
                   return (
                     <button
                       key={value}
                       type="button"
-                      className="btn mini qwixx-cell"
+                      className={`btn mini qwixx-cell${recentClass}`}
                       disabled={!canMark}
                       onClick={() => phase === 'white' ? updateWhiteChoice(row.id, value) : handleColorMark(row.id, value)}
                       style={{
@@ -3490,10 +3601,20 @@ export function DisneyQwixxGame({ mode, room, localPlayer, players, updateRoomSt
                     </button>
                   );
                 })}
+                <button
+                  type="button"
+                  className={`btn mini qwixx-cell qwixx-lock${hasLockBonus ? ' is-locked' : ''}`}
+                  disabled
+                  aria-label={`${row.name} ${rowLocked ? 'gesloten' : 'open'}`}
+                  title={rowLocked ? `Rij gesloten door ${playerNames[closedBy[row.id]] || 'een speler'}` : 'Sluitvak: wordt automatisch afgekruist met het laatste getal'}
+                >
+                  {hasLockBonus ? 'X' : '🔒'}
+                </button>
               </div>
             </div>
           );
         })}
+      </div>
       </div>
 
       {complete && (
