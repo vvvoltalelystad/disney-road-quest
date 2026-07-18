@@ -947,7 +947,9 @@ hr{border:0;border-top:1px solid var(--line);margin:18px 0}
 .badge-display-grid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:8px}
 .badge-jewel-slot{min-width:0;padding:7px;border:1px solid rgba(255,255,255,.07);border-radius:13px;background:linear-gradient(145deg,rgba(8,30,65,.76),rgba(2,10,25,.82));box-shadow:inset 0 1px rgba(255,255,255,.03)}
 .badge-recess{display:grid;place-items:center;width:100%;aspect-ratio:1;border-radius:50%;background:radial-gradient(circle at 48% 42%,#071b3b 0,#031029 63%,#010716 100%);box-shadow:inset 0 8px 18px rgba(0,0,0,.75),inset 0 -1px rgba(255,255,255,.06)}
-.badge-jewel-slot.is-empty .badge-recess::after{content:"";width:70%;aspect-ratio:1;border-radius:50%;border:1px dashed rgba(154,178,216,.12);box-shadow:0 0 20px rgba(3,9,22,.8)}
+.badge-jewel-slot.is-empty .badge-recess{overflow:hidden;border-radius:10px;background:#020817;box-shadow:inset 0 5px 16px rgba(0,0,0,.7)}
+.badge-empty-frame{display:block;width:100%;height:100%;object-fit:contain;opacity:.4;filter:saturate(.72) brightness(.72);transition:opacity .2s ease,filter .2s ease}
+.badge-jewel-slot.is-empty:hover .badge-empty-frame{opacity:.54;filter:saturate(.85) brightness(.82)}
 .badge-nameplate{display:flex;flex-direction:column;justify-content:center;min-height:46px;margin-top:7px;padding:5px 4px;border:1px solid rgba(218,180,91,.22);border-radius:6px;background:linear-gradient(180deg,#17243a,#0b1424);text-align:center;box-shadow:0 4px 8px rgba(0,0,0,.28)}
 .badge-nameplate strong{display:-webkit-box;overflow:hidden;-webkit-line-clamp:2;-webkit-box-orient:vertical;color:#f1e7ce;font-size:9px;line-height:1.25}
 .badge-nameplate span{margin-top:3px;color:#77869e;font-size:7px;line-height:1.2}

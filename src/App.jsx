@@ -84,11 +84,11 @@ const BADGE_SELL_VALUE = 2;
 const ENABLE_LEGACY_SHOP = false;
 
 const BADGE_RARITIES = [
-  { id: 'common', name: 'Common', subtitle: 'De eerste stap van ieder Disney-avontuur', perPark: 12 },
-  { id: 'uncommon', name: 'Uncommon', subtitle: 'Bijzondere herinneringen uit beide parken', perPark: 8 },
-  { id: 'rare', name: 'Rare', subtitle: 'Voor verzamelaars met oog voor magie', perPark: 8 },
-  { id: 'epic', name: 'Epic', subtitle: 'Iconische belevenissen in een exclusieve uitvoering', perPark: 6 },
-  { id: 'legendary', name: 'Legendary', subtitle: 'De kroonjuwelen van de Disney-collectie', perPark: 4 }
+  { id: 'common', name: 'Common', subtitle: 'De eerste stap van ieder Disney-avontuur', perPark: 12, frame: 'badges/frames/common-silver.png' },
+  { id: 'uncommon', name: 'Uncommon', subtitle: 'Bijzondere herinneringen uit beide parken', perPark: 8, frame: 'badges/frames/uncommon-green.png' },
+  { id: 'rare', name: 'Rare', subtitle: 'Voor verzamelaars met oog voor magie', perPark: 8, frame: 'badges/frames/rare-blue.png' },
+  { id: 'epic', name: 'Epic', subtitle: 'Iconische belevenissen in een exclusieve uitvoering', perPark: 6, frame: 'badges/frames/epic-purple.png' },
+  { id: 'legendary', name: 'Legendary', subtitle: 'De kroonjuwelen van de Disney-collectie', perPark: 4, frame: 'badges/frames/legendary-gold.png' }
 ];
 
 const BADGE_NAMES = {
@@ -346,7 +346,11 @@ function MiguelMarket({
                       const count = Number(ownedBadges[badge.id]) || 0;
                       return (
                         <div key={badge.id} className={`badge-jewel-slot${count ? ' is-owned' : ' is-empty'}`}>
-                          <div className="badge-recess">{count > 0 && <BadgeArtwork badge={badge} count={count} />}</div>
+                          <div className="badge-recess">
+                            {count > 0
+                              ? <BadgeArtwork badge={badge} count={count} />
+                              : <img className="badge-empty-frame" src={assetPath(rarity.frame)} alt="" aria-hidden="true" />}
+                          </div>
                           <div className="badge-nameplate"><strong>{badge.name}</strong><span>{count ? `${badge.rarityName} · ×${count}` : 'Nog niet verzameld'}</span></div>
                         </div>
                       );
