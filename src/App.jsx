@@ -1863,9 +1863,9 @@ export default function App() {
     recoverSession();
   }, []);
 
-  // Day/Night theme toggles class on document.body
+  // Day/Night theme applies everywhere after a Disney profile is active.
   useEffect(() => {
-    if (screen === 'game' && themeMode === 'night') {
+    if (activeProfileName && themeMode === 'night') {
       document.body.classList.add('night-theme');
     } else {
       document.body.classList.remove('night-theme');
@@ -1873,7 +1873,7 @@ export default function App() {
     return () => {
       document.body.classList.remove('night-theme');
     };
-  }, [themeMode, screen]);
+  }, [themeMode, activeProfileName]);
 
   const clearSession = () => {
     localStorage.removeItem('disney_room_id');
@@ -3317,75 +3317,97 @@ export default function App() {
 
   // --- RENDERING HELPERS ---
 
-  const renderAppHeader = (title = "McQueen's Road Race", backAction = null, options = {}) => {
+  const handleGlobalHeaderBack = () => {
+    if (screen === 'arcade_select' && selectedArcadeGame) {
+      setSelectedArcadeGame(null);
+      return;
+    }
+    if (screen === 'portal') {
+      if (showPortalShop) {
+        setShowPortalShop(false);
+        return;
+      }
+      if (selectedPortalGame) {
+        setSelectedPortalGame(null);
+        return;
+      }
+      handleOpenProfileManagement();
+      return;
+    }
+
+    if (screen === 'game' && room) {
+      if (stagePause) {
+        setScreen('scores');
+        return;
+      }
+      if (room.id === 'solo') {
+        if (!soloLoggedRef.current) {
+          logSoloAttempt(0, "Opdracht verlaten");
+          soloLoggedRef.current = true;
+        }
+        const targetScreen = room.game_mode?.startsWith('arcade-') ? 'arcade_select' : 'solo_select';
+        setRoom(null);
+        setScreen(targetScreen);
+        return;
+      }
+      if (room.game_mode?.startsWith('arcade-')) {
+        leaveCurrentRoom('arcade_select');
+        return;
+      }
+      setScoreReturnScreen('game');
+      setScreen('scores');
+      return;
+    }
+
+    if (screen === 'lobby' || screen === 'end') {
+      handleNewGameStart();
+      return;
+    }
+    if (screen === 'scores') {
+      setScreen(scoreReturnScreen);
+      return;
+    }
+    if (screen === 'scorelog' || screen === 'manage') {
+      setScreen('scores');
+      return;
+    }
+
+    setSelectedPortalGame(null);
+    setShowPortalShop(false);
+    setScreen('portal');
+  };
+
+  const renderAppHeader = () => {
     const key = getCollectorKey(activeProfileName);
     const balance = starBank[key] || 0;
-    const isArenaHeader = title === "Hercules' Duel Arena" || title === 'Duel Arena';
-    const { brandImage, brandAlt = '', brandAction = backAction } = options;
 
     return (
-      <div className="topbar">
-        {!isArenaHeader && brandImage ? (
-          <button type="button" className="app-header-mark" onClick={brandAction} aria-label={brandAlt || 'Terug naar Portal'}>
-            <img src={assetPath(brandImage)} onLoad={removeBg} alt={brandAlt} />
+      <header className="topbar global-app-header">
+        <div className="global-app-header-actions">
+          <button
+            type="button"
+            className="global-profile-pill"
+            onClick={() => {
+              setLogProfileName(activeProfileName);
+              setLogPopupOpen(true);
+            }}
+            title="Open Captain's Log"
+          >
+            <span className="global-profile-name">{activeProfileName}</span>
+            <span aria-hidden="true">·</span>
+            <span>{balance}</span>
+            <CocoCoinIcon size={18} />
+            <span aria-hidden="true">·</span>
+            <span className="global-log-anchor" aria-hidden="true">⚓</span>
           </button>
-        ) : !isArenaHeader && title && (
-          <div className="brand">
-            <span className="castle">🏰</span>
-            <span>{title}</span>
-          </div>
-        )}
-        <div style={{ display: 'flex', gap: '8px', alignItems: 'center', width: isArenaHeader ? '100%' : undefined }}>
-          {activeProfileName && (
-            <div 
-              onClick={() => {
-                setLogProfileName(activeProfileName);
-                setLogPopupOpen(true);
-              }}
-              style={{ 
-                display: 'flex', 
-                alignItems: 'center', 
-                gap: '7px',
-                background: 'rgba(255,212,92,0.12)', 
-                border: '1px solid rgba(255,212,92,0.3)', 
-                borderRadius: '18px',
-                padding: '6px 11px',
-                minHeight: '38px',
-                cursor: 'pointer',
-                fontSize: '13px',
-                fontWeight: 'bold',
-                color: 'var(--gold)',
-                userSelect: 'none',
-                whiteSpace: 'nowrap',
-                marginRight: isArenaHeader ? 'auto' : undefined
-              }}
-              title="Open Captain's Log"
-            >
-              <span>{activeProfileName}</span>
-              <span>·</span>
-              <span>{balance}</span>
-              <CocoCoinIcon size={18} />
-              <span>·</span>
-              <span style={{ fontSize: '16px', lineHeight: 1 }}>⚓</span>
-            </div>
-          )}
-          {room?.code && (
-            <button className="btn secondary mini" onClick={handleForceSync} style={{ padding: '4px 8px', fontSize: '11px', fontFamily: 'Outfit, Inter, sans-serif' }}>
-              🔄 Herlaad
-            </button>
-          )}
-          {screen === 'game' && (
-            <button className="iconbtn" onClick={() => setThemeMode(prev => prev === 'day' ? 'night' : 'day')} aria-label="Sfeer">
-              {themeMode === 'day' ? "🌙" : "☀️"}
-            </button>
-          )}
-          {backAction && (
-            <button className="iconbtn" onClick={backAction} aria-label="Terug">
-              ←
-            </button>
-          )}
+          <button className="iconbtn" onClick={() => setThemeMode(prev => prev === 'day' ? 'night' : 'day')} aria-label={themeMode === 'day' ? 'Nachtstand inschakelen' : 'Dagstand inschakelen'}>
+            {themeMode === 'day' ? "🌙" : "☀️"}
+          </button>
+          <button className="iconbtn" onClick={handleGlobalHeaderBack} aria-label="Terug">
+            ←
+          </button>
         </div>
-      </div>
+      </header>
     );
   };
 
@@ -4104,6 +4126,7 @@ export default function App() {
 
       {!loading && activeProfileName && (
         <>
+          {renderAppHeader()}
           {selectedCollectionItem && (
             <div
               className="collection-popup-backdrop"
@@ -4799,8 +4822,6 @@ export default function App() {
           {/* SCREEN: SOLO SELECT */}
           {screen === 'solo_select' && (
             <div>
-              {renderAppHeader("Solo Spel", () => setScreen('portal'))}
-              
               <section className="card">
                 <h2 className="sectiontitle">🎮 Kies een Speltype</h2>
                 <div style={{ display: 'grid', gridTemplateColumns: 'repeat(1, 1fr)', gap: '12px', marginTop: '14px' }}>
@@ -4944,8 +4965,6 @@ export default function App() {
           {/* SCREEN: SETUP */}
           {screen === 'setup' && (
             <div>
-              {renderAppHeader("Nieuwe Game", () => setScreen('portal'))}
-              
               <section className="card">
                 <h2 className="sectiontitle">1. Kies de spelonderdelen</h2>
                 <div className="category-grid">
@@ -5031,7 +5050,6 @@ export default function App() {
           {/* SCREEN: LOBBY */}
           {screen === 'lobby' && (
             <div>
-              {renderAppHeader("Wachtruimte", () => handleNewGameStart())}
               <section className="card hero">
                 <div className="badge">Kamer Code</div>
                 <h1 style={{ fontSize: '64px', margin: '10px 0', letterSpacing: '4px', color: 'var(--gold)', fontFamily: 'Outfit, Inter, sans-serif' }}>{room?.code}</h1>
@@ -5079,7 +5097,6 @@ export default function App() {
               {stagePause ? (
                 // ETAPPE VOLTOOID PAUSE VIEW
                 <div>
-                  {renderAppHeader("Etappe Voltooid", () => setScreen('scores'))}
                   {renderScoreBar()}
                   <section className="card hero" style={{ padding: '30px 10px' }}>
                     <div className="bigicon">🛣️</div>
@@ -5099,27 +5116,6 @@ export default function App() {
               ) : (
                 // ACTIVE GAME VIEW
                 <div>
-                  {renderAppHeader(
-                    room.id === 'solo'
-                      ? (room.game_mode?.startsWith('arcade-') ? "Duel Arena" : "Quest Solo")
-                      : (room.game_mode?.startsWith('arcade-') ? "Duel Arena" : "Road Race"), 
-                    () => {
-                      if (room.id === 'solo') {
-                        if (!soloLoggedRef.current) {
-                          logSoloAttempt(0, "Opdracht verlaten");
-                          soloLoggedRef.current = true;
-                        }
-                        const targetScreen = room.game_mode?.startsWith('arcade-') ? 'arcade_select' : 'solo_select';
-                        setRoom(null);
-                        setScreen(targetScreen);
-                      } else if (room.game_mode?.startsWith('arcade-')) {
-                        leaveCurrentRoom('arcade_select');
-                      } else {
-                        setScoreReturnScreen('game');
-                        setScreen('scores');
-                      }
-                    }
-                  )}
                   {!room.game_mode?.startsWith('arcade-') && renderScoreBar()}
 
                   <div className="routecaption">
@@ -5165,11 +5161,16 @@ export default function App() {
                                   const projectedQwixxStars = t.gameId === 'qwixx' && arenaToolbar?.gameId === 'qwixx'
                                     ? arenaToolbar.projectedStars?.[playerIndex]
                                     : null;
+                                  const projectedQwixxCoins = t.gameId === 'qwixx' && arenaToolbar?.gameId === 'qwixx'
+                                    ? arenaToolbar.projectedCoins?.[playerIndex]
+                                    : null;
                                   const displayedStars = projectedQwixxStars ?? (player.score || 0);
+                                  const displayedCoins = projectedQwixxCoins ?? displayedStars;
                                   return (
-                                    <div key={player.id} title={projectedQwixxStars !== null ? 'Sterren als Qwixx nu eindigt' : undefined} style={{ background: '#0c2145', border: '1px solid var(--line)', borderRadius: '10px', padding: '5px 8px', textAlign: 'center', minWidth: '62px' }}>
+                                    <div key={player.id} title={projectedQwixxStars !== null ? 'Beloning als Qwixx nu eindigt' : undefined} className="arena-live-reward">
                                       <b style={{ display: 'block', maxWidth: '88px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', fontSize: '11px' }}>{player.name}</b>
-                                      <span style={{ display: 'block', color: 'var(--gold)', fontWeight: 900, fontSize: '13px' }}>{displayedStars} ★</span>
+                                      <span className="arena-live-reward-stars">{displayedStars} ★</span>
+                                      <span className="arena-live-reward-coins"><CocoCoinIcon size={13} /> {displayedCoins}</span>
                                     </div>
                                   );
                                 })}
@@ -6434,8 +6435,6 @@ export default function App() {
           {/* SCREEN: SCORES */}
           {screen === 'scores' && (
             <div>
-              {renderAppHeader("Tussenstand", () => setScreen(scoreReturnScreen))}
-
               {/* breaking news trivia banner */}
               {(() => {
                 const newsIndex = (room?.round || 0) % MAGIC_NEWS.length;
@@ -6508,7 +6507,6 @@ export default function App() {
           {/* SCREEN: SCORELOG */}
           {screen === 'scorelog' && (
             <div>
-              {renderAppHeader("Scoreverloop", () => setScreen('scores'))}
               {renderScoreBar()}
               <section className="card">
                 <h2 className="sectiontitle">Snelle correctie</h2>
@@ -6561,8 +6559,6 @@ export default function App() {
           {/* SCREEN: END */}
           {screen === 'end' && room && (
             <div>
-              {renderAppHeader("Podium")}
-
               {/* Render confetti overlay */}
               {Array.from({ length: 20 }).map((_, i) => (
                 <div 
@@ -6623,7 +6619,6 @@ export default function App() {
           {/* SCREEN: VERSION INFO */}
           {screen === 'versioninfo' && (
             <div>
-              {renderAppHeader("Versie-info", () => setScreen('portal'))}
               <section className="card">
                 <div className="badge">McQueen's Road Race · Premium Editie</div>
                 <h2 className="sectiontitle" style={{ marginTop: '14px' }}>Nieuw en aangepast</h2>
@@ -6657,7 +6652,6 @@ export default function App() {
           {/* SCREEN: MANAGE TASKS */}
           {screen === 'manage' && (
             <div>
-              {renderAppHeader("Opdrachten beheren", () => setScreen('scores'))}
               <section className="card">
                 <h2 className="sectiontitle">Eigen opdracht toevoegen</h2>
                 <div className="field">

@@ -3573,6 +3573,7 @@ export function DisneyQwixxGame({ mode, room, localPlayer, players, updateRoomSt
     onToolbarChange?.({
       gameId: 'qwixx',
       projectedStars,
+      projectedCoins: projectedStars,
       totals
     });
   }, [onToolbarChange, projectedStars[0], projectedStars[1], totals[0], totals[1]]);
