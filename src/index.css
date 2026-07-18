@@ -13,8 +13,7 @@ button{cursor:pointer}
 .app{position:relative;z-index:10;min-height:100dvh;padding:calc(env(safe-area-inset-top) + 14px) 16px calc(env(safe-area-inset-bottom) + 18px);max-width:760px;margin:auto}
 .topbar{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-bottom:14px}
 .global-app-header{
-  position:sticky;
-  top:max(5px,env(safe-area-inset-top));
+  position:relative;
   z-index:900;
   width:100%;
   padding:5px;
@@ -27,9 +26,10 @@ button{cursor:pointer}
 }
 .global-app-header-actions{display:flex;align-items:center;gap:8px;width:100%;min-width:0}
 .global-profile-pill{
-  display:flex;
+  display:grid;
+  grid-template-columns:minmax(0,1fr) auto minmax(0,1fr) auto minmax(0,1fr);
   align-items:center;
-  gap:7px;
+  gap:4px;
   flex:1 1 220px;
   max-width:320px;
   margin-right:auto;
@@ -45,10 +45,13 @@ button{cursor:pointer}
   white-space:nowrap;
   justify-content:space-between;
 }
-.global-profile-log-main{display:flex;align-items:center;gap:7px;flex:1 1 auto;min-width:0;padding:0;border:0;background:transparent;color:inherit;font:inherit;cursor:pointer}
+.global-profile-segment{display:flex;align-items:center;min-width:0;padding:0;border:0;background:transparent;color:inherit;font:inherit;cursor:pointer}
+.global-profile-name-segment{justify-content:flex-start;text-align:left}
+.global-profile-balance-segment{justify-content:center;gap:5px}
+.global-profile-divider{color:rgba(255,212,92,.62);font-weight:900;text-align:center}
 .global-profile-name{flex:1 1 auto;overflow:hidden;text-align:left;text-overflow:ellipsis}
-.global-log-anchor{display:grid;place-items:center;flex:0 0 auto;padding:0;border:0;background:transparent;color:inherit;font-size:16px;line-height:1;cursor:pointer}
-.global-profile-log-main:focus-visible,.global-log-anchor:focus-visible{outline:2px solid var(--gold);outline-offset:3px;border-radius:5px}
+.global-log-anchor{justify-content:flex-end;font-size:16px;line-height:1}
+.global-profile-segment:focus-visible{outline:2px solid var(--gold);outline-offset:3px;border-radius:5px}
 .arena-live-reward{min-width:68px;padding:5px 8px;border:1px solid var(--line);border-radius:10px;background:#0c2145;text-align:center}
 .arena-live-reward-line{display:flex;align-items:center;justify-content:center;gap:4px;color:var(--muted);font-size:11px;white-space:nowrap}
 .arena-live-reward-line strong:first-child{color:var(--gold)}
@@ -914,10 +917,12 @@ hr{border:0;border-top:1px solid var(--line);margin:18px 0}
 .badge-odds summary{cursor:pointer;color:#ffd36b;font-weight:800}
 .badge-odds p{margin:7px 0 0;line-height:1.45}
 .miguel-trade-card{display:grid;grid-template-columns:104px minmax(0,1fr);gap:12px;align-items:start}
-.miguel-portrait-button{grid-row:1/3;display:flex;flex-direction:column;align-items:center;align-self:stretch;overflow:hidden;padding:0 0 8px;border:1px solid rgba(255,196,71,.35);border-radius:16px;background:#06152d;color:#ffd36b;font:800 10px/1.2 inherit;cursor:pointer;transition:.2s ease}
+.miguel-portrait-button{grid-row:1/3;display:flex;flex-direction:column;align-items:center;align-self:stretch;overflow:hidden;padding:9px 6px;border:1px solid rgba(255,196,71,.35);border-radius:16px;background:#06152d;color:#ffd36b;font:800 10px/1.2 inherit;cursor:pointer;transition:.2s ease}
 .miguel-portrait-button:hover{border-color:#ffd36b;transform:translateY(-2px)}
-.miguel-portrait-button img{width:100%;height:112px;object-fit:contain;object-position:center bottom;background:radial-gradient(circle at 50% 65%,rgba(255,180,57,.25),transparent 68%)}
-.miguel-portrait-button span{padding:7px 6px 0}
+.miguel-sell-title{display:flex;flex-direction:column;align-items:center;color:#ffe08a;font-size:11px;line-height:1.12;letter-spacing:.02em;text-transform:uppercase}
+.miguel-portrait-button img{width:100%;height:100px;object-fit:contain;object-position:center;background:radial-gradient(circle at 50% 55%,rgba(255,180,57,.25),transparent 68%)}
+.miguel-sell-value{display:flex;flex-direction:column;align-items:center;gap:3px;color:#fff5cf;font-size:8px;line-height:1.1}
+.miguel-sell-coins{display:flex;align-items:center;justify-content:center;gap:2px}
 .market-countdown{display:inline-flex;padding:5px 8px;border-radius:999px;background:rgba(255,178,62,.11);color:#ffd36b;font-size:10px;font-weight:800;font-variant-numeric:tabular-nums}
 .market-offer-grid{grid-column:2;display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:7px}
 .market-offer{min-width:0;padding:7px;border:1px solid rgba(255,255,255,.12);border-radius:13px;background:#061329;color:#fff;text-align:center;cursor:pointer;transition:.2s ease}
@@ -990,7 +995,7 @@ hr{border:0;border-top:1px solid var(--line);margin:18px 0}
   .miguel-market{padding:12px}
   .miguel-commerce-grid{grid-template-columns:1fr}
   .miguel-trade-card{grid-template-columns:88px minmax(0,1fr)}
-  .miguel-portrait-button img{height:92px}
+  .miguel-portrait-button img{height:88px}
   .badge-display-grid{gap:5px}
   .badge-park-section{padding-inline:7px}
   .badge-jewel-slot{padding:4px;border-radius:9px}
@@ -1000,7 +1005,7 @@ hr{border:0;border-top:1px solid var(--line);margin:18px 0}
 }
 @media(max-width:390px){
   .miguel-trade-card{grid-template-columns:74px minmax(0,1fr);padding:11px;gap:9px}
-  .miguel-portrait-button img{height:78px}
+  .miguel-portrait-button img{height:72px}
   .market-offer-grid{grid-column:1/-1}
   .badge-rarity-heading{padding:13px 11px 10px}.badge-rarity-heading p{font-size:8px}
   .badge-rarity-heading>strong{padding:5px 7px;font-size:9px}

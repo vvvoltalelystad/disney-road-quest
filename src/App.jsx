@@ -303,8 +303,12 @@ function MiguelMarket({
 
         <article className="miguel-trade-card">
           <button type="button" className="miguel-portrait-button" onClick={onOpenSell} aria-label="Verkoop een badge aan Miguel">
+            <strong className="miguel-sell-title"><span>Verkoop</span><span>aan</span><span>Miguel</span></strong>
             <img src={assetPath('portal/miguel-sell.png')} alt="Miguel met zijn gitaar" />
-            <span>Verkoop aan Miguel</span>
+            <span className="miguel-sell-value">
+              <span className="miguel-sell-coins" aria-hidden="true"><CocoCoinIcon size={18} /><CocoCoinIcon size={18} /></span>
+              <span>per badge</span>
+            </span>
           </button>
           <div className="miguel-trade-copy">
             <span className="portal-section-kicker">Miguel ruilt altijd</span>
@@ -3801,7 +3805,7 @@ export default function App() {
           <div className="global-profile-pill">
             <button
               type="button"
-              className="global-profile-log-main"
+              className="global-profile-segment global-profile-name-segment"
               onClick={() => {
                 setLogProfileName(activeProfileName);
                 setLogPopupOpen(true);
@@ -3809,14 +3813,15 @@ export default function App() {
               title="Open Captain's Log"
             >
               <span className="global-profile-name">{activeProfileName}</span>
-              <span aria-hidden="true">·</span>
-              <span>{balance}</span>
             </button>
-            <CocoCoinIcon size={20} onInspect={openCoinViewer} />
-            <span aria-hidden="true">·</span>
+            <span className="global-profile-divider" aria-hidden="true">·</span>
+            <button type="button" className="global-profile-segment global-profile-balance-segment" onClick={openCoinViewer} aria-label={`Bekijk Coco Coin. Saldo: ${balance}`}>
+              <span>{balance}</span><CocoCoinIcon size={20} />
+            </button>
+            <span className="global-profile-divider" aria-hidden="true">·</span>
             <button
               type="button"
-              className="global-log-anchor"
+              className="global-profile-segment global-log-anchor"
               onClick={() => {
                 setLogProfileName(activeProfileName);
                 setLogPopupOpen(true);
