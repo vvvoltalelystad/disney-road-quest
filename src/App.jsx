@@ -5161,12 +5161,18 @@ export default function App() {
                             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '8px', marginBottom: '6px' }}>
                               <div className="badge">{badgeText}</div>
                               <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '6px', minWidth: 0 }}>
-                                {players.map(player => (
-                                  <div key={player.id} style={{ background: '#0c2145', border: '1px solid var(--line)', borderRadius: '10px', padding: '5px 8px', textAlign: 'center', minWidth: '62px' }}>
-                                    <b style={{ display: 'block', maxWidth: '88px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', fontSize: '11px' }}>{player.name}</b>
-                                    <span style={{ display: 'block', color: 'var(--gold)', fontWeight: 900, fontSize: '13px' }}>{player.score || 0} ★</span>
-                                  </div>
-                                ))}
+                                {players.map((player, playerIndex) => {
+                                  const projectedQwixxStars = t.gameId === 'qwixx' && arenaToolbar?.gameId === 'qwixx'
+                                    ? arenaToolbar.projectedStars?.[playerIndex]
+                                    : null;
+                                  const displayedStars = projectedQwixxStars ?? (player.score || 0);
+                                  return (
+                                    <div key={player.id} title={projectedQwixxStars !== null ? 'Sterren als Qwixx nu eindigt' : undefined} style={{ background: '#0c2145', border: '1px solid var(--line)', borderRadius: '10px', padding: '5px 8px', textAlign: 'center', minWidth: '62px' }}>
+                                      <b style={{ display: 'block', maxWidth: '88px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', fontSize: '11px' }}>{player.name}</b>
+                                      <span style={{ display: 'block', color: 'var(--gold)', fontWeight: 900, fontSize: '13px' }}>{displayedStars} ★</span>
+                                    </div>
+                                  );
+                                })}
                               </div>
                             </div>
                           ) : (
@@ -5182,7 +5188,7 @@ export default function App() {
                           <h2>{t.title}</h2>
                           <div className="prompt">{t.text}</div>
 
-                           <div style={{ marginTop: '20px' }}>
+                           <div className={t.type === 'arcade-game' && t.gameId === 'qwixx' ? 'task-game-content task-game-content-qwixx' : 'task-game-content'} style={{ marginTop: '20px' }}>
                             {/* -1. DISNEY DUEL ARENA */}
                             {t.type === "arcade-game" && (() => {
                               const isTinkerGame = t.gameId === 'tictactinker';
@@ -5227,7 +5233,7 @@ export default function App() {
                                   players={players}
                                   updateRoomState={updateRoomState}
                                   showRules={!isTinkerGame}
-                                  onToolbarChange={isTinkerGame ? setArenaToolbar : undefined}
+                                  onToolbarChange={isTinkerGame || t.gameId === 'qwixx' ? setArenaToolbar : undefined}
                                   onFinish={async (score, detail) => {
                                     const isScoreBased = t.gameId === 'ricochet';
                                     const coinsEarned = isScoreBased ? score : (score === 3 ? 2 : (score === 2 ? 1 : 0));

@@ -3096,14 +3096,152 @@ function getQwixxEndReason(nextState) {
   return "";
 }
 
-export function DisneyQwixxGame({ mode, room, localPlayer, players, updateRoomState, onFinish }) {
+function QwixxZoomBoard({ children, label, color }) {
+  const [zoom, setZoom] = useState(1);
+  const [pan, setPan] = useState({ x: 0, y: 0 });
+  const viewportRef = useRef(null);
+  const touchRef = useRef(null);
+  const mouseRef = useRef(null);
+  const suppressClickRef = useRef(false);
+
+  const clampZoom = value => Math.min(2.2, Math.max(1, value));
+  const clampPan = (nextPan, nextZoom = zoom) => {
+    const rect = viewportRef.current?.getBoundingClientRect();
+    if (!rect || nextZoom <= 1) return { x: 0, y: 0 };
+    const maxX = Math.max(18, (rect.width * (nextZoom - 1)) / 2);
+    const maxY = Math.max(18, (rect.height * (nextZoom - 1)) / 2);
+    return {
+      x: Math.min(maxX, Math.max(-maxX, nextPan.x)),
+      y: Math.min(maxY, Math.max(-maxY, nextPan.y))
+    };
+  };
+  const applyZoom = value => {
+    const nextZoom = clampZoom(value);
+    setZoom(nextZoom);
+    setPan(previous => clampPan(previous, nextZoom));
+  };
+  const touchDistance = touches => {
+    const [first, second] = touches;
+    return Math.hypot(first.clientX - second.clientX, first.clientY - second.clientY);
+  };
+  const handleTouchStart = event => {
+    if (event.touches.length === 2) {
+      touchRef.current = { mode: 'pinch', distance: touchDistance(event.touches), zoom, pan };
+    } else if (event.touches.length === 1 && zoom > 1) {
+      touchRef.current = {
+        mode: 'pan',
+        startX: event.touches[0].clientX,
+        startY: event.touches[0].clientY,
+        pan,
+        moved: false
+      };
+    }
+  };
+  const handleTouchMove = event => {
+    const gesture = touchRef.current;
+    if (!gesture) return;
+    if (event.touches.length === 2 && gesture.mode === 'pinch') {
+      event.preventDefault();
+      const nextZoom = clampZoom(gesture.zoom * (touchDistance(event.touches) / gesture.distance));
+      setZoom(nextZoom);
+      setPan(clampPan(gesture.pan, nextZoom));
+      return;
+    }
+    if (event.touches.length !== 1 || gesture.mode !== 'pan') return;
+    const dx = event.touches[0].clientX - gesture.startX;
+    const dy = event.touches[0].clientY - gesture.startY;
+    if (!gesture.moved && Math.abs(dx) + Math.abs(dy) > 6) {
+      gesture.moved = true;
+      suppressClickRef.current = true;
+    }
+    if (!gesture.moved) return;
+    event.preventDefault();
+    setPan(clampPan({ x: gesture.pan.x + dx, y: gesture.pan.y + dy }, zoom));
+  };
+  const handleTouchEnd = () => {
+    const moved = touchRef.current?.moved;
+    touchRef.current = null;
+    setPan(previous => clampPan(previous, zoom));
+    if (moved) {
+      window.setTimeout(() => { suppressClickRef.current = false; }, 220);
+    }
+  };
+  const handleMouseDown = event => {
+    if (zoom <= 1 || event.button !== 0) return;
+    mouseRef.current = { startX: event.clientX, startY: event.clientY, pan };
+    event.currentTarget.setPointerCapture?.(event.pointerId);
+  };
+  const handleMouseMove = event => {
+    const gesture = mouseRef.current;
+    if (!gesture) return;
+    setPan(clampPan({
+      x: gesture.pan.x + event.clientX - gesture.startX,
+      y: gesture.pan.y + event.clientY - gesture.startY
+    }, zoom));
+  };
+  const handleMouseUp = event => {
+    if (!mouseRef.current) return;
+    mouseRef.current = null;
+    event.currentTarget.releasePointerCapture?.(event.pointerId);
+  };
+
+  useEffect(() => {
+    const keepInBounds = () => setPan(previous => clampPan(previous, zoom));
+    window.addEventListener('resize', keepInBounds);
+    return () => window.removeEventListener('resize', keepInBounds);
+  }, [zoom]);
+
+  return (
+    <div className="qwixx-zoom-shell">
+      <div className="qwixx-viewbar" style={{ borderColor: color }}>
+        <div>
+          <strong style={{ color }}>{label}</strong>
+          <small>{zoom > 1 ? 'Sleep om over het bord te bewegen' : '100% vult het kader precies'}</small>
+        </div>
+        <div className="qwixx-zoom-controls" aria-label="Zoom scorekaart">
+          <button type="button" onClick={() => applyZoom(+(zoom - 0.2).toFixed(2))} disabled={zoom <= 1} aria-label="Scorekaart verkleinen">−</button>
+          <span>{Math.round(zoom * 100)}%</span>
+          <button type="button" onClick={() => applyZoom(+(zoom + 0.2).toFixed(2))} disabled={zoom >= 2.2} aria-label="Scorekaart vergroten">+</button>
+        </div>
+      </div>
+      <div
+        ref={viewportRef}
+        className="qwixx-board-frame"
+        onTouchStart={handleTouchStart}
+        onTouchMove={handleTouchMove}
+        onTouchEnd={handleTouchEnd}
+        onTouchCancel={handleTouchEnd}
+        onPointerDown={event => event.pointerType === 'mouse' && handleMouseDown(event)}
+        onPointerMove={event => event.pointerType === 'mouse' && handleMouseMove(event)}
+        onPointerUp={event => event.pointerType === 'mouse' && handleMouseUp(event)}
+        onPointerCancel={event => event.pointerType === 'mouse' && handleMouseUp(event)}
+        style={{ touchAction: zoom > 1 ? 'none' : 'pan-y', cursor: zoom > 1 ? 'grab' : 'default' }}
+      >
+        <div
+          className="qwixx-board-surface"
+          style={{ transform: `translate(${pan.x}px, ${pan.y}px) scale(${zoom})` }}
+          onClickCapture={event => {
+            if (!suppressClickRef.current) return;
+            event.preventDefault();
+            event.stopPropagation();
+            suppressClickRef.current = false;
+          }}
+        >
+          {children}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+export function DisneyQwixxGame({ mode, room, localPlayer, players, updateRoomState, onFinish, onToolbarChange }) {
   const isSolo = mode === 'solo' || room.id === 'solo';
   const taskState = room.current_task_state || {};
   const aiLevel = taskState.aiLevel || 'normal';
   const activeIndex = room.current_player_index || 0;
   const myIndex = Math.max(0, players.findIndex(p => p.id === localPlayer.id));
   const playerNames = [
-    isSolo ? "Jij" : (players[0]?.name || "Speler 1"),
+    isSolo ? (players[0]?.name || localPlayer?.name || "Speler 1") : (players[0]?.name || "Speler 1"),
     isSolo ? "Computer" : (players[1]?.name || "Speler 2")
   ];
 
@@ -3123,7 +3261,6 @@ export function DisneyQwixxGame({ mode, room, localPlayer, players, updateRoomSt
   const myTurn = activeIndex === myIndex && !complete;
   const aiTurnRef = useRef("");
   const [viewedPlayerIndex, setViewedPlayerIndex] = useState(myIndex);
-  const [boardZoom, setBoardZoom] = useState(1);
   const playerColors = ['#5bbcff', '#ff7b8b'];
 
   useEffect(() => {
@@ -3424,10 +3561,21 @@ export function DisneyQwixxGame({ mode, room, localPlayer, players, updateRoomSt
   const winnerText = totals[0] === totals[1]
     ? "Gelijkspel"
     : `${playerNames[totals[0] > totals[1] ? 0 : 1]} wint!`;
+  const projectedStars = totals[0] === totals[1]
+    ? [2, 2]
+    : totals[0] > totals[1] ? [3, 1] : [1, 3];
   const opponentActions = actionLog.filter(action => action.playerIndex !== myIndex).slice(-2);
   const visibleRecentMarks = actionLog
     .filter(action => action.kind === 'mark' && action.playerIndex === viewedPlayerIndex)
     .slice(-2);
+
+  useEffect(() => {
+    onToolbarChange?.({
+      gameId: 'qwixx',
+      projectedStars,
+      totals
+    });
+  }, [onToolbarChange, projectedStars[0], projectedStars[1], totals[0], totals[1]]);
 
   return (
     <div className="qwixx-game" style={{ textAlign: 'center' }}>
@@ -3455,15 +3603,6 @@ export function DisneyQwixxGame({ mode, room, localPlayer, players, updateRoomSt
             </div>
           </button>
         ))}
-      </div>
-
-      <div className="qwixx-viewbar" style={{ borderColor: playerColors[viewedPlayerIndex] }}>
-        <strong style={{ color: playerColors[viewedPlayerIndex] }}>Kaart van {playerNames[viewedPlayerIndex]}</strong>
-        <div className="qwixx-zoom-controls" aria-label="Zoom scorekaart">
-          <button type="button" onClick={() => setBoardZoom(value => Math.max(1, +(value - 0.15).toFixed(2)))} disabled={boardZoom <= 1} aria-label="Scorekaart verkleinen">A−</button>
-          <span>{Math.round(boardZoom * 100)}%</span>
-          <button type="button" onClick={() => setBoardZoom(value => Math.min(1.6, +(value + 0.15).toFixed(2)))} disabled={boardZoom >= 1.6} aria-label="Scorekaart vergroten">A+</button>
-        </div>
       </div>
 
       <div className="qwixx-status" style={{ margin: '8px 0 12px', minHeight: '22px', color: 'var(--muted)', fontSize: '13px' }}>
@@ -3554,8 +3693,8 @@ export function DisneyQwixxGame({ mode, room, localPlayer, players, updateRoomSt
         )}
       </div>
 
-      <div className="qwixx-board-viewport">
-      <div className="qwixx-board" style={{ display: 'grid', gap: '8px', zoom: boardZoom }}>
+      <QwixxZoomBoard label={`Kaart van ${playerNames[viewedPlayerIndex]}`} color={playerColors[viewedPlayerIndex]}>
+      <div className="qwixx-board" style={{ display: 'grid', gap: '8px' }}>
         {QWIXX_ROWS.map(row => {
           const rowMarks = visibleMarks[row.id] || [];
           const rowLocked = lockedRows.includes(row.id);
@@ -3615,7 +3754,7 @@ export function DisneyQwixxGame({ mode, room, localPlayer, players, updateRoomSt
           );
         })}
       </div>
-      </div>
+      </QwixxZoomBoard>
 
       {complete && (
         <button className="btn primary full" onClick={handleFinish} style={{ marginTop: '14px' }}>
@@ -4765,6 +4904,7 @@ export function MiniGameRenderer({ gameId, mode, room, localPlayer, players, upd
           players={players}
           updateRoomState={safeUpdateRoomState}
           onFinish={onFinish}
+          onToolbarChange={onToolbarChange}
         />
       );
       break;
