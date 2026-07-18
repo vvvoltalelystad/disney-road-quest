@@ -77,6 +77,84 @@ const COCO_BANK_KEY = 'disney_coco_coin_bank';
 const COCO_PROFILES_KEY = 'disney_coco_profiles';
 const ACTIVE_PROFILE_KEY = 'disney_active_profile';
 const COCO_PROFILE_STORE_CODE = 'COCO-PROFILES-V1';
+const BADGE_COLLECTION_KEY = 'disney_badge_collections';
+const BADGE_MARKET_KEY = 'disney_badge_market';
+const BADGE_PACK_COST = 5;
+const BADGE_SELL_VALUE = 2;
+const ENABLE_LEGACY_SHOP = false;
+
+const BADGE_RARITIES = [
+  { id: 'common', name: 'Common', subtitle: 'De eerste stap van ieder Disney-avontuur', perPark: 12 },
+  { id: 'uncommon', name: 'Uncommon', subtitle: 'Bijzondere herinneringen uit beide parken', perPark: 8 },
+  { id: 'rare', name: 'Rare', subtitle: 'Voor verzamelaars met oog voor magie', perPark: 8 },
+  { id: 'epic', name: 'Epic', subtitle: 'Iconische belevenissen in een exclusieve uitvoering', perPark: 6 },
+  { id: 'legendary', name: 'Legendary', subtitle: 'De kroonjuwelen van de Disney-collectie', perPark: 4 }
+];
+
+const BADGE_NAMES = {
+  disneyland: {
+    common: ['Main Street Station', 'Town Square', 'Horse-Drawn Tram', 'Casey’s Corner', 'Liberty Arcade', 'Discovery Arcade', 'Sleeping Beauty Castle', 'La Carrousel de Lancelot', 'Alice’s Curious Labyrinth', 'Mad Hatter’s Tea Cups', 'Le Pays des Contes de Fées', 'It’s a Small World'],
+    uncommon: ['Pirates’ Beach', 'Adventure Isle', 'Swiss Family Treehouse', 'Frontierland Depot', 'Thunder Mesa', 'Phantom Manor', 'Orbitron', 'Autopia'],
+    rare: ['Peter Pan’s Flight', 'Pirates of the Caribbean', 'Star Tours', 'Buzz Lightyear Laser Blast', 'Mickey’s PhilharMagic', 'Big Thunder Mountain', 'Indiana Jones Temple', 'Dragon’s Lair'],
+    epic: ['Disney Stars on Parade', 'Disney Tales of Magic', 'Meet Mickey Mouse', 'Princess Pavilion', 'Star Wars Hyperspace Mountain', 'Castle Dream'],
+    legendary: ['Disneyland Hotel', 'Walt & Mickey', 'Sleeping Beauty Castle Gold', 'Disneyland Park Icon']
+  },
+  adventure: {
+    common: ['Front Lot', 'Studio Theater', 'Toon Studio', 'World Premiere Plaza', 'Animation Celebration', 'Cars Road Trip', 'Toy Story Playland', 'Slinky Dog Zigzag Spin', 'Cars Quatre Roues Rallye', 'Flying Carpets over Agrabah', 'Stitch Live!', 'Studio D'],
+    uncommon: ['Ratatouille Courtyard', 'Place de Rémy', 'Spider-Man W.E.B.', 'Avengers Headquarters', 'Training Center', 'Frozen Promenade', 'Arendelle Village', 'Raiponce Tangled Spin'],
+    rare: ['Ratatouille Adventure', 'Crush’s Coaster', 'Tower of Terror', 'RC Racer', 'Toy Soldiers Parachute Drop', 'Avengers Flight Force', 'Frozen Ever After', 'Mickey and the Magician'],
+    epic: ['World of Frozen', 'Avengers Campus', 'Together: Pixar Adventure', 'Disney Studio 1', 'Adventure Bay', 'Adventure Way'],
+    legendary: ['Hollywood Tower', 'Arendelle Castle', 'Adventure Bay Night', 'Disney Adventure World Icon']
+  }
+};
+
+const BADGE_PARKS = [
+  { id: 'disneyland', name: 'Disneyland Park', short: 'DLP' },
+  { id: 'adventure', name: 'Disney Adventure World', short: 'DAW' }
+];
+
+const BADGE_DEFINITIONS = BADGE_RARITIES.flatMap(rarity =>
+  BADGE_PARKS.flatMap(park =>
+    BADGE_NAMES[park.id][rarity.id].map((name, index) => ({
+      id: `${park.id}-${rarity.id}-${index + 1}`,
+      name,
+      rarity: rarity.id,
+      rarityName: rarity.name,
+      park: park.id,
+      parkName: park.name,
+      parkShort: park.short,
+      number: index + 1
+    }))
+  )
+);
+
+const getBadge = badgeId => BADGE_DEFINITIONS.find(badge => badge.id === badgeId);
+const getMarketHour = () => Math.floor(Date.now() / 3600000);
+
+const weightedRarity = weights => {
+  const roll = Math.random() * 100;
+  let cursor = 0;
+  for (const [rarity, chance] of Object.entries(weights)) {
+    cursor += chance;
+    if (roll < cursor) return rarity;
+  }
+  return Object.keys(weights)[0];
+};
+
+const randomBadge = (weights, excludedIds = []) => {
+  const rarity = weightedRarity(weights);
+  const candidates = BADGE_DEFINITIONS.filter(badge => badge.rarity === rarity && !excludedIds.includes(badge.id));
+  const fallback = BADGE_DEFINITIONS.filter(badge => !excludedIds.includes(badge.id));
+  const pool = candidates.length ? candidates : fallback;
+  return pool[Math.floor(Math.random() * pool.length)];
+};
+
+const createHourlyBadgeMarket = (hour = getMarketHour()) => {
+  const offers = [];
+  const weights = { common: 42, uncommon: 28, rare: 17, epic: 9, legendary: 4 };
+  while (offers.length < 3) offers.push(randomBadge(weights, offers).id);
+  return { hour, offers };
+};
 
 function CocoCoinIcon({ size = 30, onInspect }) {
   const icon = (
@@ -158,6 +236,186 @@ const renderCollectableVisual = (item, className = '', style = {}) => {
   }
   return <span className={className} style={style}>{item?.icon}</span>;
 };
+
+function BadgeArtwork({ badge, count = 0, compact = false }) {
+  if (!badge) return null;
+  const initials = badge.name
+    .split(/\s+/)
+    .filter(Boolean)
+    .slice(0, 3)
+    .map(word => word[0])
+    .join('')
+    .toUpperCase();
+  return (
+    <div
+      className={`disney-badge-art rarity-${badge.rarity} park-${badge.park}${compact ? ' is-compact' : ''}`}
+      aria-label={`${badge.name}, ${badge.rarityName}, ${badge.parkName}`}
+    >
+      <span className="disney-badge-rim" />
+      <span className="disney-badge-park">{badge.parkShort}</span>
+      <strong>{initials}</strong>
+      <span className="disney-badge-spark">✦</span>
+      {count > 1 && <span className="disney-badge-count">×{count}</span>}
+    </div>
+  );
+}
+
+function MiguelMarket({
+  activeName, balance, ownedBadges, badgeMarket, badgeMarketNow,
+  tradeOfferIndex, sellOpen, openedPack,
+  onOpenPack, onChooseTrade, onTrade, onOpenSell, onCloseSell, onSell, onClosePack
+}) {
+  const uniqueOwned = Object.values(ownedBadges).filter(count => Number(count) > 0).length;
+  const totalOwned = Object.values(ownedBadges).reduce((sum, count) => sum + (Number(count) || 0), 0);
+  const secondsUntilRefresh = Math.max(0, Math.ceil((((badgeMarket.hour + 1) * 3600000) - badgeMarketNow) / 1000));
+  const refreshTime = `${String(Math.floor(secondsUntilRefresh / 60)).padStart(2, '0')}:${String(secondsUntilRefresh % 60).padStart(2, '0')}`;
+  const sellableBadges = BADGE_DEFINITIONS.filter(badge => ownedBadges[badge.id] > 0);
+  const offeredBadge = tradeOfferIndex === null ? null : getBadge(badgeMarket.offers[tradeOfferIndex]);
+
+  return (
+    <section className="card portal-shop-content miguel-market">
+      <div className="portal-shop-heading">
+        <div>
+          <span className="portal-section-kicker">Collectie van {activeName}</span>
+          <h2>{uniqueOwned} van {BADGE_DEFINITIONS.length} badges ontdekt</h2>
+          <p>{totalOwned} badge{totalOwned === 1 ? '' : 's'} in bezit, inclusief dubbele exemplaren.</p>
+        </div>
+        <div className="portal-shop-balance" aria-label={`${formatCocoCoins(balance)} beschikbaar`}>
+          <CocoCoinIcon size={30} /><strong>{balance}</strong>
+        </div>
+      </div>
+
+      <div className="miguel-commerce-grid">
+        <article className="badge-pack-card">
+          <span className="portal-section-kicker">Verrassingspakje</span>
+          <div className="badge-pack-visual" aria-hidden="true"><span>?</span><span>?</span></div>
+          <h3>2 willekeurige badges</h3>
+          <p>Nooit twee dezelfde badges in één pakje. Badges uit je collectie kunnen wel opnieuw verschijnen.</p>
+          <details className="badge-odds">
+            <summary>Bekijk de kansen</summary>
+            <p><strong>Badge 1:</strong> 55% Common · 25% Uncommon · 15% Rare · 5% Epic</p>
+            <p><strong>Badge 2:</strong> 40% Common · 30% Uncommon · 15% Rare · 10% Epic · 5% Legendary</p>
+          </details>
+          <button type="button" className="btn primary full" disabled={balance < BADGE_PACK_COST} onClick={onOpenPack}>
+            {balance < BADGE_PACK_COST ? 'Niet genoeg Coco Coins' : `Open pakje · ${BADGE_PACK_COST} Coco Coins`}
+          </button>
+        </article>
+
+        <article className="miguel-trade-card">
+          <button type="button" className="miguel-portrait-button" onClick={onOpenSell} aria-label="Verkoop een badge aan Miguel">
+            <img src={assetPath('portal/Coco_png.png')} alt="Tijdelijke afbeelding van Miguel" />
+            <span>Verkoop aan Miguel</span>
+          </button>
+          <div className="miguel-trade-copy">
+            <span className="portal-section-kicker">Miguel ruilt altijd</span>
+            <h3>Ruilaanbod van dit uur</h3>
+            <p>Kies een badge en geef daarna één van je eigen badges terug.</p>
+            <span className="market-countdown">Nieuw aanbod over {refreshTime}</span>
+          </div>
+          <div className="market-offer-grid">
+            {badgeMarket.offers.map((badgeId, index) => {
+              const badge = getBadge(badgeId);
+              return (
+                <button key={`${badgeId}-${index}`} type="button" className="market-offer" onClick={() => onChooseTrade(index)} disabled={totalOwned === 0}>
+                  <BadgeArtwork badge={badge} compact />
+                  <strong>{badge?.name}</strong>
+                  <span>{badge?.rarityName} · {badge?.parkShort}</span>
+                  <em>{totalOwned === 0 ? 'Geen badge om te ruilen' : 'Kies om te ruilen'}</em>
+                </button>
+              );
+            })}
+          </div>
+        </article>
+      </div>
+
+      <div className="badge-jewel-collection">
+        {BADGE_RARITIES.map(rarity => {
+          const rarityBadges = BADGE_DEFINITIONS.filter(badge => badge.rarity === rarity.id);
+          const rarityOwned = rarityBadges.filter(badge => ownedBadges[badge.id] > 0).length;
+          return (
+            <section key={rarity.id} className={`badge-rarity-case rarity-${rarity.id}`}>
+              <header className="badge-rarity-heading">
+                <div><h3>{rarity.name}</h3><p>{rarity.subtitle}</p></div>
+                <strong>{rarityOwned} / {rarityBadges.length}</strong>
+              </header>
+              {BADGE_PARKS.map(park => (
+                <div key={park.id} className="badge-park-section">
+                  <div className="badge-park-divider"><span>{park.name}</span></div>
+                  <div className="badge-display-grid">
+                    {rarityBadges.filter(badge => badge.park === park.id).map(badge => {
+                      const count = Number(ownedBadges[badge.id]) || 0;
+                      return (
+                        <div key={badge.id} className={`badge-jewel-slot${count ? ' is-owned' : ' is-empty'}`}>
+                          <div className="badge-recess">{count > 0 && <BadgeArtwork badge={badge} count={count} />}</div>
+                          <div className="badge-nameplate"><strong>{badge.name}</strong><span>{count ? `${badge.rarityName} · ×${count}` : 'Nog niet verzameld'}</span></div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              ))}
+            </section>
+          );
+        })}
+      </div>
+
+      {tradeOfferIndex !== null && (
+        <div className="badge-market-modal" role="dialog" aria-modal="true" aria-label="Kies een badge om te ruilen" onClick={() => onChooseTrade(null)}>
+          <div className="badge-market-dialog" onClick={event => event.stopPropagation()}>
+            <button className="badge-dialog-close" type="button" onClick={() => onChooseTrade(null)} aria-label="Sluiten">×</button>
+            <span className="portal-section-kicker">Ruil met Miguel</span>
+            <h2>Kies jouw badge</h2>
+            <p>Je ontvangt <strong>{offeredBadge?.name}</strong>. Miguel accepteert iedere andere badge.</p>
+            <div className="badge-choice-grid">
+              {sellableBadges.map(badge => (
+                <button key={badge.id} type="button" className="badge-choice" disabled={badge.id === offeredBadge?.id} onClick={() => onTrade(badge.id)}>
+                  <BadgeArtwork badge={badge} count={ownedBadges[badge.id]} compact />
+                  <strong>{badge.name}</strong><span>{ownedBadges[badge.id] === 1 ? 'Enige exemplaar' : `${ownedBadges[badge.id]} exemplaren`}</span>
+                </button>
+              ))}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {sellOpen && (
+        <div className="badge-market-modal" role="dialog" aria-modal="true" aria-label="Verkoop badges aan Miguel" onClick={onCloseSell}>
+          <div className="badge-market-dialog" onClick={event => event.stopPropagation()}>
+            <button className="badge-dialog-close" type="button" onClick={onCloseSell} aria-label="Sluiten">×</button>
+            <span className="portal-section-kicker">Miguel koopt badges</span>
+            <h2>Verkoop een badge</h2>
+            <p>Iedere badge levert <strong>{BADGE_SELL_VALUE} Coco Coins</strong> op. Bij je laatste exemplaar waarschuwt Miguel je eerst.</p>
+            {sellableBadges.length ? <div className="badge-choice-grid">
+              {sellableBadges.map(badge => (
+                <button key={badge.id} type="button" className="badge-choice" onClick={() => onSell(badge.id)}>
+                  <BadgeArtwork badge={badge} count={ownedBadges[badge.id]} compact />
+                  <strong>{badge.name}</strong><span>×{ownedBadges[badge.id]} · verkoop voor {BADGE_SELL_VALUE}</span>
+                </button>
+              ))}
+            </div> : <div className="empty-badge-message">Je hebt nog geen badge om te verkopen.</div>}
+          </div>
+        </div>
+      )}
+
+      {openedPack && (
+        <div className="badge-market-modal badge-pack-reveal" role="dialog" aria-modal="true" aria-label="Nieuwe badges" onClick={onClosePack}>
+          <div className="badge-market-dialog" onClick={event => event.stopPropagation()}>
+            <span className="portal-section-kicker">Pakje geopend</span>
+            <h2>Dit zijn jouw nieuwe badges!</h2>
+            <div className="opened-badges">
+              {openedPack.map((badge, index) => (
+                <div key={badge.id} style={{ '--reveal-delay': `${index * 180}ms` }}>
+                  <BadgeArtwork badge={badge} /><strong>{badge.name}</strong><span>{badge.rarityName} · {badge.parkName}</span>
+                </div>
+              ))}
+            </div>
+            <button type="button" className="btn primary full" onClick={onClosePack}>Voeg toe aan mijn collectie</button>
+          </div>
+        </div>
+      )}
+    </section>
+  );
+}
 
 const readJsonStorage = (key, fallback) => {
   try {
@@ -684,6 +942,17 @@ export default function App() {
   const [starBank, setStarBank] = useState(() => readJsonStorage(COCO_BANK_KEY, readJsonStorage('disney_star_bank', {})));
   const [collections, setCollections] = useState(() => readJsonStorage('disney_collections', {}));
   const [exclusiveClaims, setExclusiveClaims] = useState(() => readJsonStorage('disney_exclusive_claims', {}));
+  const [badgeCollections, setBadgeCollections] = useState(() => readJsonStorage(BADGE_COLLECTION_KEY, {}));
+  const [badgeMarket, setBadgeMarket] = useState(() => {
+    const saved = readJsonStorage(BADGE_MARKET_KEY, null);
+    return saved?.hour === getMarketHour() && Array.isArray(saved.offers) && saved.offers.length === 3
+      ? saved
+      : createHourlyBadgeMarket();
+  });
+  const [badgeMarketNow, setBadgeMarketNow] = useState(() => Date.now());
+  const [marketTradeOfferIndex, setMarketTradeOfferIndex] = useState(null);
+  const [badgeSellOpen, setBadgeSellOpen] = useState(false);
+  const [openedBadgePack, setOpenedBadgePack] = useState(null);
   const [shopPlayerName, setShopPlayerName] = useState(() => localStorage.getItem('disney_player_name') || 'Speler 1');
   const [cocoProfiles, setCocoProfiles] = useState(() => {
     const saved = readJsonStorage(COCO_PROFILES_KEY, []);
@@ -1104,6 +1373,20 @@ export default function App() {
       return Object.fromEntries([...keys].map(key => [key, Math.max(Number(remoteBank?.[key]) || 0, Number(localBank?.[key]) || 0)]));
     };
 
+    const mergeBadgeCollections = (remoteBadges, localBadges) => {
+      const profileKeys = new Set([...Object.keys(remoteBadges || {}), ...Object.keys(localBadges || {})]);
+      return Object.fromEntries([...profileKeys].map(profileKey => {
+        const badgeIds = new Set([
+          ...Object.keys(remoteBadges?.[profileKey] || {}),
+          ...Object.keys(localBadges?.[profileKey] || {})
+        ]);
+        return [profileKey, Object.fromEntries([...badgeIds].map(badgeId => [
+          badgeId,
+          Math.max(Number(remoteBadges?.[profileKey]?.[badgeId]) || 0, Number(localBadges?.[profileKey]?.[badgeId]) || 0)
+        ]))];
+      }));
+    };
+
     const loadSharedProfiles = async () => {
       const localProfiles = uniqueProfileNames(cocoProfiles);
       const localState = {
@@ -1111,7 +1394,9 @@ export default function App() {
         coco_bank: starBank,
         coco_collections: collections,
         coco_exclusive_claims: exclusiveClaims,
-        coco_profile_store_version: 1,
+        coco_badge_collections: badgeCollections,
+        coco_badge_market: badgeMarket,
+        coco_profile_store_version: 2,
         updated_at: new Date().toISOString()
       };
 
@@ -1163,12 +1448,21 @@ export default function App() {
         const mergedClaims = migrateLocalState
           ? { ...(exclusiveClaims || {}), ...(remoteState.coco_exclusive_claims || {}) }
           : (remoteState.coco_exclusive_claims || {});
+        const mergedBadgeCollections = migrateLocalState
+          ? mergeBadgeCollections(remoteState.coco_badge_collections, badgeCollections)
+          : (remoteState.coco_badge_collections || {});
+        const remoteMarket = remoteState.coco_badge_market;
+        const mergedBadgeMarket = remoteMarket?.hour === getMarketHour() && Array.isArray(remoteMarket.offers) && remoteMarket.offers.length === 3
+          ? remoteMarket
+          : createHourlyBadgeMarket();
         const mergedState = {
           coco_profiles: mergedProfiles,
           coco_bank: mergedBank,
           coco_collections: mergedCollections,
           coco_exclusive_claims: mergedClaims,
-          coco_profile_store_version: 1,
+          coco_badge_collections: mergedBadgeCollections,
+          coco_badge_market: mergedBadgeMarket,
+          coco_profile_store_version: 2,
           updated_at: new Date().toISOString()
         };
 
@@ -1178,10 +1472,14 @@ export default function App() {
           setStarBank(mergedBank);
           setCollections(mergedCollections);
           setExclusiveClaims(mergedClaims);
+          setBadgeCollections(mergedBadgeCollections);
+          setBadgeMarket(mergedBadgeMarket);
           localStorage.setItem(COCO_PROFILES_KEY, JSON.stringify(mergedProfiles));
           localStorage.setItem(COCO_BANK_KEY, JSON.stringify(mergedBank));
           localStorage.setItem('disney_collections', JSON.stringify(mergedCollections));
           localStorage.setItem('disney_exclusive_claims', JSON.stringify(mergedClaims));
+          localStorage.setItem(BADGE_COLLECTION_KEY, JSON.stringify(mergedBadgeCollections));
+          localStorage.setItem(BADGE_MARKET_KEY, JSON.stringify(mergedBadgeMarket));
         }
 
         if (store?.id) {
@@ -1210,7 +1508,9 @@ export default function App() {
             coco_bank: starBank,
             coco_collections: collections,
             coco_exclusive_claims: exclusiveClaims,
-            coco_profile_store_version: 1,
+            coco_badge_collections: badgeCollections,
+            coco_badge_market: badgeMarket,
+            coco_profile_store_version: 2,
             updated_at: new Date().toISOString()
           }
         })
@@ -1221,7 +1521,21 @@ export default function App() {
     }, 250);
 
     return () => window.clearTimeout(timeoutId);
-  }, [cocoProfiles, cocoProfilesReady, collections, exclusiveClaims, starBank]);
+  }, [badgeCollections, badgeMarket, cocoProfiles, cocoProfilesReady, collections, exclusiveClaims, starBank]);
+
+  useEffect(() => {
+    const updateMarketClock = () => {
+      setBadgeMarketNow(Date.now());
+      setBadgeMarket(current => {
+        if (current?.hour === getMarketHour()) return current;
+        const next = createHourlyBadgeMarket();
+        localStorage.setItem(BADGE_MARKET_KEY, JSON.stringify(next));
+        return next;
+      });
+    };
+    const intervalId = window.setInterval(updateMarketClock, 1000);
+    return () => window.clearInterval(intervalId);
+  }, []);
 
   useEffect(() => {
     const dagobertProfile = cocoProfiles.find(name => norm(name) === 'dagobert');
@@ -1426,6 +1740,81 @@ export default function App() {
     setSelectedCollectionItem(item);
   };
 
+  const getActiveBadgeProfile = () => {
+    const name = activeProfileName || shopPlayerName.trim() || playerNameInput.trim() || 'Speler 1';
+    return { name, key: getCollectorKey(name) };
+  };
+
+  const persistBadgeCollections = nextCollections => {
+    setBadgeCollections(nextCollections);
+    localStorage.setItem(BADGE_COLLECTION_KEY, JSON.stringify(nextCollections));
+  };
+
+  const handleOpenBadgePack = () => {
+    const { name, key } = getActiveBadgeProfile();
+    const balance = Number(starBank[key]) || 0;
+    if (balance < BADGE_PACK_COST) return;
+
+    const firstBadge = randomBadge({ common: 55, uncommon: 25, rare: 15, epic: 5 });
+    const secondBadge = randomBadge({ common: 40, uncommon: 30, rare: 15, epic: 10, legendary: 5 }, [firstBadge.id]);
+    const wonBadges = [firstBadge, secondBadge];
+    const profileBadges = { ...(badgeCollections[key] || {}) };
+    wonBadges.forEach(badge => { profileBadges[badge.id] = (profileBadges[badge.id] || 0) + 1; });
+
+    const nextBank = { ...starBank, [key]: balance - BADGE_PACK_COST };
+    const nextCollections = { ...badgeCollections, [key]: profileBadges };
+    setStarBank(nextBank);
+    localStorage.setItem(COCO_BANK_KEY, JSON.stringify(nextBank));
+    persistBadgeCollections(nextCollections);
+    logCaptainMutation(name, -BADGE_PACK_COST, 'spend', 'Badgepakje geopend bij Miguel', nextBank[key]);
+    setOpenedBadgePack(wonBadges);
+  };
+
+  const handleTradeBadge = offeredBadgeId => {
+    if (marketTradeOfferIndex === null) return;
+    const { name, key } = getActiveBadgeProfile();
+    const receivedBadgeId = badgeMarket.offers[marketTradeOfferIndex];
+    const profileBadges = { ...(badgeCollections[key] || {}) };
+    if (!profileBadges[offeredBadgeId] || offeredBadgeId === receivedBadgeId) return;
+    const offeredBadge = getBadge(offeredBadgeId);
+    const receivedBadge = getBadge(receivedBadgeId);
+    const onlyCopyWarning = profileBadges[offeredBadgeId] === 1 ? '\n\nDit is je enige exemplaar van deze badge.' : '';
+    if (!window.confirm(`${offeredBadge?.name} ruilen voor ${receivedBadge?.name}?${onlyCopyWarning}`)) return;
+
+    profileBadges[offeredBadgeId] -= 1;
+    if (profileBadges[offeredBadgeId] <= 0) delete profileBadges[offeredBadgeId];
+    profileBadges[receivedBadgeId] = (profileBadges[receivedBadgeId] || 0) + 1;
+    const nextCollections = { ...badgeCollections, [key]: profileBadges };
+    const nextMarket = {
+      ...badgeMarket,
+      offers: badgeMarket.offers.map((badgeId, index) => index === marketTradeOfferIndex ? offeredBadgeId : badgeId)
+    };
+    persistBadgeCollections(nextCollections);
+    setBadgeMarket(nextMarket);
+    localStorage.setItem(BADGE_MARKET_KEY, JSON.stringify(nextMarket));
+    logCaptainMutation(name, 0, 'earn', `Badge geruild: ${offeredBadge?.name} voor ${receivedBadge?.name}`, starBank[key] || 0);
+    setMarketTradeOfferIndex(null);
+  };
+
+  const handleSellBadge = badgeId => {
+    const { name, key } = getActiveBadgeProfile();
+    const badge = getBadge(badgeId);
+    const profileBadges = { ...(badgeCollections[key] || {}) };
+    const count = Number(profileBadges[badgeId]) || 0;
+    if (!badge || count <= 0) return;
+    const onlyCopyWarning = count === 1 ? '\n\nDit is je enige exemplaar van deze badge.' : '';
+    if (!window.confirm(`${badge.name} aan Miguel verkopen voor ${BADGE_SELL_VALUE} Coco Coins?${onlyCopyWarning}`)) return;
+
+    profileBadges[badgeId] -= 1;
+    if (profileBadges[badgeId] <= 0) delete profileBadges[badgeId];
+    const nextCollections = { ...badgeCollections, [key]: profileBadges };
+    const nextBank = { ...starBank, [key]: (starBank[key] || 0) + BADGE_SELL_VALUE };
+    persistBadgeCollections(nextCollections);
+    setStarBank(nextBank);
+    localStorage.setItem(COCO_BANK_KEY, JSON.stringify(nextBank));
+    logCaptainMutation(name, BADGE_SELL_VALUE, 'earn', `Badge verkocht aan Miguel: ${badge.name}`, nextBank[key]);
+  };
+
   const handleAddShopPlayer = () => {
     const name = newShopPlayerName.trim();
     if (!name) return;
@@ -1469,12 +1858,22 @@ export default function App() {
         Object.entries(exclusiveClaims).map(([itemId, ownerKey]) => [itemId, ownerKey === oldKey ? newKey : ownerKey])
       );
 
+      const nextBadgeCollections = { ...badgeCollections };
+      const mergedBadges = { ...(nextBadgeCollections[newKey] || {}) };
+      Object.entries(nextBadgeCollections[oldKey] || {}).forEach(([badgeId, count]) => {
+        mergedBadges[badgeId] = (mergedBadges[badgeId] || 0) + (Number(count) || 0);
+      });
+      nextBadgeCollections[newKey] = mergedBadges;
+      delete nextBadgeCollections[oldKey];
+
       setStarBank(nextBank);
       setCollections(nextCollections);
       setExclusiveClaims(nextClaims);
+      setBadgeCollections(nextBadgeCollections);
       localStorage.setItem(COCO_BANK_KEY, JSON.stringify(nextBank));
       localStorage.setItem('disney_collections', JSON.stringify(nextCollections));
       localStorage.setItem('disney_exclusive_claims', JSON.stringify(nextClaims));
+      localStorage.setItem(BADGE_COLLECTION_KEY, JSON.stringify(nextBadgeCollections));
     }
 
     setShopPlayerName(nextName);
@@ -1504,8 +1903,10 @@ export default function App() {
 
     const nextBank = { ...starBank };
     const nextCollections = { ...collections };
+    const nextBadgeCollections = { ...badgeCollections };
     delete nextBank[currentKey];
     delete nextCollections[currentKey];
+    delete nextBadgeCollections[currentKey];
 
     const nextClaims = Object.fromEntries(
       Object.entries(exclusiveClaims).filter(([, ownerKey]) => ownerKey !== currentKey)
@@ -1514,6 +1915,7 @@ export default function App() {
     setStarBank(nextBank);
     setCollections(nextCollections);
     setExclusiveClaims(nextClaims);
+    setBadgeCollections(nextBadgeCollections);
     setShopPlayerName(nextName);
     setActiveProfileName(keepProfileChooserOpen ? '' : nextName);
     setPlayerNameInput(nextName);
@@ -1521,6 +1923,7 @@ export default function App() {
     localStorage.setItem(COCO_BANK_KEY, JSON.stringify(nextBank));
     localStorage.setItem('disney_collections', JSON.stringify(nextCollections));
     localStorage.setItem('disney_exclusive_claims', JSON.stringify(nextClaims));
+    localStorage.setItem(BADGE_COLLECTION_KEY, JSON.stringify(nextBadgeCollections));
     if (keepProfileChooserOpen) {
       localStorage.removeItem(ACTIVE_PROFILE_KEY);
       localStorage.removeItem('disney_player_name');
@@ -4054,7 +4457,7 @@ export default function App() {
               </div>
               <h1 style={{ margin: '0 0 8px' }}>Kies je Disney-profiel</h1>
               <p style={{ color: 'var(--muted)', margin: 0 }}>
-                Je Coco Coins, aankopen, collectables en spelersnaam worden aan dit profiel gekoppeld.
+                Je Coco Coins, badges en spelersnaam worden aan dit profiel gekoppeld.
               </p>
             </div>
 
@@ -4062,7 +4465,7 @@ export default function App() {
               {getDisplayShopPlayers().map(name => {
                 const key = getCollectorKey(name);
                 const balance = starBank[key] || 0;
-                const ownedCount = (collections[key] || []).length;
+                const ownedCount = Object.values(badgeCollections[key] || {}).reduce((sum, count) => sum + (Number(count) || 0), 0);
                 return (
                   <button
                     key={name}
@@ -4073,7 +4476,7 @@ export default function App() {
                     <span style={{ fontSize: '26px', fontWeight: 900, color: 'var(--gold)' }}>{name.slice(0, 1).toUpperCase()}</span>
                     <span>
                       <strong>{name}</strong>
-                      <small>{formatCocoCoins(balance)} · {ownedCount} collectable{ownedCount === 1 ? '' : 's'}</small>
+                      <small>{formatCocoCoins(balance)} · {ownedCount} badge{ownedCount === 1 ? '' : 's'}</small>
                     </span>
                   </button>
                 );
@@ -4288,7 +4691,7 @@ export default function App() {
                   </div>
                 </div>
 
-                {/* Game 4: Coco's Coin Shop */}
+                {/* Game 4: Miguel's Market */}
                 <div 
                   onClick={(e) => {
                     e.stopPropagation();
@@ -4308,16 +4711,16 @@ export default function App() {
                     <div className="portal-card-media portal-glow-shop">
                       <img src={assetPath("portal/Coco_png.png")} className="portal-media-img" alt="Coco Coins" />
                     </div>
-                    <span className="portal-card-badge shop">Shop</span>
+                    <span className="portal-card-badge shop">Badgemarkt</span>
                   </div>
                   <div className="portal-card-body">
-                    <h3>Coco's Coin Shop</h3>
-                    <p style={{ color: '#ff9800', fontSize: '12px', marginTop: '-4px' }}>Stickers & Magische Items</p>
-                    <p>Wissel je zuurverdiende Coco Coins in voor magische stickers en exclusieve verzamelobjecten. Vul je persoonlijke Disney Collection aan!</p>
+                    <h3>Miguel's Market</h3>
+                    <p style={{ color: '#ff9800', fontSize: '12px', marginTop: '-4px' }}>Koop, verzamel en ruil badges</p>
+                    <p>Open verrassingspakjes, verzamel badges uit beide Disney-parken en ontdek ieder uur een nieuw ruilaanbod van Miguel.</p>
                   </div>
                   <div className="portal-card-footer">
                     <span className="btn-play shop">
-                      {selectedPortalGame === 'coin_shop' ? 'Klik nogmaals om te openen ➔' : 'Selecteer Shop ➔'}
+                      {selectedPortalGame === 'coin_shop' ? 'Klik nogmaals om te openen ➔' : 'Selecteer Markt ➔'}
                     </span>
                   </div>
                 </div>
@@ -4329,13 +4732,55 @@ export default function App() {
 
               {showPortalShop && (
                 <>
+                  {renderPortalDestinationHero({
+                    image: 'portal/Coco_png.png',
+                    imageAlt: "Miguel's Market",
+                    badge: 'Disney Badge Collection',
+                    title: "Miguel's",
+                    accentTitle: 'Market',
+                    description: 'Koop verrassingspakjes, ruil met Miguel en maak je badgecollectie compleet.',
+                    onBack: () => {
+                      setSelectedPortalGame(null);
+                      setShowPortalShop(false);
+                    },
+                    theme: 'shop',
+                    imageClass: 'portal-mark-coco'
+                  })}
+                  {(() => {
+                    const activeName = activeProfileName || shopPlayerName.trim() || 'Speler 1';
+                    const activeKey = getCollectorKey(activeName);
+                    return (
+                      <MiguelMarket
+                        activeName={activeName}
+                        balance={starBank[activeKey] || 0}
+                        ownedBadges={badgeCollections[activeKey] || {}}
+                        badgeMarket={badgeMarket}
+                        badgeMarketNow={badgeMarketNow}
+                        tradeOfferIndex={marketTradeOfferIndex}
+                        sellOpen={badgeSellOpen}
+                        openedPack={openedBadgePack}
+                        onOpenPack={handleOpenBadgePack}
+                        onChooseTrade={setMarketTradeOfferIndex}
+                        onTrade={handleTradeBadge}
+                        onOpenSell={() => setBadgeSellOpen(true)}
+                        onCloseSell={() => setBadgeSellOpen(false)}
+                        onSell={handleSellBadge}
+                        onClosePack={() => setOpenedBadgePack(null)}
+                      />
+                    );
+                  })()}
+                </>
+              )}
+
+              {ENABLE_LEGACY_SHOP && showPortalShop && (
+                <>
               {renderPortalDestinationHero({
                 image: 'portal/Coco_png.png',
-                imageAlt: "Coco's Coin Shop",
-                badge: 'Stickers & Magische Items',
-                title: "Coco's",
-                accentTitle: 'Coin Shop',
-                description: 'Wissel je Coco Coins in voor magische stickers en exclusieve verzamelobjecten.',
+                imageAlt: "Miguel's Market",
+                badge: 'Disney Badge Collection',
+                title: "Miguel's",
+                accentTitle: 'Market',
+                description: 'Koop verrassingspakjes, ruil met Miguel en maak je badgecollectie compleet.',
                 onBack: () => {
                   setSelectedPortalGame(null);
                   setShowPortalShop(false);
