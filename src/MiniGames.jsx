@@ -3353,11 +3353,12 @@ export function DisneyQwixxGame({ mode, room, localPlayer, players, updateRoomSt
     : `${playerNames[totals[0] > totals[1] ? 0 : 1]} wint!`;
 
   return (
-    <div style={{ textAlign: 'center' }}>
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px', marginBottom: '12px' }}>
+    <div className="qwixx-game" style={{ textAlign: 'center' }}>
+      <div className="qwixx-scoreboard" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px', marginBottom: '12px' }}>
         {[0, 1].map(index => (
           <div
             key={index}
+            className="qwixx-player-score"
             style={{
               padding: '10px',
               borderRadius: '12px',
@@ -3372,7 +3373,7 @@ export function DisneyQwixxGame({ mode, room, localPlayer, players, updateRoomSt
         ))}
       </div>
 
-      <div style={{ margin: '8px 0 12px', minHeight: '22px', color: 'var(--muted)', fontSize: '13px' }}>
+      <div className="qwixx-status" style={{ margin: '8px 0 12px', minHeight: '22px', color: 'var(--muted)', fontSize: '13px' }}>
         {complete
           ? (
             <span>
@@ -3402,7 +3403,7 @@ export function DisneyQwixxGame({ mode, room, localPlayer, players, updateRoomSt
         )}
       </div>
 
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(6, 1fr)', gap: '6px', margin: '0 auto 12px', maxWidth: '360px' }}>
+      <div className="qwixx-dice" style={{ display: 'grid', gridTemplateColumns: 'repeat(6, 1fr)', gap: '6px', margin: '0 auto 12px', maxWidth: '360px' }}>
         {[
           ["W1", dice?.white1, "#f8fbff"],
           ["W2", dice?.white2, "#f8fbff"],
@@ -3413,6 +3414,7 @@ export function DisneyQwixxGame({ mode, room, localPlayer, players, updateRoomSt
         ].map(([label, value, color]) => (
           <div
             key={label}
+            className="qwixx-die"
             style={{
               aspectRatio: '1',
               borderRadius: '10px',
@@ -3432,7 +3434,7 @@ export function DisneyQwixxGame({ mode, room, localPlayer, players, updateRoomSt
         ))}
       </div>
 
-      <div style={{ display: 'grid', gridTemplateColumns: rolled && (canChooseWhite || canChooseColor) ? '1fr 1fr' : '1fr', gap: '8px', marginBottom: '12px' }}>
+      <div className="qwixx-actions" style={{ display: 'grid', gridTemplateColumns: rolled && (canChooseWhite || canChooseColor) ? '1fr 1fr' : '1fr', gap: '8px', marginBottom: '12px' }}>
         <button className="btn primary full" onClick={handleRoll} disabled={!myTurn || rolled || complete}>
           Gooi dobbelstenen
         </button>
@@ -3448,19 +3450,19 @@ export function DisneyQwixxGame({ mode, room, localPlayer, players, updateRoomSt
         )}
       </div>
 
-      <div style={{ display: 'grid', gap: '8px' }}>
+      <div className="qwixx-board" style={{ display: 'grid', gap: '8px' }}>
         {QWIXX_ROWS.map(row => {
           const rowMarks = visibleMarks[row.id] || [];
           const rowLocked = lockedRows.includes(row.id);
           return (
-            <div key={row.id} style={{ background: '#07152c', border: '1px solid var(--line)', borderRadius: '12px', padding: '8px' }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '6px' }}>
+            <div key={row.id} className="qwixx-row" style={{ background: '#07152c', border: '1px solid var(--line)', borderRadius: '12px', padding: '8px' }}>
+              <div className="qwixx-row-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '6px' }}>
                 <strong style={{ color: row.color, fontSize: '13px' }}>{row.name}</strong>
                 <span style={{ color: 'var(--muted)', fontSize: '11px' }}>
                   {rowMarks.length} kruisjes {rowLocked ? "· gesloten" : ""}
                 </span>
               </div>
-              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(11, 1fr)', gap: '4px' }}>
+              <div className="qwixx-row-cells" style={{ display: 'grid', gridTemplateColumns: 'repeat(11, 1fr)', gap: '4px' }}>
                 {row.values.map(value => {
                   const marked = rowMarks.includes(value);
                   const playable = currentOptions.some(option => option.rowId === row.id && option.value === value);
@@ -3469,7 +3471,7 @@ export function DisneyQwixxGame({ mode, room, localPlayer, players, updateRoomSt
                     <button
                       key={value}
                       type="button"
-                      className="btn mini"
+                      className="btn mini qwixx-cell"
                       disabled={!canMark}
                       onClick={() => phase === 'white' ? updateWhiteChoice(row.id, value) : handleColorMark(row.id, value)}
                       style={{

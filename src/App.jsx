@@ -459,7 +459,7 @@ const getCellBorderStyles = (r, c, size, isSelected, hasError) => {
   return styles;
 };
 
-function GameZoomContainer({ children, maxHeight = '420px', aspectRatio = '1 / 1', maxWidth = '100%', resetKey, toolbarContent, footerContent }) {
+function GameZoomContainer({ children, maxHeight = '420px', aspectRatio = '1 / 1', maxWidth = '100%', resetKey, toolbarContent, footerContent, fluid = false }) {
   const [zoom, setZoom] = useState(1);
   const [pan, setPan] = useState({ x: 0, y: 0 });
   const viewportRef = useRef(null);
@@ -564,6 +564,16 @@ function GameZoomContainer({ children, maxHeight = '420px', aspectRatio = '1 / 1
     setZoom(1);
     setPan({ x: 0, y: 0 });
   }, [resetKey]);
+
+  if (fluid) {
+    return (
+      <div className="game-fluid-container">
+        {toolbarContent && <div className="game-fluid-toolbar">{toolbarContent}</div>}
+        {children}
+        {footerContent && <div className="game-fluid-footer">{footerContent}</div>}
+      </div>
+    );
+  }
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', width: '100%' }}>
@@ -5146,7 +5156,7 @@ export default function App() {
                       const badgeText = `${t.cat}${difficultyLabel ? " · " + difficultyLabel : ""} · ${pointsText}`;
 
                       return (
-                        <section className="card task">
+                        <section className={`card task${t.type === 'arcade-game' && t.gameId === 'qwixx' ? ' task-qwixx' : ''}`}>
                           {t.type === "arcade-game" ? (
                             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '8px', marginBottom: '6px' }}>
                               <div className="badge">{badgeText}</div>
@@ -5205,6 +5215,7 @@ export default function App() {
                               <GameZoomContainer
                                 maxHeight={isTinkerGame ? '520px' : '420px'}
                                 aspectRatio="1 / 1"
+                                fluid={t.gameId === 'qwixx'}
                                 toolbarContent={tinkerToolbar}
                                 footerContent={tinkerFooter}
                               >
