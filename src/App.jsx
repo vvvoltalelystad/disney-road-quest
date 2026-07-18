@@ -5148,7 +5148,13 @@ export default function App() {
                       const isHost = players[0]?.id === localPlayer?.id;
                       const canControlTurnTask = isMyTurn || isHost;
                       const difficultyLabel = t.difficulty ? { easy: "Makkelijk", medium: "Medium", hard: "Moeilijk" }[t.difficulty] : "";
-                      const pointsText = t.type === "quizChoice" ? "Kies je niveau" : `${t.points || 1} ster${(t.points || 1) > 1 ? "ren" : ""}`;
+                      const isSoloAiGame = t.type === 'arcade-game' && t.mode === 'solo' && getArenaGame(t.gameId)?.maxPlayers !== 1;
+                      const aiLevelNumber = { easy: 1, normal: 2, hard: 3 }[room.current_task_state?.aiLevel || aiLevel] || 2;
+                      const pointsText = t.type === "quizChoice"
+                        ? "Kies je niveau"
+                        : isSoloAiGame
+                          ? `LEVEL ${aiLevelNumber}`
+                          : `${t.points || 1} ster${(t.points || 1) > 1 ? "ren" : ""}`;
                       const badgeText = `${t.cat}${difficultyLabel ? " · " + difficultyLabel : ""} · ${pointsText}`;
 
                       return (
@@ -5169,8 +5175,12 @@ export default function App() {
                                   return (
                                     <div key={player.id} title={projectedQwixxStars !== null ? 'Beloning als Qwixx nu eindigt' : undefined} className="arena-live-reward">
                                       <b style={{ display: 'block', maxWidth: '88px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', fontSize: '11px' }}>{player.name}</b>
-                                      <span className="arena-live-reward-stars">{displayedStars} ★</span>
-                                      <span className="arena-live-reward-coins"><CocoCoinIcon size={13} /> {displayedCoins}</span>
+                                      <span className="arena-live-reward-line">
+                                        <strong>{displayedStars} ★</strong>
+                                        <span>=</span>
+                                        <strong>{displayedCoins}</strong>
+                                        <CocoCoinIcon size={13} />
+                                      </span>
                                     </div>
                                   );
                                 })}

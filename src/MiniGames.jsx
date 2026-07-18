@@ -3011,6 +3011,7 @@ function getQwixxColorOptions(dice, marks, lockedRows) {
   const options = [];
 
   QWIXX_ROWS.forEach(row => {
+    if (lockedRows.includes(row.id) || !Number.isFinite(dice[row.id])) return;
     const rowMarks = marks?.[row.id] || [];
     [dice.white1 + dice[row.id], dice.white2 + dice[row.id]].forEach(value => {
       if (isQwixxValueOpen(row, rowMarks, value, lockedRows)) {
@@ -3242,7 +3243,7 @@ export function DisneyQwixxGame({ mode, room, localPlayer, players, updateRoomSt
   const myIndex = Math.max(0, players.findIndex(p => p.id === localPlayer.id));
   const playerNames = [
     isSolo ? (players[0]?.name || localPlayer?.name || "Speler 1") : (players[0]?.name || "Speler 1"),
-    isSolo ? "Computer" : (players[1]?.name || "Speler 2")
+    isSolo ? `Computer · LEVEL ${{ easy: 1, normal: 2, hard: 3 }[aiLevel] || 2}` : (players[1]?.name || "Speler 2")
   ];
 
   const marks = Array.isArray(taskState.qwixxMarks) ? taskState.qwixxMarks : createQwixxScores();
@@ -3332,10 +3333,10 @@ export function DisneyQwixxGame({ mode, room, localPlayer, players, updateRoomSt
         qwixxDice: {
           white1: rollQwixxDie(),
           white2: rollQwixxDie(),
-          red: rollQwixxDie(),
-          yellow: rollQwixxDie(),
-          green: rollQwixxDie(),
-          blue: rollQwixxDie()
+          red: lockedRows.includes('red') ? null : rollQwixxDie(),
+          yellow: lockedRows.includes('yellow') ? null : rollQwixxDie(),
+          green: lockedRows.includes('green') ? null : rollQwixxDie(),
+          blue: lockedRows.includes('blue') ? null : rollQwixxDie()
         },
         qwixxRolled: true,
         qwixxPhase: 'white',
@@ -3445,10 +3446,10 @@ export function DisneyQwixxGame({ mode, room, localPlayer, players, updateRoomSt
             qwixxDice: {
               white1: rollQwixxDie(),
               white2: rollQwixxDie(),
-              red: rollQwixxDie(),
-              yellow: rollQwixxDie(),
-              green: rollQwixxDie(),
-              blue: rollQwixxDie()
+              red: lockedRows.includes('red') ? null : rollQwixxDie(),
+              yellow: lockedRows.includes('yellow') ? null : rollQwixxDie(),
+              green: lockedRows.includes('green') ? null : rollQwixxDie(),
+              blue: lockedRows.includes('blue') ? null : rollQwixxDie()
             },
             qwixxRolled: true,
             qwixxPhase: 'white',
@@ -3647,15 +3648,15 @@ export function DisneyQwixxGame({ mode, room, localPlayer, players, updateRoomSt
         ) : <p>Nog geen acties van de tegenstander.</p>}
       </div>
 
-      <div className="qwixx-dice" style={{ display: 'grid', gridTemplateColumns: 'repeat(6, 1fr)', gap: '6px', margin: '0 auto 12px', maxWidth: '360px' }}>
+      <div className="qwixx-dice" style={{ display: 'grid', gridTemplateColumns: `repeat(${Math.max(2, 6 - lockedRows.length)}, 1fr)`, gap: '6px', margin: '0 auto 12px', maxWidth: '360px' }}>
         {[
-          ["W1", dice?.white1, "#f8fbff"],
-          ["W2", dice?.white2, "#f8fbff"],
-          ["R", dice?.red, "#ff4d5d"],
-          ["G", dice?.green, "#32d583"],
-          ["B", dice?.blue, "#5bbcff"],
-          ["Y", dice?.yellow, "#ffd45c"]
-        ].map(([label, value, color]) => (
+          ["W1", dice?.white1, "#f8fbff", null],
+          ["W2", dice?.white2, "#f8fbff", null],
+          ["R", dice?.red, "#ff4d5d", "red"],
+          ["G", dice?.green, "#32d583", "green"],
+          ["B", dice?.blue, "#5bbcff", "blue"],
+          ["Y", dice?.yellow, "#ffd45c", "yellow"]
+        ].filter(([, , , rowId]) => !rowId || !lockedRows.includes(rowId)).map(([label, value, color]) => (
           <div
             key={label}
             className="qwixx-die"
@@ -3704,7 +3705,7 @@ export function DisneyQwixxGame({ mode, room, localPlayer, players, updateRoomSt
           const hasLockBonus = closedBy[row.id] === viewedPlayerIndex;
           const rowPoints = scoreQwixxMarks(rowMarks.length + (hasLockBonus ? 1 : 0));
           return (
-            <div key={row.id} className="qwixx-row" style={{ background: '#07152c', border: '1px solid var(--line)', borderRadius: '12px', padding: '8px' }}>
+            <div key={row.id} className={`qwixx-row${rowLocked ? ' is-closed' : ''}`} style={{ background: '#07152c', border: '1px solid var(--line)', borderRadius: '12px', padding: '8px' }}>
               <div className="qwixx-row-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '6px' }}>
                 <strong style={{ color: row.color, fontSize: '13px' }}>{row.name}</strong>
                 <span style={{ color: 'var(--muted)', fontSize: '11px' }}>
@@ -4688,6 +4689,7 @@ const MINI_GAME_RULES = {
       "Je mag alleen getallen afstrepen die verder naar rechts staan dan je eerdere kruisjes in die rij.",
       "De rode en gele rij lopen van 2 naar 12; de groene en blauwe rij lopen van 12 naar 2.",
       "Sluit een kleur alleen met het laatste getal wanneer je daarvoor al minstens vijf kruisjes in die rij hebt.",
+      "Een gesloten kleurrij sluit direct voor iedereen; de bijbehorende gekleurde dobbelsteen gaat uit het spel.",
       "Alleen de actieve speler krijgt een strafvakje van min vijf als die in beide acties niets afstreept.",
       "Het spel eindigt direct bij twee gesloten kleuren of vier strafvakjes; elke rij met n kruisjes is n x (n + 1) / 2 punten waard."
     ],
