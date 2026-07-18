@@ -303,7 +303,7 @@ function MiguelMarket({
 
         <article className="miguel-trade-card">
           <button type="button" className="miguel-portrait-button" onClick={onOpenSell} aria-label="Verkoop een badge aan Miguel">
-            <img src={assetPath('portal/Coco_png.png')} alt="Tijdelijke afbeelding van Miguel" />
+            <img src={assetPath('portal/miguel-sell.png')} alt="Miguel met zijn gitaar" />
             <span>Verkoop aan Miguel</span>
           </button>
           <div className="miguel-trade-copy">
@@ -4724,7 +4724,7 @@ export default function App() {
                 >
                   <div className="portal-card-header">
                     <div className="portal-card-media portal-glow-shop">
-                      <img src={assetPath("portal/Coco_png.png")} className="portal-media-img" alt="Coco Coins" />
+                      <img src={assetPath("portal/miguel-market.png")} className="portal-media-img" alt="Miguel speelt gitaar" />
                     </div>
                     <span className="portal-card-badge shop">Badgemarkt</span>
                   </div>
@@ -4748,7 +4748,7 @@ export default function App() {
               {showPortalShop && (
                 <>
                   {renderPortalDestinationHero({
-                    image: 'portal/Coco_png.png',
+                    image: 'portal/miguel-market.png',
                     imageAlt: "Miguel's Market",
                     badge: 'Disney Badge Collection',
                     title: "Miguel's",
@@ -4791,7 +4791,7 @@ export default function App() {
               {ENABLE_LEGACY_SHOP && showPortalShop && (
                 <>
               {renderPortalDestinationHero({
-                image: 'portal/Coco_png.png',
+                image: 'portal/miguel-market.png',
                 imageAlt: "Miguel's Market",
                 badge: 'Disney Badge Collection',
                 title: "Miguel's",
