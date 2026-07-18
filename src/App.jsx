@@ -263,7 +263,7 @@ function BadgeArtwork({ badge, count = 0, compact = false }) {
 function MiguelMarket({
   activeName, balance, ownedBadges, badgeMarket, badgeMarketNow,
   tradeOfferIndex, sellOpen, openedPack,
-  onOpenPack, onChooseTrade, onTrade, onOpenSell, onCloseSell, onSell, onClosePack
+  onOpenPack, onChooseTrade, onTrade, onOpenSell, onCloseSell, onSell, onClosePack, onInspectCoin
 }) {
   const uniqueOwned = Object.values(ownedBadges).filter(count => Number(count) > 0).length;
   const totalOwned = Object.values(ownedBadges).reduce((sum, count) => sum + (Number(count) || 0), 0);
@@ -281,7 +281,7 @@ function MiguelMarket({
           <p>{totalOwned} badge{totalOwned === 1 ? '' : 's'} in bezit, inclusief dubbele exemplaren.</p>
         </div>
         <div className="portal-shop-balance" aria-label={`${formatCocoCoins(balance)} beschikbaar`}>
-          <CocoCoinIcon size={30} /><strong>{balance}</strong>
+          <CocoCoinIcon size={30} onInspect={onInspectCoin} /><strong>{balance}</strong>
         </div>
       </div>
 
@@ -3782,6 +3782,11 @@ export default function App() {
     setScreen('portal');
   };
 
+  const openCoinViewer = () => {
+    setCoinFlipped(false);
+    setCoinPopupOpen(true);
+  };
+
   const renderAppHeader = () => {
     const key = getCollectorKey(activeProfileName);
     const balance = starBank[key] || 0;
@@ -3789,22 +3794,32 @@ export default function App() {
     return (
       <header className="topbar global-app-header">
         <div className="global-app-header-actions">
-          <button
-            type="button"
-            className="global-profile-pill"
-            onClick={() => {
-              setLogProfileName(activeProfileName);
-              setLogPopupOpen(true);
-            }}
-            title="Open Captain's Log"
-          >
-            <span className="global-profile-name">{activeProfileName}</span>
+          <div className="global-profile-pill">
+            <button
+              type="button"
+              className="global-profile-log-main"
+              onClick={() => {
+                setLogProfileName(activeProfileName);
+                setLogPopupOpen(true);
+              }}
+              title="Open Captain's Log"
+            >
+              <span className="global-profile-name">{activeProfileName}</span>
+              <span aria-hidden="true">·</span>
+              <span>{balance}</span>
+            </button>
+            <CocoCoinIcon size={20} onInspect={openCoinViewer} />
             <span aria-hidden="true">·</span>
-            <span>{balance}</span>
-            <CocoCoinIcon size={18} />
-            <span aria-hidden="true">·</span>
-            <span className="global-log-anchor" aria-hidden="true">⚓</span>
-          </button>
+            <button
+              type="button"
+              className="global-log-anchor"
+              onClick={() => {
+                setLogProfileName(activeProfileName);
+                setLogPopupOpen(true);
+              }}
+              aria-label="Open Captain's Log"
+            >⚓</button>
+          </div>
           <button className="iconbtn" onClick={() => setThemeMode(prev => prev === 'day' ? 'night' : 'day')} aria-label={themeMode === 'day' ? 'Nachtstand inschakelen' : 'Dagstand inschakelen'}>
             {themeMode === 'day' ? "🌙" : "☀️"}
           </button>
@@ -4419,15 +4434,15 @@ export default function App() {
             <div className="coin-flip-stage">
               <button
                 type="button"
-                className="coin-flip-inner"
+                className={`coin-flip-inner ${coinFlipped ? 'is-flipped' : ''}`}
                 onClick={() => setCoinFlipped(prev => !prev)}
                 aria-label={coinFlipped ? 'Bekijk voorkant van Coco Coin' : 'Bekijk achterkant van Coco Coin'}
               >
-                <span className="coin-flip-face">
-                  <img
-                    src={assetPath(coinFlipped ? 'collectables/coco-coin-back.png' : 'collectables/coco-coin-front.png')}
-                    alt={coinFlipped ? 'Achterkant van de Coco Coin' : 'Voorkant van de Coco Coin'}
-                  />
+                <span className="coin-flip-face coin-flip-front">
+                  <img src={assetPath('collectables/coco-coin-front.png')} alt="Voorkant van de Coco Coin" />
+                </span>
+                <span className="coin-flip-face coin-flip-back">
+                  <img src={assetPath('collectables/coco-coin-back.png')} alt="Achterkant van de Coco Coin" />
                 </span>
               </button>
             </div>
@@ -4453,7 +4468,7 @@ export default function App() {
           <section className="card" style={{ maxWidth: '560px', margin: '40px auto 0' }}>
             <div style={{ textAlign: 'center', marginBottom: '18px' }}>
               <div style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', marginBottom: '10px' }}>
-                <CocoCoinIcon size={74} onInspect={() => { setCoinFlipped(false); setCoinPopupOpen(true); }} />
+                <CocoCoinIcon size={74} onInspect={openCoinViewer} />
               </div>
               <h1 style={{ margin: '0 0 8px' }}>Kies je Disney-profiel</h1>
               <p style={{ color: 'var(--muted)', margin: 0 }}>
@@ -4766,6 +4781,7 @@ export default function App() {
                         onCloseSell={() => setBadgeSellOpen(false)}
                         onSell={handleSellBadge}
                         onClosePack={() => setOpenedBadgePack(null)}
+                        onInspectCoin={openCoinViewer}
                       />
                     );
                   })()}
@@ -5626,7 +5642,7 @@ export default function App() {
                                         <strong>{displayedStars} ★</strong>
                                         <span>=</span>
                                         <strong>{displayedCoins}</strong>
-                                        <CocoCoinIcon size={13} />
+                                        <CocoCoinIcon size={13} onInspect={openCoinViewer} />
                                       </span>
                                     </div>
                                   );
