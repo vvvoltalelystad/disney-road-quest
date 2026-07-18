@@ -83,6 +83,50 @@ const makeOthelloMove = (board, r, c, player) => {
   return newBoard;
 };
 
+const OTHELLO_POSITION_WEIGHTS = [
+  [120, -28, 18, 8, 8, 18, -28, 120],
+  [-28, -45, -6, -5, -5, -6, -45, -28],
+  [18, -6, 12, 4, 4, 12, -6, 18],
+  [8, -5, 4, 2, 2, 4, -5, 8],
+  [8, -5, 4, 2, 2, 4, -5, 8],
+  [18, -6, 12, 4, 4, 12, -6, 18],
+  [-28, -45, -6, -5, -5, -6, -45, -28],
+  [120, -28, 18, 8, 8, 18, -28, 120]
+];
+
+function evaluateOthelloBoard(board, player = 'red') {
+  const opponent = player === 'red' ? 'blue' : 'red';
+  let score = 0;
+  board.forEach((row, r) => row.forEach((cell, c) => {
+    if (cell === player) score += OTHELLO_POSITION_WEIGHTS[r][c];
+    if (cell === opponent) score -= OTHELLO_POSITION_WEIGHTS[r][c];
+  }));
+  const mobility = getOthelloValidMoves(board, player).length - getOthelloValidMoves(board, opponent).length;
+  const pieceDiff = board.flat().filter(cell => cell === player).length - board.flat().filter(cell => cell === opponent).length;
+  return score + mobility * 7 + pieceDiff * 0.6;
+}
+
+function chooseOthelloAiMove(board, aiLevel = 'normal') {
+  const moves = getOthelloValidMoves(board, 'red');
+  if (!moves.length) return null;
+  if (aiLevel === 'easy') return moves[Math.floor(Math.random() * moves.length)];
+
+  const ranked = moves.map(move => {
+    const nextBoard = makeOthelloMove(board, move.r, move.c, 'red');
+    const immediateGain = nextBoard.flat().filter(cell => cell === 'red').length - board.flat().filter(cell => cell === 'red').length;
+    if (aiLevel === 'normal') {
+      return { ...move, score: immediateGain * 3 + OTHELLO_POSITION_WEIGHTS[move.r][move.c] };
+    }
+
+    const replies = getOthelloValidMoves(nextBoard, 'blue');
+    const worstReplyScore = replies.length
+      ? Math.min(...replies.map(reply => evaluateOthelloBoard(makeOthelloMove(nextBoard, reply.r, reply.c, 'blue'), 'red')))
+      : evaluateOthelloBoard(nextBoard, 'red') + 20;
+    return { ...move, score: worstReplyScore };
+  });
+  return ranked.sort((a, b) => b.score - a.score)[0];
+}
+
 // ----------------------------------------------------
 // 1. OTHELLO COMPONENT
 // ----------------------------------------------------
@@ -138,34 +182,8 @@ export function OthelloGame({ mode, room, localPlayer, players, updateRoomState,
   useEffect(() => {
     if (isSolo && activeColor === 'red') {
       const timer = setTimeout(() => {
-        const aiMoves = getOthelloValidMoves(board, 'red');
-        if (aiMoves.length > 0) {
-          if (aiLevel === 'easy') {
-            const randomMove = aiMoves[Math.floor(Math.random() * aiMoves.length)];
-            const nextBoard = makeOthelloMove(board, randomMove.r, randomMove.c, 'red');
-            const nextOpponentMoves = getOthelloValidMoves(nextBoard, 'blue');
-            updateRoomState(room.id, {
-              current_task_state: {
-                ...taskState,
-                othelloBoard: nextBoard,
-                othelloTurn: nextOpponentMoves.length > 0 ? 'blue' : 'red'
-              }
-            });
-            return;
-          }
-
-          let bestMove = aiMoves[0];
-          let maxFlips = -1;
-          for (const m of aiMoves) {
-            const tempBoard = makeOthelloMove(board, m.r, m.c, 'red');
-            const flips = tempBoard.flat().filter(c => c === 'red').length - board.flat().filter(c => c === 'red').length;
-            const isCorner = (m.r === 0 || m.r === 7) && (m.c === 0 || m.c === 7);
-            const score = flips + (aiLevel === 'hard' && isCorner ? 20 : 0);
-            if (score > maxFlips) {
-              maxFlips = score;
-              bestMove = m;
-            }
-          }
+        const bestMove = chooseOthelloAiMove(board, aiLevel);
+        if (bestMove) {
           const nextBoard = makeOthelloMove(board, bestMove.r, bestMove.c, 'red');
           const nextOpponentMoves = getOthelloValidMoves(nextBoard, 'blue');
           const nextTurn = nextOpponentMoves.length > 0 ? 'blue' : 'red';
@@ -194,7 +212,7 @@ export function OthelloGame({ mode, room, localPlayer, players, updateRoomState,
       }, 800);
       return () => clearTimeout(timer);
     }
-  }, [activeColor, isSolo]);
+  }, [activeColor, isSolo, aiLevel, board]);
 
   const handleCellClick = (r, c) => {
     if (!myTurn || isSolo && activeColor === 'red') return;
@@ -358,6 +376,7 @@ export function DotsBoxesGame({ mode, room, localPlayer, players, updateRoomStat
   const myTurn = myIndex === activeIndex;
 
   const taskState = room.current_task_state || {};
+  const aiLevel = taskState.aiLevel || 'normal';
   const dotsGridSize = taskState.dotsGridSize || 4;
   const boxGridSize = dotsGridSize - 1;
   const hLineCount = dotsGridSize * boxGridSize;
@@ -429,41 +448,45 @@ export function DotsBoxesGame({ mode, room, localPlayer, players, updateRoomStat
 
         if (availableH.length === 0 && availableV.length === 0) return;
 
-        let selectedMove = null;
-        let isH = true;
-
-        const checkCompletesBox = (hIdx, isHorizontal) => {
+        const evaluateMove = (lineIndex, isHorizontal) => {
           const testH = [...hLines];
           const testV = [...vLines];
-          if (isHorizontal) testH[hIdx] = true;
-          else testV[hIdx] = true;
+          if (isHorizontal) testH[lineIndex] = true;
+          else testV[lineIndex] = true;
 
+          let completed = 0;
+          let exposed = 0;
           for (let b = 0; b < boxCount; b++) {
             if (boxes[b] !== null) continue;
             const { top, bottom, left, right } = getBoxSides(b, testH, testV);
-            if (top && bottom && left && right) return true;
+            const sideCount = [top, bottom, left, right].filter(Boolean).length;
+            if (sideCount === 4) completed++;
+            else if (sideCount === 3) exposed++;
           }
-          return false;
+          return { lineIndex, isHorizontal, completed, exposed };
         };
 
-        for (const h of availableH) {
-          if (checkCompletesBox(h, true)) { selectedMove = h; isH = true; break; }
+        const moves = [
+          ...availableH.map(index => evaluateMove(index, true)),
+          ...availableV.map(index => evaluateMove(index, false))
+        ];
+        let selected;
+        if (aiLevel === 'easy') {
+          selected = moves[Math.floor(Math.random() * moves.length)];
+        } else if (aiLevel === 'normal') {
+          const scoringMoves = moves.filter(move => move.completed > 0);
+          selected = scoringMoves.length
+            ? scoringMoves.sort((a, b) => b.completed - a.completed)[0]
+            : moves[Math.floor(Math.random() * moves.length)];
+        } else {
+          selected = moves.sort((a, b) => {
+            if (b.completed !== a.completed) return b.completed - a.completed;
+            if (a.exposed !== b.exposed) return a.exposed - b.exposed;
+            return Math.random() - 0.5;
+          })[0];
         }
-        if (selectedMove === null) {
-          for (const v of availableV) {
-            if (checkCompletesBox(v, false)) { selectedMove = v; isH = false; break; }
-          }
-        }
-
-        if (selectedMove === null) {
-          if (availableH.length > 0 && (availableV.length === 0 || Math.random() < 0.5)) {
-            selectedMove = availableH[Math.floor(Math.random() * availableH.length)];
-            isH = true;
-          } else {
-            selectedMove = availableV[Math.floor(Math.random() * availableV.length)];
-            isH = false;
-          }
-        }
+        const selectedMove = selected.lineIndex;
+        const isH = selected.isHorizontal;
 
         const nextH = [...hLines];
         const nextV = [...vLines];
@@ -495,7 +518,7 @@ export function DotsBoxesGame({ mode, room, localPlayer, players, updateRoomStat
       }, 800);
       return () => clearTimeout(timer);
     }
-  }, [activeIndex, isSolo, hLines, vLines, boxes, dotsGridSize]);
+  }, [activeIndex, isSolo, hLines, vLines, boxes, dotsGridSize, aiLevel]);
 
   const handleLineClick = (index, isHorizontal) => {
     if (!myTurn || isSolo && activeIndex === 1) return;
@@ -1724,6 +1747,7 @@ export function AbaloneGame({ mode, room, localPlayer, players, updateRoomState,
   const myTurn = myIndex === activeIndex;
 
   const taskState = room.current_task_state || {};
+  const aiLevel = taskState.aiLevel || 'normal';
   const marbles = taskState.abaloneMarbles || [];
   const p1Out = taskState.p1Out || 0;
   const p2Out = taskState.p2Out || 0;
@@ -1734,6 +1758,54 @@ export function AbaloneGame({ mode, room, localPlayer, players, updateRoomState,
     { r: -1, q: 0 }, { r: -1, q: 1 }, { r: 0, q: 1 },
     { r: 1, q: 0 },  { r: 1, q: -1 }, { r: 0, q: -1 }
   ];
+  const isInsideHex = (r, q) => Math.abs(r) <= 3 && Math.abs(q) <= 3 && Math.abs(r + q) <= 3;
+
+  const getAbaloneAiMoves = () => {
+    const moves = [];
+    marbles.filter(marble => marble.colorIdx === 1).forEach(marble => {
+      hexDirections.forEach(dir => {
+        const nr = marble.r + dir.r;
+        const nq = marble.q + dir.q;
+        if (!isInsideHex(nr, nq)) return;
+        if (marbles.some(item => item.r === nr && item.q === nq && item.colorIdx === 1)) return;
+
+        const opponent = marbles.find(item => item.r === nr && item.q === nq && item.colorIdx === 0);
+        const nextMarbles = marbles.map(item => ({ ...item }));
+        let pushed = false;
+        let ejected = false;
+        let opponentEdgeBefore = 0;
+        let opponentEdgeAfter = 0;
+
+        if (opponent) {
+          const tr = nr + dir.r;
+          const tq = nq + dir.q;
+          const targetIndex = nextMarbles.findIndex(item => item.r === nr && item.q === nq && item.colorIdx === 0);
+          pushed = true;
+          opponentEdgeBefore = Math.max(Math.abs(nr), Math.abs(nq), Math.abs(nr + nq));
+          if (!isInsideHex(tr, tq)) {
+            nextMarbles.splice(targetIndex, 1);
+            ejected = true;
+            opponentEdgeAfter = 4;
+          } else {
+            if (marbles.some(item => item.r === tr && item.q === tq)) return;
+            nextMarbles[targetIndex].r = tr;
+            nextMarbles[targetIndex].q = tq;
+            opponentEdgeAfter = Math.max(Math.abs(tr), Math.abs(tq), Math.abs(tr + tq));
+          }
+        }
+
+        const ownIndex = nextMarbles.findIndex(item => item.r === marble.r && item.q === marble.q && item.colorIdx === 1);
+        nextMarbles[ownIndex].r = nr;
+        nextMarbles[ownIndex].q = nq;
+        const ownEdge = Math.max(Math.abs(nr), Math.abs(nq), Math.abs(nr + nq));
+        const support = hexDirections.filter(supportDir => nextMarbles.some(item => (
+          item.colorIdx === 1 && item.r === nr + supportDir.r && item.q === nq + supportDir.q
+        ))).length;
+        moves.push({ nextMarbles, pushed, ejected, opponentEdgeGain: opponentEdgeAfter - opponentEdgeBefore, ownEdge, support });
+      });
+    });
+    return moves;
+  };
 
   const initializeBoard = () => {
     const list = [];
@@ -1843,62 +1915,38 @@ export function AbaloneGame({ mode, room, localPlayer, players, updateRoomState,
   useEffect(() => {
     if (isSolo && activeIndex === 1) {
       const timer = setTimeout(() => {
-        const aiMarbles = marbles.filter(m => m.colorIdx === 1);
-        if (aiMarbles.length === 0) return;
-
-        let moveFound = false;
-        let attempts = 0;
-        
-        while (!moveFound && attempts < 100) {
-          const marble = aiMarbles[Math.floor(Math.random() * aiMarbles.length)];
-          const dir = hexDirections[Math.floor(Math.random() * 6)];
-          const nr = marble.r + dir.r;
-          const nq = marble.q + dir.q;
-
-          if (Math.abs(nr) <= 3 && Math.abs(nq) <= 3 && Math.abs(nr + nq) <= 3) {
-            const hasOwn = marbles.some(m => m.r === nr && m.q === nq && m.colorIdx === 1);
-            if (!hasOwn) {
-              let nextMarbles = marbles.map(m => ({ ...m }));
-              const idx = nextMarbles.findIndex(m => m.r === marble.r && m.q === marble.q);
-              nextMarbles[idx].r = nr;
-              nextMarbles[idx].q = nq;
-
-              const oppIdx = marbles.findIndex(m => m.r === nr && m.q === nq && m.colorIdx === 0);
-              let pOut = 0;
-
-              if (oppIdx !== -1) {
-                const tr = nr + dir.r;
-                const tq = nq + dir.q;
-                if (Math.abs(tr) > 3 || Math.abs(tq) > 3 || Math.abs(tr + tq) > 3) {
-                  nextMarbles = nextMarbles.filter(m => !(m.r === nr && m.q === nq));
-                  pOut = 1;
-                } else {
-                  const blocked = marbles.some(m => m.r === tr && m.q === tq);
-                  if (blocked) continue;
-                  const targetIdx = nextMarbles.findIndex(m => m.r === nr && m.q === nq && m.colorIdx === 0);
-                  nextMarbles[targetIdx].r = tr;
-                  nextMarbles[targetIdx].q = tq;
-                }
-              }
-
-              updateRoomState(room.id, {
-                current_player_index: 0,
-                current_task_state: {
-                  ...taskState,
-                  abaloneMarbles: nextMarbles,
-                  p1Out: p1Out + pOut,
-                  p2Out
-                }
-              });
-              moveFound = true;
-            }
-          }
-          attempts++;
+        const moves = getAbaloneAiMoves();
+        if (!moves.length) {
+          updateRoomState(room.id, { current_player_index: 0 });
+          return;
         }
+        const selectedMove = aiLevel === 'easy'
+          ? moves[Math.floor(Math.random() * moves.length)]
+          : moves
+              .map(move => ({
+                ...move,
+                priority: move.ejected * 120
+                  + move.pushed * (aiLevel === 'hard' ? 24 : 12)
+                  + move.opponentEdgeGain * (aiLevel === 'hard' ? 9 : 4)
+                  + move.support * (aiLevel === 'hard' ? 3 : 1)
+                  - move.ownEdge * (aiLevel === 'hard' ? 2.5 : 0.5)
+                  + Math.random() * 0.25
+              }))
+              .sort((a, b) => b.priority - a.priority)[0];
+
+        updateRoomState(room.id, {
+          current_player_index: 0,
+          current_task_state: {
+            ...taskState,
+            abaloneMarbles: selectedMove.nextMarbles,
+            p1Out: p1Out + (selectedMove.ejected ? 1 : 0),
+            p2Out
+          }
+        });
       }, 1000);
       return () => clearTimeout(timer);
     }
-  }, [activeIndex, isSolo]);
+  }, [activeIndex, isSolo, aiLevel, marbles, p1Out, p2Out]);
 
   const isGameOver = p1Out >= 6 || p2Out >= 6;
 
@@ -2662,12 +2710,81 @@ function chooseYahtzeeAiCategoryByLevel(dice, scoreCard = {}, aiLevel = 'normal'
     return openCategories
       .map(category => {
         const score = scoreYahtzeeCategory(category.id, dice);
-        const upperPotential = category.upperValue ? Math.max(0, YAHTZEE_BONUS_THRESHOLD - getYahtzeeUpperTotal(scoreCard)) : 0;
-        return { ...category, score, priority: score + (category.upperValue && score >= upperPotential ? 10 : 0) };
+        const zeroCost = {
+          yahtzee: 32,
+          largeStreet: 25,
+          smallStreet: 17,
+          fullHouse: 16,
+          fourKind: 13,
+          threeKind: 9,
+          chance: 18
+        }[category.id] || (category.upperValue || 1) * 1.5;
+        const upperBonusPace = category.upperValue && score >= category.upperValue * 3 ? 8 : 0;
+        const categoryBonus = category.id === 'yahtzee' && score === 50 ? 30
+          : category.id === 'largeStreet' && score === 40 ? 18
+            : category.id === 'smallStreet' && score === 30 ? 10
+              : 0;
+        return { ...category, score, priority: score > 0 ? score + upperBonusPace + categoryBonus : -zeroCost };
       })
       .sort((a, b) => b.priority - a.priority)[0];
   }
   return chooseYahtzeeAiCategory(dice, scoreCard);
+}
+
+function chooseYahtzeeKeepIndices(dice, scoreCard = {}, aiLevel = 'normal') {
+  const counts = getYahtzeeCounts(dice);
+  const groups = Object.entries(counts)
+    .map(([value, count]) => ({ value: Number(value), count }))
+    .sort((a, b) => b.count - a.count || b.value - a.value);
+  const open = id => scoreCard[id] === undefined;
+  const indicesForValues = values => {
+    const used = new Set();
+    return dice.reduce((indices, value, index) => {
+      if (!values.includes(value) || used.has(value)) return indices;
+      used.add(value);
+      indices.push(index);
+      return indices;
+    }, []);
+  };
+
+  if (aiLevel === 'hard') {
+    const bestGroup = groups[0];
+    if (bestGroup?.count >= 3 && (open('yahtzee') || open('fourKind') || open('threeKind'))) {
+      return dice.reduce((indices, value, index) => value === bestGroup.value ? [...indices, index] : indices, []);
+    }
+
+    if (open('largeStreet') || open('smallStreet')) {
+      const runs = [[1, 2, 3, 4, 5], [2, 3, 4, 5, 6], [1, 2, 3, 4], [2, 3, 4, 5], [3, 4, 5, 6]];
+      const bestRun = runs
+        .map(run => ({ run, present: run.filter(value => counts[value]).length }))
+        .sort((a, b) => b.present - a.present)[0];
+      if (bestRun.present >= 3) return indicesForValues(bestRun.run);
+    }
+
+    if (open('fullHouse')) {
+      const pairValues = groups.filter(group => group.count >= 2).slice(0, 2).map(group => group.value);
+      if (pairValues.length >= 2 || groups[0]?.count >= 3) {
+        return dice.reduce((indices, value, index) => pairValues.includes(value) ? [...indices, index] : indices, []);
+      }
+    }
+  }
+
+  const upperCandidates = groups.filter(group => open(YAHTZEE_UPPER_IDS[group.value - 1]));
+  const target = (upperCandidates.length ? upperCandidates : groups)
+    .sort((a, b) => (b.count * b.value) - (a.count * a.value))[0];
+  if (!target || target.count < 2) return [];
+  return dice.reduce((indices, value, index) => value === target.value ? [...indices, index] : indices, []);
+}
+
+function playYahtzeeAiTurn(scoreCard = {}, aiLevel = 'normal') {
+  const rollCount = aiLevel === 'easy' ? 1 : aiLevel === 'hard' ? 3 : 2;
+  let dice = Array.from({ length: 5 }, rollYahtzeeDie);
+  for (let roll = 1; roll < rollCount; roll++) {
+    const keep = new Set(chooseYahtzeeKeepIndices(dice, scoreCard, aiLevel));
+    dice = dice.map((value, index) => keep.has(index) ? value : rollYahtzeeDie());
+  }
+  const choice = chooseYahtzeeAiCategoryByLevel(dice, scoreCard, aiLevel);
+  return { dice, choice, rolls: rollCount };
 }
 
 export function DisneyYahtzeeGame({ mode, room, localPlayer, players, updateRoomState, onFinish }) {
@@ -2716,8 +2833,7 @@ export function DisneyYahtzeeGame({ mode, room, localPlayer, players, updateRoom
     aiTurnRef.current = aiKey;
 
     const timer = setTimeout(() => {
-      const aiDice = Array.from({ length: 5 }, rollYahtzeeDie);
-      const aiChoice = chooseYahtzeeAiCategoryByLevel(aiDice, scores[1] || {}, aiLevel);
+      const { dice: aiDice, choice: aiChoice, rolls: aiRolls } = playYahtzeeAiTurn(scores[1] || {}, aiLevel);
       if (!aiChoice) return;
       const aiScore = scoreYahtzeeCategory(aiChoice.id, aiDice);
 
@@ -2736,13 +2852,13 @@ export function DisneyYahtzeeGame({ mode, room, localPlayer, players, updateRoom
           yahtzeeHeld: [false, false, false, false, false],
           yahtzeeRolls: 0,
           yahtzeeComplete: nextComplete,
-          yahtzeeLastMove: `Computer (${aiLevel}) koos ${aiChoice.name} voor ${aiScore} punten.`
+          yahtzeeLastMove: `Computer (LEVEL ${{ easy: 1, normal: 2, hard: 3 }[aiLevel] || 2}) gebruikte ${aiRolls} worp${aiRolls === 1 ? '' : 'en'} en koos ${aiChoice.name} voor ${aiScore} punten.`
         }
       });
     }, 900);
 
     return () => clearTimeout(timer);
-  }, [isSolo, activeIndex, isComplete, taskState.yahtzeeScores]);
+  }, [isSolo, activeIndex, isComplete, taskState.yahtzeeScores, aiLevel]);
 
   const handleRoll = () => {
     if (!myTurn || rolls >= 3) return;
@@ -3056,22 +3172,92 @@ function appendQwixxAction(actionLog, action) {
   }].slice(-8);
 }
 
-function chooseQwixxAiOption(options, marks, aiLevel) {
+function chooseQwixxAiOption(options, marks, aiLevel, context = {}) {
   if (!options.length) return null;
   const scored = options.map(option => {
     const row = QWIXX_ROWS.find(item => item.id === option.rowId);
     const rowIndex = row.values.indexOf(option.value);
-    const canLock = rowIndex === row.values.length - 1 && (marks[row.id] || []).length >= 5;
+    const rowMarks = marks[row.id] || [];
+    const markCount = rowMarks.length;
+    const furthestIndex = rowMarks.reduce((max, value) => Math.max(max, row.values.indexOf(value)), -1);
+    const skippedBoxes = Math.max(0, rowIndex - furthestIndex - 1);
+    const canLock = rowIndex === row.values.length - 1 && markCount >= 5;
+    const pointGain = markCount + 1 + (canLock ? markCount + 2 : 0);
+    const opponentThreat = (context.opponentMarks?.[row.id] || []).length >= 5;
+    const normalPriority = pointGain * 2.2 - skippedBoxes * 2.4 + (canLock ? 18 : 0) + rowIndex * 0.12;
+    const hardPriority = pointGain * 3.4
+      - skippedBoxes * 5.2
+      + (canLock ? 34 : 0)
+      + (canLock && opponentThreat ? 10 : 0)
+      + (markCount >= 4 ? 4 : 0)
+      - (rowIndex >= 8 && markCount < 3 ? 9 : 0);
     return {
       ...option,
       row,
-      priority: rowIndex
-        + (canLock ? (aiLevel === 'hard' ? 12 : 7) : 0)
-        + (aiLevel === 'hard' && (marks[option.rowId] || []).length >= 4 ? 3 : 0)
+      markCount,
+      skippedBoxes,
+      canLock,
+      priority: aiLevel === 'hard' ? hardPriority : normalPriority
     };
   });
-  if (aiLevel === 'easy') return scored[Math.floor(Math.random() * scored.length)];
-  return scored.sort((a, b) => b.priority - a.priority)[0];
+  if (aiLevel === 'easy') {
+    if (context.canSkip && Math.random() < 0.18) return null;
+    return scored[Math.floor(Math.random() * scored.length)];
+  }
+  const best = scored.sort((a, b) => b.priority - a.priority)[0];
+  if (context.canSkip && !context.mustAvoidPenalty) {
+    if (aiLevel === 'hard' && best.skippedBoxes >= 4 && best.markCount < 4 && !best.canLock) return null;
+    if (aiLevel === 'normal' && best.skippedBoxes >= 6 && !best.canLock) return null;
+  }
+  return best;
+}
+
+function chooseQwixxAiWhiteOption(dice, aiMarks, lockedRows, aiLevel, context = {}) {
+  const whiteOptions = getQwixxWhiteOptions(dice, aiMarks, lockedRows);
+  if (aiLevel !== 'hard' || !context.isActivePlayer) {
+    return chooseQwixxAiOption(whiteOptions, aiMarks, aiLevel, {
+      canSkip: true,
+      opponentMarks: context.opponentMarks,
+      phase: 'white'
+    });
+  }
+
+  const candidates = [null, ...whiteOptions].map(option => {
+    if (!option) {
+      const colorChoice = chooseQwixxAiOption(
+        getQwixxColorOptions(dice, aiMarks, lockedRows),
+        aiMarks,
+        'hard',
+        { canSkip: false, mustAvoidPenalty: true, opponentMarks: context.opponentMarks, phase: 'color' }
+      );
+      return { option: null, combinedPriority: (colorChoice?.priority || -5) - 1 };
+    }
+
+    const row = QWIXX_ROWS.find(item => item.id === option.rowId);
+    const nextAiMarks = {
+      ...aiMarks,
+      [option.rowId]: [...(aiMarks[option.rowId] || []), option.value]
+    };
+    const nextLockedRows = getQwixxNextLockedRows(lockedRows, row, aiMarks[option.rowId] || [], option.value);
+    const whiteEvaluation = chooseQwixxAiOption([option], aiMarks, 'hard', {
+      canSkip: false,
+      opponentMarks: context.opponentMarks,
+      phase: 'white'
+    });
+    const colorChoice = chooseQwixxAiOption(
+      getQwixxColorOptions(dice, nextAiMarks, nextLockedRows),
+      nextAiMarks,
+      'hard',
+      { canSkip: true, mustAvoidPenalty: false, opponentMarks: context.opponentMarks, phase: 'color' }
+    );
+    const closesGame = nextLockedRows.length >= 2;
+    return {
+      option,
+      combinedPriority: (whiteEvaluation?.priority || 0) + (colorChoice?.priority || 0) + (closesGame ? 45 : 0)
+    };
+  });
+
+  return candidates.sort((a, b) => b.combinedPriority - a.combinedPriority)[0]?.option || null;
 }
 
 function scoreQwixxMarks(count) {
@@ -3463,7 +3649,16 @@ export function DisneyQwixxGame({ mode, room, localPlayer, players, updateRoomSt
 
       const aiMarks = marks[aiIndex] || createQwixxMarks();
       if (phase === 'white') {
-        const bestOption = chooseQwixxAiOption(getQwixxWhiteOptions(dice, aiMarks, lockedRows), aiMarks, aiLevel);
+        const bestOption = chooseQwixxAiWhiteOption(
+          dice,
+          aiMarks,
+          lockedRows,
+          aiLevel,
+          {
+            isActivePlayer: activeIndex === aiIndex,
+            opponentMarks: marks[0] || createQwixxMarks()
+          }
+        );
         const row = bestOption ? QWIXX_ROWS.find(item => item.id === bestOption.rowId) : null;
         const nextMarks = bestOption ? addQwixxMark(marks, aiIndex, bestOption.rowId, bestOption.value) : marks;
         const nextLockedRows = bestOption
@@ -3498,7 +3693,17 @@ export function DisneyQwixxGame({ mode, room, localPlayer, players, updateRoomSt
         return;
       }
 
-      const bestOption = chooseQwixxAiOption(getQwixxColorOptions(dice, aiMarks, lockedRows), aiMarks, aiLevel);
+      const bestOption = chooseQwixxAiOption(
+        getQwixxColorOptions(dice, aiMarks, lockedRows),
+        aiMarks,
+        aiLevel,
+        {
+          canSkip: true,
+          mustAvoidPenalty: !activeMarked,
+          opponentMarks: marks[0] || createQwixxMarks(),
+          phase: 'color'
+        }
+      );
       if (!bestOption) {
         const nextPenalties = penalties.map((value, index) => index === aiIndex && !activeMarked ? value + 1 : value);
         finishTurn(
@@ -4385,9 +4590,39 @@ const makeUltimateMove = (state, boardIndex, cellIndex, playerIndex) => {
   };
 };
 
+const evaluateUltimateLine = (values, aiPlayer = 1) => {
+  const opponent = aiPlayer === 1 ? 0 : 1;
+  let score = 0;
+  ULTIMATE_LINES.forEach(line => {
+    const lineValues = line.map(index => values[index]);
+    const aiCount = lineValues.filter(value => value === aiPlayer).length;
+    const opponentCount = lineValues.filter(value => value === opponent).length;
+    if (opponentCount === 0) score += aiCount === 2 ? 12 : aiCount === 1 ? 2 : 0;
+    if (aiCount === 0) score -= opponentCount === 2 ? 15 : opponentCount === 1 ? 2 : 0;
+  });
+  return score;
+};
+
+const evaluateUltimateState = (state, aiPlayer = 1) => {
+  if (state.winner === aiPlayer) return 100000;
+  if (state.winner !== null && state.winner !== 'draw') return -100000;
+  let score = evaluateUltimateLine(state.boardOwners, aiPlayer) * 40;
+  state.boardOwners.forEach((owner, boardIndex) => {
+    if (owner === aiPlayer) score += 420;
+    else if (owner !== null) score -= 460;
+    else score += evaluateUltimateLine(state.cells[boardIndex], aiPlayer) * 2.5;
+  });
+  if (state.forcedBoard !== null && state.boardOwners[state.forcedBoard] === null) {
+    score += evaluateUltimateLine(state.cells[state.forcedBoard], aiPlayer) * (state.turn === aiPlayer ? 1.5 : -1.5);
+  }
+  return score;
+};
+
 const chooseUltimateAiMove = (state, level) => {
   const legalMoves = getUltimateLegalMoves(state);
   if (legalMoves.length === 0) return null;
+  if (level === 'easy') return legalMoves[Math.floor(Math.random() * legalMoves.length)];
+
   if (level !== 'easy') {
     const winningMove = legalMoves.find(move => {
       const next = makeUltimateMove(state, move.boardIndex, move.cellIndex, 1);
@@ -4402,8 +4637,18 @@ const chooseUltimateAiMove = (state, level) => {
     if (blockingMove) return blockingMove;
   }
   if (level === 'hard') {
-    const centerMove = legalMoves.find(move => move.cellIndex === 4);
-    if (centerMove) return centerMove;
+    return legalMoves
+      .map(move => {
+        const next = makeUltimateMove(state, move.boardIndex, move.cellIndex, 1);
+        const replies = getUltimateLegalMoves(next);
+        const worstReply = replies.length
+          ? Math.min(...replies.map(reply => evaluateUltimateState(makeUltimateMove(next, reply.boardIndex, reply.cellIndex, 0), 1)))
+          : evaluateUltimateState(next, 1);
+        const positionalBonus = (move.cellIndex === 4 ? 5 : [0, 2, 6, 8].includes(move.cellIndex) ? 2 : 0)
+          + (move.boardIndex === 4 ? 3 : 0);
+        return { ...move, score: worstReply + positionalBonus };
+      })
+      .sort((a, b) => b.score - a.score)[0];
   }
   return legalMoves[Math.floor(Math.random() * legalMoves.length)];
 };

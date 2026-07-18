@@ -70,6 +70,8 @@ const ARENA_GAMES = [
 ];
 
 const getArenaGame = (gameId) => ARENA_GAMES.find(game => game.id === gameId);
+const AI_ARENA_GAME_IDS = new Set(['othello', 'dotsboxes', 'abalone', 'yahtzee', 'qwixx', 'tictactinker']);
+const hasArenaAi = gameId => AI_ARENA_GAME_IDS.has(gameId);
 
 const COCO_BANK_KEY = 'disney_coco_coin_bank';
 const COCO_PROFILES_KEY = 'disney_coco_profiles';
@@ -4694,7 +4696,7 @@ export default function App() {
 
                       {arcadePlayMode === 'solo' && (
                         <div className="animate-fade-in">
-                          {getArenaGame(selectedArcadeGame)?.maxPlayers !== 1 && (
+                          {hasArenaAi(selectedArcadeGame) && (
                             <div style={{ background: '#07152c', border: '1px solid var(--line)', borderRadius: '12px', padding: '12px', marginBottom: '12px' }}>
                               <label style={{ display: 'block', marginBottom: '8px', fontSize: '13px', fontWeight: 'bold', color: 'var(--gold)' }}>AI-niveau tegenstander</label>
                               <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '8px' }}>
@@ -5148,7 +5150,7 @@ export default function App() {
                       const isHost = players[0]?.id === localPlayer?.id;
                       const canControlTurnTask = isMyTurn || isHost;
                       const difficultyLabel = t.difficulty ? { easy: "Makkelijk", medium: "Medium", hard: "Moeilijk" }[t.difficulty] : "";
-                      const isSoloAiGame = t.type === 'arcade-game' && t.mode === 'solo' && getArenaGame(t.gameId)?.maxPlayers !== 1;
+                      const isSoloAiGame = t.type === 'arcade-game' && t.mode === 'solo' && hasArenaAi(t.gameId);
                       const aiLevelNumber = { easy: 1, normal: 2, hard: 3 }[room.current_task_state?.aiLevel || aiLevel] || 2;
                       const pointsText = t.type === "quizChoice"
                         ? "Kies je niveau"
