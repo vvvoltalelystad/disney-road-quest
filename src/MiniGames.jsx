@@ -2801,7 +2801,7 @@ export function DisneyYahtzeeGame({ mode, room, localPlayer, players, updateRoom
     const otherTotal = getYahtzeeTotal(scores[otherIndex] || {});
     const won = myTotal > otherTotal;
     const tie = myTotal === otherTotal;
-    const points = won ? 2 : tie ? 1 : 0;
+    const points = won ? 3 : tie ? 2 : 1;
     const detail = won
       ? `Goofy's Geluksworp gewonnen: ${myTotal}-${otherTotal}`
       : tie
@@ -3545,7 +3545,7 @@ export function DisneyQwixxGame({ mode, room, localPlayer, players, updateRoomSt
     const otherTotal = getQwixxPlayerTotal(marks[otherIndex] || {}, penalties[otherIndex] || 0, closedBy, otherIndex);
     const won = myTotal > otherTotal;
     const tie = myTotal === otherTotal;
-    const points = won ? 3 : tie ? 2 : 1;
+    const points = won ? 2 : tie ? 1 : 0;
     const detail = won
       ? `Mike's Wazowski-Board gewonnen: ${myTotal}-${otherTotal}`
       : tie
@@ -3677,10 +3677,12 @@ export function DisneyQwixxGame({ mode, room, localPlayer, players, updateRoomSt
         ))}
       </div>
 
-      <div className="qwixx-actions" style={{ display: 'grid', gridTemplateColumns: rolled && (canChooseWhite || canChooseColor) ? '1fr 1fr' : '1fr', gap: '8px', marginBottom: '12px' }}>
-        <button className="btn primary full" onClick={handleRoll} disabled={!myTurn || rolled || complete}>
-          Gooi dobbelstenen
-        </button>
+      <div className="qwixx-actions" style={{ display: 'grid', gridTemplateColumns: '1fr', gap: '8px', marginBottom: '12px' }}>
+        {!rolled && (
+          <button className="btn primary full" onClick={handleRoll} disabled={!myTurn || complete}>
+            Gooi dobbelstenen
+          </button>
+        )}
         {canChooseWhite && (
           <button className="btn secondary full" onClick={() => updateWhiteChoice()}>
             Witte som overslaan
