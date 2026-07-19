@@ -94,7 +94,7 @@ const BADGE_RARITIES = [
 
 const BADGE_NAMES = {
   disneyland: {
-    common: ['Main Street Station', 'Town Square', 'Horse-Drawn Tram', 'Casey’s Corner', 'Liberty Arcade', 'Discovery Arcade', 'Sleeping Beauty Castle', 'La Carrousel de Lancelot', 'Alice’s Curious Labyrinth', 'Mad Hatter’s Tea Cups', 'Le Pays des Contes de Fées', 'It’s a Small World'],
+    common: ['Main Street Station', 'Town Square', 'Horse-Drawn Streetcars', 'Casey’s Corner', 'Liberty Arcade', 'Discovery Arcade', 'Sleeping Beauty Castle', 'Le Carrousel de Lancelot', 'Alice’s Curious Labyrinth', 'Mad Hatter’s Tea Cups', 'Le Pays des Contes de Fées', 'It’s a Small World'],
     uncommon: ['Pirates’ Beach', 'Adventure Isle', 'Swiss Family Treehouse', 'Frontierland Depot', 'Thunder Mesa', 'Phantom Manor', 'Orbitron', 'Autopia'],
     rare: ['Peter Pan’s Flight', 'Pirates of the Caribbean', 'Star Tours', 'Buzz Lightyear Laser Blast', 'Mickey’s PhilharMagic', 'Big Thunder Mountain', 'Indiana Jones Temple', 'Dragon’s Lair'],
     epic: ['Disney Stars on Parade', 'Disney Tales of Magic', 'Meet Mickey Mouse', 'Princess Pavilion', 'Star Wars Hyperspace Mountain', 'Castle Dream'],
@@ -304,6 +304,8 @@ function BadgeArtwork({ badge, count = 0, compact = false }) {
         src={assetPath(badge.image)}
         alt=""
         aria-hidden="true"
+        loading="lazy"
+        decoding="async"
         onError={event => { event.currentTarget.hidden = true; }}
       />
       {count > 1 && <span className="disney-badge-count">×{count}</span>}
