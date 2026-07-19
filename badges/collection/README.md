@@ -23,7 +23,7 @@ Voorbeelden:
 
 - `disneyland-common-1.png` — Main Street Station
 - `disneyland-legendary-4.png` — Disneyland Park Icon
-- `adventure-common-1.png` — Front Lot
+- `adventure-common-1.png` — World Premiere Entrance
 - `adventure-legendary-4.png` — Disney Adventure World Icon
 
 Aanbevolen formaat: 1200 × 1200 pixels, PNG. De volledige afbeelding wordt proportioneel in het vierkante badgevak geplaatst.
