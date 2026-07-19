@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
+import { createPortal } from 'react-dom';
 import { DEFAULT_TASKS, MAGIC_NEWS } from './questions';
 import { supabase } from './supabaseClient';
 import {
@@ -180,6 +181,21 @@ const JACCO_BADGE_SHOWCASE_COUNTS = {
   'disneyland-common-11': 3,
   'disneyland-common-12': 2,
   'adventure-common-1': 3
+};
+const BADGE_FACTS = {
+  'disneyland-common-1': 'Een volledige ronde met de Disneyland Railroad duurt ongeveer dertig minuten.',
+  'disneyland-common-2': 'Town Square is het eerste plein na de ingang en vormt de poort naar Main Street, U.S.A.',
+  'disneyland-common-3': 'Deze paardentram rijdt in klassieke negentiende-eeuwse stijl over Main Street, U.S.A.',
+  'disneyland-common-4': 'Casey’s Corner is een Amerikaans restaurant dat helemaal in het teken staat van honkbal.',
+  'disneyland-common-5': 'Liberty Arcade is een van de twee overdekte passages vol kunst, foto’s en schaalmodellen.',
+  'disneyland-common-6': 'Discovery Arcade laat je langs fantasierijke uitvindingen en toekomstvisies uit het verleden wandelen.',
+  'disneyland-common-7': 'Onder het kasteel woont een 24 meter lange draak van ruim twee ton.',
+  'disneyland-common-8': 'Dit carrousel brengt de legende van ridder Lancelot tot leven in het hart van Fantasyland.',
+  'disneyland-common-9': 'Het doolhof van Wonderland eindigt bij het kasteel van de Hartenkoningin.',
+  'disneyland-common-10': 'De kleurrijke theekopjes draaien rond een enorme theepot van de Mad Hatter.',
+  'disneyland-common-11': 'In 2024 kreeg deze miniatuurwereld nieuwe scènes van Frozen, Winnie de Poeh en Up.',
+  'disneyland-common-12': 'Tijdens de boottocht zie je bijna 300 Audio-Animatronics-poppen uit alle hoeken van de wereld.',
+  'adventure-common-1': 'World Premiere herschept de glitter en spanning van de openingsavond van een Hollywoodfilm.'
 };
 const getAchievement = achievementId => BADGE_ACHIEVEMENTS.find(achievement => achievement.id === achievementId);
 const getRarityBadgeProgress = (ownedBadges, rarity) => {
@@ -372,6 +388,7 @@ function MiguelMarket({
   const viewerBadge = getBadge(viewerBadgeId);
   const viewerRarity = BADGE_RARITIES.find(rarity => rarity.id === viewerBadge?.rarity);
   const viewerCount = Number(ownedBadges?.[viewerBadgeId]) || 0;
+  const viewerFact = BADGE_FACTS[viewerBadgeId] || `Deze badge bewaart een bijzondere herinnering aan ${viewerBadge?.parkName || 'Disneyland Paris'}.`;
 
   const handleCollectionBadgeClick = badgeId => {
     if ((Number(ownedBadges?.[badgeId]) || 0) <= 0) return;
@@ -387,6 +404,23 @@ function MiguelMarket({
     setViewerBadgeId(null);
     setViewerFlipped(false);
   };
+
+  useEffect(() => {
+    if (!viewerBadgeId) return undefined;
+    const previousOverflow = document.body.style.overflow;
+    const closeOnEscape = event => {
+      if (event.key === 'Escape') {
+        setViewerBadgeId(null);
+        setViewerFlipped(false);
+      }
+    };
+    document.body.style.overflow = 'hidden';
+    window.addEventListener('keydown', closeOnEscape);
+    return () => {
+      document.body.style.overflow = previousOverflow;
+      window.removeEventListener('keydown', closeOnEscape);
+    };
+  }, [viewerBadgeId]);
 
   return (
     <section className="card portal-shop-content miguel-market">
@@ -542,17 +576,10 @@ function MiguelMarket({
         })}
       </div>
 
-      {viewerBadge && viewerRarity && viewerCount > 0 && (
+      {viewerBadge && viewerRarity && viewerCount > 0 && createPortal(
         <div className="badge-viewer-modal" role="dialog" aria-modal="true" aria-label={`${viewerBadge.name} bekijken`} onClick={closeBadgeViewer}>
           <section className={`badge-viewer-shell rarity-${viewerBadge.rarity}`} onClick={event => event.stopPropagation()}>
-            <header className="badge-viewer-header">
-              <div>
-                <span className="portal-section-kicker">Jouw Disney-badge</span>
-                <strong>{viewerBadge.name}</strong>
-                <small>{viewerBadge.parkName} · {viewerBadge.rarityName} · ×{viewerCount}</small>
-              </div>
-              <button type="button" className="badge-dialog-close" onClick={closeBadgeViewer} aria-label="Badgeviewer sluiten">×</button>
-            </header>
+            <button type="button" className="badge-viewer-close" onClick={closeBadgeViewer} aria-label="Badgeviewer sluiten">×</button>
 
             <button
               type="button"
@@ -566,16 +593,18 @@ function MiguelMarket({
                 </span>
                 <span className="badge-flip-face badge-flip-back">
                   <img src={assetPath(viewerRarity.frame)} alt="" aria-hidden="true" />
-                  <span className="badge-back-name">
-                    <strong>{viewerBadge.name}</strong>
+                  <span className="badge-back-fact">
+                    <strong>Wist je dat?</strong>
+                    <span>{viewerFact}</span>
                   </span>
                 </span>
               </span>
             </button>
 
-            <p className="badge-viewer-hint">Tik op de badge om hem om te draaien</p>
+            <p className="badge-viewer-hint">{viewerBadge.rarityName} · ×{viewerCount} <span>·</span> Tik om te draaien</p>
           </section>
-        </div>
+        </div>,
+        document.body
       )}
 
       {tradeOfferIndex !== null && (
