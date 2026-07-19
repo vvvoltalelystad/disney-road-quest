@@ -2034,34 +2034,34 @@ export function AbaloneGame({ mode, room, localPlayer, players, updateRoomState,
 }
 
 const PIRATES_PLANK_WORDS = [
-  { word: "PHANTOM MANOR", language: "en" },
-  { word: "THUNDER MESA", language: "en" },
-  { word: "CASEY JR CIRCUS TRAIN", language: "en" },
-  { word: "NAUTILUS", language: "en" },
-  { word: "DISCOVERYLAND", language: "en" },
-  { word: "SKULL ROCK", language: "en" },
-  { word: "ADMIRAL BOOM", language: "en" },
-  { word: "CLARABELLE COW", language: "en" },
-  { word: "PROFESSOR PORTER", language: "en" },
-  { word: "KRONKS SPINACH PUFFS", language: "en" },
-  { word: "MAURICES INVENTION", language: "en" },
-  { word: "YEN SID", language: "en" },
-  { word: "GREAT MOUSE DETECTIVE", language: "en" },
-  { word: "SILVERMIST", language: "en" },
-  { word: "MADAME MEDUSA", language: "en" },
-  { word: "ROBIN HOOD AND LITTLE JOHN", language: "en" },
-  { word: "THE RESCUERS DOWN UNDER", language: "en" },
-  { word: "WALT DISNEY STUDIOS PARK", language: "en" },
-  { word: "AVENGERS ASSEMBLE FLIGHT FORCE", language: "en" },
-  { word: "LAND OF FAIRY TALES", language: "en" },
-  { word: "DE KLEINE ZEEMEERMIN", language: "nl" },
-  { word: "BELLE EN HET BEEST", language: "nl" },
-  { word: "DE PRINSES EN DE KIKKER", language: "nl" },
-  { word: "DE REDDERTJES", language: "nl" },
-  { word: "KNABBEL EN BABBEL", language: "nl" },
-  { word: "HET JUNGLEBOEK", language: "nl" },
-  { word: "DE KLOKKENLUIDER VAN DE NOTRE DAME", language: "nl" },
-  { word: "101 DALMATIERS", language: "nl" }
+  { word: "PHANTOM MANOR", language: "en", category: "Attractie", hint: "Een spookachtig landhuis in Frontierland." },
+  { word: "THUNDER MESA", language: "en", category: "Disney-locatie", hint: "Het mijnstadje rond Big Thunder Mountain." },
+  { word: "CASEY JR CIRCUS TRAIN", language: "en", category: "Attractie", hint: "Een kleine circustrein uit Fantasyland." },
+  { word: "NAUTILUS", language: "en", category: "Disney-locatie", hint: "De beroemde onderzeeër van kapitein Nemo." },
+  { word: "DISCOVERYLAND", language: "en", category: "Disney-locatie", hint: "Hier draait alles om uitvindingen en de toekomst." },
+  { word: "SKULL ROCK", language: "en", category: "Disney-locatie", hint: "Een rots in de vorm van een piratenschedel." },
+  { word: "ADMIRAL BOOM", language: "en", category: "Personage", hint: "De luidruchtige buurman uit Mary Poppins." },
+  { word: "CLARABELLE COW", language: "en", category: "Personage", hint: "Een klassieke vriendin van Mickey en Minnie." },
+  { word: "PROFESSOR PORTER", language: "en", category: "Personage", hint: "De vader van Jane in Tarzan." },
+  { word: "KRONKS SPINACH PUFFS", language: "en", category: "Disney-gerecht", hint: "Kronks beroemdste ovenhapjes." },
+  { word: "MAURICES INVENTION", language: "en", category: "Disney-voorwerp", hint: "Een uitvinding van Belles vader." },
+  { word: "YEN SID", language: "en", category: "Personage", hint: "De machtige tovenaar uit Fantasia." },
+  { word: "GREAT MOUSE DETECTIVE", language: "en", category: "Film", hint: "Een muis lost een mysterie op in Londen." },
+  { word: "SILVERMIST", language: "en", category: "Personage", hint: "Een watertalent uit Pixie Hollow." },
+  { word: "MADAME MEDUSA", language: "en", category: "Personage", hint: "De schurk uit The Rescuers." },
+  { word: "ROBIN HOOD AND LITTLE JOHN", language: "en", category: "Film", hint: "Twee vrienden die door het woud trekken." },
+  { word: "THE RESCUERS DOWN UNDER", language: "en", category: "Film", hint: "Bernard en Bianca reizen naar Australië." },
+  { word: "WALT DISNEY STUDIOS PARK", language: "en", category: "Disney-locatie", hint: "De vroegere naam van het tweede park in Parijs." },
+  { word: "AVENGERS ASSEMBLE FLIGHT FORCE", language: "en", category: "Attractie", hint: "Een snelle Marvel-missie in Avengers Campus." },
+  { word: "LAND OF FAIRY TALES", language: "en", category: "Attractie", hint: "Een boottocht langs miniatuur-sprookjes." },
+  { word: "DE KLEINE ZEEMEERMIN", language: "nl", category: "Film", hint: "Een prinses droomt van een leven op het land." },
+  { word: "BELLE EN HET BEEST", language: "nl", category: "Film", hint: "Een betoverd kasteel en een magische roos." },
+  { word: "DE PRINSES EN DE KIKKER", language: "nl", category: "Film", hint: "Een ambitieuze kokkin in New Orleans." },
+  { word: "DE REDDERTJES", language: "nl", category: "Film", hint: "Twee dappere muizen schieten te hulp." },
+  { word: "KNABBEL EN BABBEL", language: "nl", category: "Personages", hint: "Twee ondeugende aardeekhoorns." },
+  { word: "HET JUNGLEBOEK", language: "nl", category: "Film", hint: "Mowgli groeit op tussen de dieren." },
+  { word: "DE KLOKKENLUIDER VAN DE NOTRE DAME", language: "nl", category: "Film", hint: "Een verhaal rond de kathedraal van Parijs." },
+  { word: "101 DALMATIERS", language: "nl", category: "Film", hint: "Een heleboel gevlekte puppy's." }
 ];
 
 const PLANK_LETTERS = "ABCDEFGHIJKLMNOPQRSTUVWXYZ".split("");
@@ -2073,33 +2073,56 @@ const PLANK_EVENT_DIE = [
   { id: "neutral-2", name: "Neutraal", icon: "🧭", tone: "#d8e8ff", allowsLetter: true, multiplier: 1 },
   { id: "double", name: "Dubbel", icon: "🏴‍☠️", tone: "#ffd45c", allowsLetter: true, multiplier: 2 },
   { id: "curse", name: "Vloek", icon: "💀", tone: "#ff6b6b", allowsLetter: false },
-  { id: "shipwreck", name: "Schipbreuk", icon: "🌊", tone: "#6bd6ff", allowsLetter: false },
-  { id: "chest", name: "Schatkist", icon: "💰", tone: "#ffd45c", allowsLetter: false }
+  { id: "shipwreck", name: "Schipbreuk", icon: "🌊", tone: "#6bd6ff", allowsLetter: true },
+  { id: "chest", name: "Schatkist", icon: "💰", tone: "#ffd45c", allowsLetter: true }
 ];
-const PLANK_MAX_STRIKES = 3;
-const PLANK_VOWEL_COST = 5;
+const PLANK_DIFFICULTIES = {
+  easy: { label: "Rustig", maxLetters: 14, preReveal: 2, maxStrikes: 5, vowelCost: 3, startTreasure: 3, solvePenalty: 1, autoHintAfter: 2, showCategory: true, showHint: true },
+  normal: { label: "Normaal", maxLetters: 22, preReveal: 1, maxStrikes: 4, vowelCost: 4, startTreasure: 3, solvePenalty: 1, autoHintAfter: 2, showCategory: true, showHint: false },
+  hard: { label: "Uitdagend", maxLetters: Infinity, preReveal: 0, maxStrikes: 3, vowelCost: 5, startTreasure: 2, solvePenalty: 2, autoHintAfter: 2, showCategory: false, showHint: false }
+};
 const PLANK_LANGUAGES = {
   en: { flag: "🇬🇧", label: "Engelstalig woord" },
   nl: { flag: "🇳🇱", label: "Nederlandstalig woord" }
 };
 
 const getPlankOccurrenceCount = (word, letter) => word.split("").filter(char => char === letter).length;
+const getPlankLetterCount = word => word.split("").filter(char => /[A-Z0-9]/.test(char)).length;
+const getPlankWordCount = word => word.trim().split(/\s+/).filter(Boolean).length;
 const isPlankWordSolved = (word, guesses) => (
-  word.split("").every(char => char === " " || char === "-" || char === "'" || guesses.includes(char))
+  word.split("").every(char => !PLANK_LETTERS.includes(char) || guesses.includes(char))
 );
 
-function createPiratesPlankState() {
-  const entry = PIRATES_PLANK_WORDS[Math.floor(Math.random() * PIRATES_PLANK_WORDS.length)];
+function createPiratesPlankState(difficulty = "normal") {
+  const safeDifficulty = PLANK_DIFFICULTIES[difficulty] ? difficulty : "normal";
+  const config = PLANK_DIFFICULTIES[safeDifficulty];
+  const candidates = PIRATES_PLANK_WORDS.filter(entry => getPlankLetterCount(entry.word) <= config.maxLetters);
+  const weightedCandidates = [
+    ...candidates,
+    ...candidates.filter(entry => getPlankLetterCount(entry.word) <= 14),
+    ...(safeDifficulty === "easy" ? candidates.filter(entry => getPlankLetterCount(entry.word) <= 11) : [])
+  ];
+  const entry = weightedCandidates[Math.floor(Math.random() * weightedCandidates.length)];
+  const uniqueLetters = Array.from(new Set(entry.word.split("").filter(char => PLANK_LETTERS.includes(char))));
+  const shuffledLetters = [...uniqueLetters].sort(() => Math.random() - 0.5);
+  const startingGuesses = shuffledLetters.slice(0, Math.min(config.preReveal, Math.max(0, uniqueLetters.length - 2)));
   return {
+    piratesDifficulty: safeDifficulty,
     plankWord: entry.word,
     plankLanguage: entry.language || "en",
-    plankGuesses: [],
+    plankCategory: entry.category,
+    plankHint: entry.hint,
+    plankGuesses: startingGuesses,
+    plankBoughtVowels: [],
     plankWrongGuesses: [],
-    plankTreasure: 0,
+    plankTreasure: config.startTreasure,
     plankStrikes: 0,
     plankTurns: 0,
+    plankWrongStreak: 0,
     plankPendingRoll: null,
-    plankLastMove: "Gooi de dobbelstenen om de jacht op buit te starten.",
+    plankLastMove: startingGuesses.length
+      ? `Startletter${startingGuesses.length > 1 ? "s" : ""}: ${startingGuesses.join(", ")}. Gooi de dobbelstenen.`
+      : "Gooi de dobbelstenen om de jacht op buit te starten.",
     plankWinnerId: null,
     plankFailed: false
   };
@@ -2133,7 +2156,7 @@ function LegacyPiratesPlankGame({ mode, room, localPlayer, players, updateRoomSt
   }, []);
 
   const visibleWord = word.split("").map(char => {
-    if (char === " " || char === "-" || char === "'") return char;
+    if (!PLANK_LETTERS.includes(char)) return char;
     return guesses.includes(char) ? char : "_";
   });
 
@@ -2260,13 +2283,20 @@ export function PiratesPlankGame({ mode, room, localPlayer, players, updateRoomS
   const myTurn = isSolo || activeIndex === myIndex;
 
   const word = taskState.plankWord || "";
+  const difficulty = PLANK_DIFFICULTIES[taskState.piratesDifficulty] ? taskState.piratesDifficulty : "normal";
+  const difficultyConfig = PLANK_DIFFICULTIES[difficulty];
   const wordLanguage = taskState.plankLanguage || PIRATES_PLANK_WORDS.find(entry => entry.word === word)?.language || "en";
+  const wordEntry = PIRATES_PLANK_WORDS.find(entry => entry.word === word);
+  const wordCategory = taskState.plankCategory || wordEntry?.category || "Disney";
+  const wordHint = taskState.plankHint || wordEntry?.hint || "Een bekende naam uit de Disney-wereld.";
   const languageInfo = PLANK_LANGUAGES[wordLanguage] || PLANK_LANGUAGES.en;
   const guesses = taskState.plankGuesses || [];
   const wrongGuesses = taskState.plankWrongGuesses || [];
+  const boughtVowelLetters = taskState.plankBoughtVowels || [];
   const treasure = taskState.plankTreasure || 0;
   const strikes = taskState.plankStrikes || 0;
   const turns = taskState.plankTurns || 0;
+  const wrongStreak = taskState.plankWrongStreak || 0;
   const pendingRoll = taskState.plankPendingRoll || null;
   const lastMove = taskState.plankLastMove || "";
   const winnerId = taskState.plankWinnerId || null;
@@ -2279,14 +2309,14 @@ export function PiratesPlankGame({ mode, room, localPlayer, players, updateRoomS
         current_player_index: 0,
         current_task_state: {
           ...taskState,
-          ...createPiratesPlankState()
+          ...createPiratesPlankState(taskState.piratesDifficulty || "normal")
         }
       });
     }
   }, []);
 
   const visibleWord = word.split("").map(char => {
-    if (char === " " || char === "-" || char === "'") return char;
+    if (!PLANK_LETTERS.includes(char)) return char;
     return guesses.includes(char) ? char : "_";
   });
 
@@ -2294,8 +2324,21 @@ export function PiratesPlankGame({ mode, room, localPlayer, players, updateRoomS
   const passTurnIndex = isSolo ? activeIndex : (activeIndex + 1) % totalPlayers;
   const canAct = Boolean(word) && !isFinished && myTurn;
   const hasLetterRoll = pendingRoll?.allowsLetter;
-  const shipProgress = Math.min(1, strikes / PLANK_MAX_STRIKES);
-  const treasureColor = treasure < PLANK_VOWEL_COST ? '#ff5b5b' : '#050b16';
+  const shipProgress = Math.min(1, (strikes / difficultyConfig.maxStrikes) * 0.82 + Math.min(turns, 12) / 12 * 0.18);
+  const treasureColor = treasure < difficultyConfig.vowelCost ? '#ff5b5b' : '#050b16';
+
+  const addAutomaticHint = (baseGuesses, nextStreak) => {
+    if (nextStreak < difficultyConfig.autoHintAfter) {
+      return { guesses: baseGuesses, wrongStreak: nextStreak, revealed: null };
+    }
+    const available = Array.from(new Set(word.split("").filter(char => PLANK_LETTERS.includes(char) && !baseGuesses.includes(char))));
+    const revealed = available[0] || null;
+    return {
+      guesses: revealed ? [...baseGuesses, revealed] : baseGuesses,
+      wrongStreak: 0,
+      revealed
+    };
+  };
 
   const commitPlankState = (updates, passTurn = true) => {
     updateRoomState(room.id, {
@@ -2322,13 +2365,19 @@ export function PiratesPlankGame({ mode, room, localPlayer, players, updateRoomS
     };
 
     if (event.id === "curse") {
-      const nextStrikes = Math.min(PLANK_MAX_STRIKES, strikes + 1);
+      const curseCost = 2;
+      const lost = Math.min(curseCost, treasure);
+      const getsStrike = treasure < curseCost;
+      const nextStrikes = Math.min(difficultyConfig.maxStrikes, strikes + (getsStrike ? 1 : 0));
       commitPlankState({
         plankPendingRoll: null,
+        plankTreasure: treasure - lost,
         plankStrikes: nextStrikes,
         plankTurns: turns + 1,
-        plankFailed: nextStrikes >= PLANK_MAX_STRIKES,
-        plankLastMove: `Vloek! ${localPlayer.name} krijgt direct een strike.`
+        plankFailed: nextStrikes >= difficultyConfig.maxStrikes,
+        plankLastMove: getsStrike
+          ? `Vloek! ${localPlayer.name} verliest ${lost} buit en krijgt door te weinig buit 1 strike.`
+          : `Vloek afgekocht: ${localPlayer.name} verliest 2 buit, maar geen strike.`
       });
       return;
     }
@@ -2336,21 +2385,19 @@ export function PiratesPlankGame({ mode, room, localPlayer, players, updateRoomS
     if (event.id === "shipwreck") {
       const lost = Math.ceil(treasure / 2);
       commitPlankState({
-        plankPendingRoll: null,
+        plankPendingRoll: baseRoll,
         plankTreasure: Math.max(0, treasure - lost),
-        plankTurns: turns + 1,
-        plankLastMove: `Schipbreuk! ${localPlayer.name} verliest ${lost} buit.`
-      });
+        plankLastMove: `Schipbreuk! ${localPlayer.name} verliest ${lost} buit en mag daarna een medeklinker kiezen.`
+      }, false);
       return;
     }
 
     if (event.id === "chest") {
       commitPlankState({
-        plankPendingRoll: null,
+        plankPendingRoll: baseRoll,
         plankTreasure: treasure + 5,
-        plankTurns: turns + 1,
-        plankLastMove: `Schatkist! ${localPlayer.name} vindt 5 buit, maar kiest geen letter.`
-      });
+        plankLastMove: `Schatkist! ${localPlayer.name} vindt 5 buit en mag een medeklinker kiezen.`
+      }, false);
       return;
     }
 
@@ -2364,49 +2411,60 @@ export function PiratesPlankGame({ mode, room, localPlayer, players, updateRoomS
     if (!canAct || !hasLetterRoll || guesses.includes(letter) || !PLANK_CONSONANTS.includes(letter)) return;
 
     const count = getPlankOccurrenceCount(word, letter);
-    const nextGuesses = [...guesses, letter];
+    const guessedLetters = [...guesses, letter];
     const earned = count * pendingRoll.number * (pendingRoll.multiplier || 1);
     const nextTreasure = treasure + earned;
-    const nextStrikes = count > 0 ? strikes : Math.min(PLANK_MAX_STRIKES, strikes + 1);
-    const solved = count > 0 && isPlankWordSolved(word, nextGuesses);
-    const nextFailed = nextStrikes >= PLANK_MAX_STRIKES && !solved;
+    const hintResult = count > 0
+      ? { guesses: guessedLetters, wrongStreak: 0, revealed: null }
+      : addAutomaticHint(guessedLetters, wrongStreak + 1);
+    const nextGuesses = hintResult.guesses;
+    const nextStrikes = count > 0 ? strikes : Math.min(difficultyConfig.maxStrikes, strikes + 1);
+    const solved = isPlankWordSolved(word, nextGuesses);
+    const nextFailed = nextStrikes >= difficultyConfig.maxStrikes && !solved;
 
     commitPlankState({
       plankGuesses: nextGuesses,
       plankWrongGuesses: count > 0 ? wrongGuesses : [...wrongGuesses, letter],
       plankTreasure: nextTreasure,
       plankStrikes: nextStrikes,
+      plankWrongStreak: hintResult.wrongStreak,
       plankTurns: turns + 1,
       plankPendingRoll: null,
       plankWinnerId: solved ? localPlayer.id : null,
       plankFailed: nextFailed,
       plankLastMove: count > 0
         ? `${letter} zit er ${count}x in: +${earned} buit.`
-        : `${letter} zit er niet in: strike ${nextStrikes}/${PLANK_MAX_STRIKES}.`
+        : `${letter} zit er niet in: strike ${nextStrikes}/${difficultyConfig.maxStrikes}.${hintResult.revealed ? ` Hulp aan dek: ${hintResult.revealed} is onthuld.` : ""}`
     });
   };
 
   const handleBuyVowel = (letter) => {
-    if (!canAct || pendingRoll || guesses.includes(letter) || treasure < PLANK_VOWEL_COST) return;
+    if (!canAct || pendingRoll || guesses.includes(letter) || treasure < difficultyConfig.vowelCost) return;
 
     const count = getPlankOccurrenceCount(word, letter);
-    const nextGuesses = [...guesses, letter];
-    const nextTreasure = Math.max(0, treasure - PLANK_VOWEL_COST);
-    const nextStrikes = count > 0 ? strikes : Math.min(PLANK_MAX_STRIKES, strikes + 1);
-    const solved = count > 0 && isPlankWordSolved(word, nextGuesses);
-    const nextFailed = nextStrikes >= PLANK_MAX_STRIKES && !solved;
+    const guessedLetters = [...guesses, letter];
+    const nextTreasure = Math.max(0, treasure - difficultyConfig.vowelCost);
+    const hintResult = count > 0
+      ? { guesses: guessedLetters, wrongStreak: 0, revealed: null }
+      : addAutomaticHint(guessedLetters, wrongStreak + 1);
+    const nextGuesses = hintResult.guesses;
+    const nextStrikes = count > 0 ? strikes : Math.min(difficultyConfig.maxStrikes, strikes + 1);
+    const solved = isPlankWordSolved(word, nextGuesses);
+    const nextFailed = nextStrikes >= difficultyConfig.maxStrikes && !solved;
 
     commitPlankState({
       plankGuesses: nextGuesses,
       plankWrongGuesses: count > 0 ? wrongGuesses : [...wrongGuesses, letter],
+      plankBoughtVowels: [...boughtVowelLetters, letter],
       plankTreasure: nextTreasure,
       plankStrikes: nextStrikes,
+      plankWrongStreak: hintResult.wrongStreak,
       plankTurns: turns + 1,
       plankWinnerId: solved ? localPlayer.id : null,
       plankFailed: nextFailed,
       plankLastMove: count > 0
         ? `${localPlayer.name} koopt ${letter}. De klinker staat ${count}x in de oplossing.`
-        : `${localPlayer.name} koopt ${letter}, maar die staat er niet in: strike ${nextStrikes}/${PLANK_MAX_STRIKES}.`
+        : `${localPlayer.name} koopt ${letter}, maar die staat er niet in: strike ${nextStrikes}/${difficultyConfig.maxStrikes}.${hintResult.revealed ? ` Hulp aan dek: ${hintResult.revealed} is onthuld.` : ""}`
     });
   };
 
@@ -2418,28 +2476,33 @@ export function PiratesPlankGame({ mode, room, localPlayer, players, updateRoomS
     const normalizedAttempt = attempt.replace(/\s+/g, ' ');
     const normalizedWord = word.replace(/\s+/g, ' ');
     const solved = normalizedAttempt === normalizedWord;
-    const nextStrikes = solved ? strikes : Math.min(PLANK_MAX_STRIKES, strikes + 2);
-    const nextFailed = !solved && nextStrikes >= PLANK_MAX_STRIKES;
+    const nextStrikes = solved ? strikes : Math.min(difficultyConfig.maxStrikes, strikes + difficultyConfig.solvePenalty);
+    const hintResult = solved
+      ? { guesses, wrongStreak: 0, revealed: null }
+      : addAutomaticHint(guesses, wrongStreak + 1);
+    const solvedByHint = !solved && isPlankWordSolved(word, hintResult.guesses);
+    const nextFailed = !solved && !solvedByHint && nextStrikes >= difficultyConfig.maxStrikes;
     const revealedLetters = solved
       ? Array.from(new Set(word.split("").filter(char => PLANK_LETTERS.includes(char))))
-      : guesses;
+      : hintResult.guesses;
 
     commitPlankState({
       plankGuesses: revealedLetters,
       plankStrikes: nextStrikes,
+      plankWrongStreak: hintResult.wrongStreak,
       plankTurns: turns + 1,
       plankPendingRoll: null,
-      plankWinnerId: solved ? localPlayer.id : null,
+      plankWinnerId: solved || solvedByHint ? localPlayer.id : null,
       plankFailed: nextFailed,
       plankLastMove: solved
         ? `${localPlayer.name} lost de schatkistcode op!`
-        : `Foute oplossing: +2 strikes (${nextStrikes}/${PLANK_MAX_STRIKES}).`
+        : `Foute oplossing: +${difficultyConfig.solvePenalty} strike${difficultyConfig.solvePenalty > 1 ? "s" : ""} (${nextStrikes}/${difficultyConfig.maxStrikes}).${hintResult.revealed ? ` Hulp aan dek: ${hintResult.revealed} is onthuld.` : ""}`
     });
   };
 
   const handleFinish = () => {
     const won = winnerId === localPlayer.id || (isSolo && winnerId);
-    const boughtVowels = guesses.filter(letter => PLANK_VOWELS.includes(letter)).length;
+    const boughtVowels = boughtVowelLetters.length;
     const speedBonus = turns <= 5 ? 2 : turns <= 8 ? 1 : 0;
     const strikeBonus = strikes === 0 ? 2 : strikes === 1 ? 1 : 0;
     const thriftBonus = boughtVowels === 0 ? 1 : 0;
@@ -2472,7 +2535,7 @@ export function PiratesPlankGame({ mode, room, localPlayer, players, updateRoomS
     const used = guesses.includes(letter);
     const correct = used && word.includes(letter);
     const disabled = kind === 'vowel'
-      ? used || !canAct || Boolean(pendingRoll) || treasure < PLANK_VOWEL_COST
+      ? used || !canAct || Boolean(pendingRoll) || treasure < difficultyConfig.vowelCost
       : used || !canAct || !hasLetterRoll;
     return (
       <button
@@ -2534,9 +2597,9 @@ export function PiratesPlankGame({ mode, room, localPlayer, players, updateRoomS
 
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '8px' }}>
           <div className="badge" style={{ justifyContent: 'center' }}>
-            Munten: <strong style={{ color: treasureColor, background: treasure < PLANK_VOWEL_COST ? 'transparent' : '#fff', borderRadius: '8px', padding: '1px 7px' }}>{treasure}</strong>
+            Buit: <strong style={{ color: treasureColor, background: treasure < difficultyConfig.vowelCost ? 'transparent' : '#fff', borderRadius: '8px', padding: '1px 7px' }}>{treasure}</strong>
           </div>
-          <div className="badge" style={{ justifyContent: 'center' }}>Strikes: {strikes}/{PLANK_MAX_STRIKES}</div>
+          <div className="badge" style={{ justifyContent: 'center' }}>Strikes: {strikes}/{difficultyConfig.maxStrikes}</div>
           <div className="badge" style={{ justifyContent: 'center' }}>Beurten: {turns}</div>
         </div>
 
@@ -2544,6 +2607,17 @@ export function PiratesPlankGame({ mode, room, localPlayer, players, updateRoomS
           <span className="plank-language-flag" aria-hidden="true">{languageInfo.flag}</span>
           <span><small>Schatkistcode</small><strong>{languageInfo.label}</strong></span>
         </div>
+
+        <div style={{ display: 'flex', flexWrap: 'wrap', justifyContent: 'center', gap: '6px', marginTop: '-3px' }}>
+          <span className="badge">{difficultyConfig.label}</span>
+          <span className="badge">{getPlankWordCount(word)} {getPlankWordCount(word) === 1 ? 'woord' : 'woorden'} · {getPlankLetterCount(word)} letters</span>
+          {difficultyConfig.showCategory && <span className="badge">Categorie: {wordCategory}</span>}
+        </div>
+        {difficultyConfig.showHint && (
+          <div style={{ maxWidth: '380px', margin: '-2px auto 0', color: '#d8e8ff', fontSize: '12px', lineHeight: 1.4 }}>
+            <strong style={{ color: 'var(--gold)' }}>Hint:</strong> {wordHint}
+          </div>
+        )}
 
         <div style={{
           margin: '8px auto',
@@ -2589,7 +2663,7 @@ export function PiratesPlankGame({ mode, room, localPlayer, players, updateRoomS
                 Gooi dobbelstenen
               </button>
               <button className="btn danger" disabled={!canAct} onClick={handleSolve}>
-                Los op (+2 strikes bij fout)
+                Los op (+{difficultyConfig.solvePenalty} strike{difficultyConfig.solvePenalty > 1 ? 's' : ''} bij fout)
               </button>
             </div>
 
@@ -2601,7 +2675,7 @@ export function PiratesPlankGame({ mode, room, localPlayer, players, updateRoomS
             </div>
 
             <div>
-              <div style={{ color: 'var(--gold)', fontWeight: 800, fontSize: '12px', marginBottom: '6px' }}>Klinkers kopen: {PLANK_VOWEL_COST} buit</div>
+              <div style={{ color: 'var(--gold)', fontWeight: 800, fontSize: '12px', marginBottom: '6px' }}>Klinkers kopen: {difficultyConfig.vowelCost} buit</div>
               <div style={{ display: 'grid', gridTemplateColumns: 'repeat(5, 1fr)', gap: '6px', maxWidth: '260px', margin: '0 auto' }}>
                 {PLANK_VOWELS.map(letter => renderLetterButton(letter, 'vowel'))}
               </div>
@@ -4919,14 +4993,15 @@ const MINI_GAME_RULES = {
   },
   piratesplank: {
     title: "Black Pearl's Plank",
-    intro: "Origineel: Galgje/Wheel of Fortune. Kraak een volledig blanco Disney/Pixar-code voordat The Black Pearl je bereikt.",
+    intro: "Origineel: Galgje/Wheel of Fortune. Kraak een Disney-code voordat The Black Pearl je bereikt.",
     rules: [
-      "Er is geen hint en geen categorie: je ziet alleen lege vakjes.",
+      "Kies Rustig, Normaal of Uitdagend. Het niveau bepaalt woordlengte, startletters, hints, kosten en strikes.",
+      "Je ziet altijd de taal en het aantal woorden en letters. Rustig toont ook een hint; Normaal toont de categorie.",
       "Gooi eerst twee dobbelstenen: een witte buit-dobbelsteen en een rode gebeurtenis-dobbelsteen.",
-      "Bij Neutraal of Dubbel kies je een medeklinker. Een juiste letter levert buit op; een foute letter geeft een strike.",
-      "Klinkers kosten 5 buit en mogen gekocht worden zodra je genoeg buit hebt.",
-      "Bij 3 strikes bereikt The Black Pearl je boot en verlies je direct.",
-      "Los op is streng: een fout antwoord geeft meteen 2 strikes."
+      "Bij vijf van de zes gebeurtenissen mag je een medeklinker kiezen. Een juiste letter levert buit op; een foute letter geeft een strike.",
+      "Een vloek kost eerst buit en geeft alleen bij te weinig buit een strike. Na meerdere missers helpt de bemanning met een letter.",
+      "Klinkers kosten 3, 4 of 5 buit en je hebt 5, 4 of 3 strikes, afhankelijk van het gekozen niveau.",
+      "De Black Pearl komt dichterbij door strikes én door verstreken beurten."
     ],
     solo: "Solo: verzamel buit, koop slim klinkers en los de code zo strak mogelijk op.",
     duel: "Duel: spelers spelen om de beurt. Degene die de volledige oplossing kraakt wint."

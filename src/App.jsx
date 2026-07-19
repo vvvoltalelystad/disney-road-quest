@@ -1050,6 +1050,7 @@ export default function App() {
   const [cocoProfilesReady, setCocoProfilesReady] = useState(false);
   const cocoProfileStoreIdRef = useRef(null);
   const [aiLevel, setAiLevel] = useState(() => localStorage.getItem('disney_ai_level') || 'normal');
+  const [piratesDifficulty, setPiratesDifficulty] = useState(() => localStorage.getItem('disney_pirates_difficulty') || 'normal');
 
   // Solo mode states and history
   const [soloHistory, setSoloHistory] = useState(() => JSON.parse(localStorage.getItem('disney_solo_history') || '[]'));
@@ -2158,6 +2159,7 @@ export default function App() {
     const name = activeProfileName || playerNameInput.trim() || localStorage.getItem('disney_player_name') || 'Solo Speler';
     localStorage.setItem('disney_player_name', name);
     localStorage.setItem('disney_ai_level', aiLevel);
+    if (gameId === 'piratesplank') localStorage.setItem('disney_pirates_difficulty', piratesDifficulty);
     const p = { id: 'solo-player', name, score: 0 };
 
     if (gameId === 'mastermind' || gameId === 'sudoku6' || gameId === 'sudoku9') {
@@ -2198,7 +2200,10 @@ export default function App() {
       game_mode: 'arcade-' + gameId,
       current_task_id: 'solo-arcade-' + gameId,
       current_player_index: 0,
-      current_task_state: { aiLevel }
+      current_task_state: {
+        aiLevel,
+        ...(gameId === 'piratesplank' ? { piratesDifficulty } : {})
+      }
     });
     soloLoggedRef.current = false;
     setScreen('game');
@@ -2223,6 +2228,7 @@ export default function App() {
         status: 'lobby',
         current_task_state: {
           aiLevel,
+          ...(gameId === 'piratesplank' ? { piratesDifficulty } : {}),
           arcadeGameId: gameId,
           arcadeMaxPlayers: arenaGame?.maxPlayers || 2
         }
@@ -5249,6 +5255,31 @@ export default function App() {
                               </div>
                             </div>
                           )}
+                          {selectedArcadeGame === 'piratesplank' && (
+                            <div style={{ background: '#07152c', border: '1px solid var(--line)', borderRadius: '12px', padding: '12px', marginBottom: '12px' }}>
+                              <label style={{ display: 'block', marginBottom: '4px', fontSize: '13px', fontWeight: 'bold', color: 'var(--gold)' }}>Moeilijkheid Black Pearl</label>
+                              <div style={{ color: 'var(--muted)', fontSize: '11px', marginBottom: '9px' }}>Bepaalt de lengte, hints, kosten en het aantal strikes.</div>
+                              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '8px' }}>
+                                {[
+                                  { id: 'easy', label: 'Rustig' },
+                                  { id: 'normal', label: 'Normaal' },
+                                  { id: 'hard', label: 'Uitdagend' }
+                                ].map(level => (
+                                  <button
+                                    key={level.id}
+                                    className={`btn mini ${piratesDifficulty === level.id ? 'primary' : 'secondary'}`}
+                                    onClick={() => {
+                                      setPiratesDifficulty(level.id);
+                                      localStorage.setItem('disney_pirates_difficulty', level.id);
+                                    }}
+                                    style={{ padding: '9px 4px', fontSize: '12px' }}
+                                  >
+                                    {level.label}
+                                  </button>
+                                ))}
+                              </div>
+                            </div>
+                          )}
                           <button
                             className="btn primary full"
                             onClick={() => handleStartArcadeSolo(selectedArcadeGame)}
@@ -5260,6 +5291,16 @@ export default function App() {
 
                       {arcadePlayMode === 'duel' && (
                         <div className="animate-fade-in" style={{ background: '#07152c', padding: '16px', borderRadius: '12px', border: '1px solid var(--line)' }}>
+                          {selectedArcadeGame === 'piratesplank' && (
+                            <div style={{ marginBottom: '14px' }}>
+                              <label style={{ display: 'block', marginBottom: '7px', fontSize: '13px', fontWeight: 'bold', color: 'var(--gold)' }}>Moeilijkheid Black Pearl</label>
+                              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '7px' }}>
+                                {[['easy', 'Rustig'], ['normal', 'Normaal'], ['hard', 'Uitdagend']].map(([id, label]) => (
+                                  <button key={id} className={`btn mini ${piratesDifficulty === id ? 'primary' : 'secondary'}`} onClick={() => setPiratesDifficulty(id)} style={{ padding: '8px 3px', fontSize: '11px' }}>{label}</button>
+                                ))}
+                              </div>
+                            </div>
+                          )}
                           <h3 style={{ margin: '0 0 12px 0', fontSize: '15px', color: 'var(--gold)' }}>⚔️ Duel Lobby</h3>
                           <p className="small" style={{ marginTop: 0 }}>
                             {getArenaGame(selectedArcadeGame)?.maxPlayers === 4
