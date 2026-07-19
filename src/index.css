@@ -994,6 +994,7 @@ hr{border:0;border-top:1px solid var(--line);margin:18px 0}
 .disney-badge-art>strong{position:absolute;inset:0;display:grid;place-items:center;font-size:clamp(13px,3.4vw,28px);letter-spacing:-.05em}
 .disney-badge-park{position:absolute;left:50%;bottom:13%;z-index:2;transform:translateX(-50%);font-size:clamp(5px,1.1vw,9px);font-weight:950;letter-spacing:.12em}
 .disney-badge-spark{position:absolute;right:20%;top:17%;font-size:clamp(7px,1.7vw,14px);color:#fff4c0}
+.disney-badge-image{position:absolute;inset:0;z-index:2;width:100%;height:100%;object-fit:contain}
 .disney-badge-count{position:absolute;right:3%;bottom:3%;z-index:3;display:grid;place-items:center;min-width:22%;aspect-ratio:1;padding:2px;border:1px solid #ffe09a;border-radius:50%;background:#061126;color:#ffe09a;font-size:clamp(7px,1.4vw,11px);font-weight:950}
 .disney-badge-art.is-compact{width:70px}
 
@@ -1015,6 +1016,35 @@ hr{border:0;border-top:1px solid var(--line);margin:18px 0}
 .opened-badges strong{margin-top:10px;font-size:14px}.opened-badges span{margin-top:4px;color:var(--muted);font-size:10px}
 @keyframes badge-reveal{from{opacity:0;transform:scale(.5) rotate(-12deg)}to{opacity:1;transform:scale(1) rotate(0)}}
 
+/* Badge Eregalerij */
+.badge-hall-of-honor{margin:18px 0;padding:18px;border:1px solid rgba(170,194,235,.2);border-radius:24px;background:radial-gradient(ellipse at 50% -10%,rgba(97,125,186,.2),transparent 42%),linear-gradient(145deg,#061732,#010817);box-shadow:inset 0 0 56px rgba(0,0,0,.48),0 20px 45px rgba(0,0,0,.32)}
+.badge-hall-heading{display:flex;align-items:flex-start;justify-content:space-between;gap:14px;margin-bottom:15px}
+.badge-hall-heading h3{margin:4px 0 3px;color:#f5dfaa;font-size:clamp(24px,5vw,36px);letter-spacing:.025em}
+.badge-hall-heading p{max-width:610px;margin:0;color:#9caec9;font-size:11px;line-height:1.55}
+.badge-hall-heading>strong{flex:0 0 auto;padding:7px 10px;border:1px solid rgba(255,211,107,.25);border-radius:999px;background:rgba(0,0,0,.25);color:#ffd76f;font-size:10px}
+.achievement-display-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:11px}
+.achievement-display-card{--achievement:#cbd3df;position:relative;min-width:0;padding:10px;border:1px solid color-mix(in srgb,var(--achievement) 25%,transparent);border-radius:17px;background:linear-gradient(155deg,rgba(14,35,68,.92),rgba(2,10,24,.98));box-shadow:inset 0 1px rgba(255,255,255,.04);text-align:center}
+.achievement-display-card.achievement-uncommon,.achievement-badge-art.achievement-uncommon{--achievement:#5de18f}.achievement-display-card.achievement-rare,.achievement-badge-art.achievement-rare{--achievement:#58a7ff}.achievement-display-card.achievement-epic,.achievement-badge-art.achievement-epic{--achievement:#c873ff}.achievement-display-card.achievement-legendary,.achievement-badge-art.achievement-legendary{--achievement:#ffd159}.achievement-display-card.achievement-ultimate,.achievement-badge-art.achievement-ultimate{--achievement:#fff0a7}
+.achievement-display-card.is-unlocked{border-color:color-mix(in srgb,var(--achievement) 58%,transparent);background:radial-gradient(circle at 50% 0%,color-mix(in srgb,var(--achievement) 15%,transparent),transparent 46%),linear-gradient(155deg,#10294c,#030d20)}
+.achievement-pedestal{display:grid;place-items:center;min-height:126px;border-radius:12px;background:radial-gradient(ellipse at 50% 73%,color-mix(in srgb,var(--achievement) 14%,transparent),transparent 55%)}
+.achievement-badge-art{--achievement:#cbd3df;position:relative;width:min(118px,86%);aspect-ratio:1;filter:drop-shadow(0 12px 12px rgba(0,0,0,.48));isolation:isolate}
+.achievement-badge-art.is-compact{width:72px}.achievement-badge-placeholder,.achievement-badge-art>img{position:absolute;inset:0;width:100%;height:100%;object-fit:contain}
+.achievement-badge-placeholder{display:grid;place-items:center;overflow:hidden;clip-path:polygon(50% 1%,89% 18%,99% 55%,77% 92%,23% 92%,1% 55%,11% 18%);background:radial-gradient(circle at 34% 24%,#fff8,var(--achievement) 19%,color-mix(in srgb,var(--achievement) 42%,#09101f) 64%,#02050c 100%);border:1px solid var(--achievement);box-shadow:inset 0 0 15px #fff5}
+.achievement-common .achievement-badge-placeholder{clip-path:polygon(50% 1%,98% 50%,50% 99%,2% 50%)}.achievement-uncommon .achievement-badge-placeholder{clip-path:polygon(50% 1%,98% 38%,80% 96%,20% 96%,2% 38%)}.achievement-rare .achievement-badge-placeholder{clip-path:polygon(50% 1%,94% 25%,94% 75%,50% 99%,6% 75%,6% 25%)}.achievement-epic .achievement-badge-placeholder{clip-path:polygon(50% 1%,89% 20%,99% 61%,72% 98%,28% 98%,1% 61%,11% 20%)}.achievement-legendary .achievement-badge-placeholder{clip-path:polygon(33% 2%,67% 2%,98% 33%,98% 67%,67% 98%,33% 98%,2% 67%,2% 33%)}
+.achievement-ultimate .achievement-badge-placeholder{clip-path:circle(49%);background:conic-gradient(from 210deg,#aeb9ca,#60df92,#58a7ff,#c873ff,#ffd159,#fff0a7,#aeb9ca)}
+.achievement-gem-ring{position:absolute;inset:10%;border:2px solid rgba(255,255,255,.7);border-radius:inherit;box-shadow:inset 0 0 16px rgba(255,255,255,.35)}
+.achievement-badge-placeholder>strong{position:relative;z-index:1;color:#fff9dc;font-size:clamp(27px,6vw,47px);text-shadow:0 3px 10px #000,0 0 16px #fff8}
+.achievement-badge-art>img{z-index:2}.achievement-badge-art.is-locked{filter:grayscale(1) brightness(.31) drop-shadow(0 9px 9px rgba(0,0,0,.52))}.achievement-badge-art.is-locked>img{opacity:.42}
+.achievement-lock{position:absolute;right:5%;bottom:4%;z-index:3;display:grid;place-items:center;width:27%;aspect-ratio:1;border:1px solid #8e9cb3;border-radius:50%;background:#071329;color:#bfc9d8;font-size:12px}
+.achievement-five-gems{position:absolute;left:16%;right:16%;bottom:15%;z-index:1;display:flex;justify-content:space-between}.achievement-five-gems i{width:10%;aspect-ratio:1;border-radius:50%;background:#fff;box-shadow:0 0 7px #fff}
+.achievement-nameplate{min-height:116px;padding:8px 6px;border:1px solid rgba(222,191,116,.2);border-radius:9px;background:linear-gradient(180deg,#182943,#091426)}
+.achievement-nameplate>span{color:var(--achievement);font-size:8px;font-weight:950;letter-spacing:.12em;text-transform:uppercase}.achievement-nameplate strong{display:block;margin:4px 0;color:#f6e9cc;font-size:11px;line-height:1.25}.achievement-nameplate p{margin:0;color:#8fa0b9;font-size:8px;line-height:1.35}.achievement-nameplate em{display:block;margin-top:6px;color:var(--achievement);font-size:7px;font-style:normal;line-height:1.3}
+.achievement-missing{margin-top:7px;color:#9aabc3;font-size:8px;text-align:left}.achievement-missing summary{cursor:pointer;color:#c9d4e5;text-align:center}.achievement-missing div{display:flex;max-height:105px;overflow:auto;flex-direction:column;gap:3px;margin-top:6px;padding:7px;border-radius:7px;background:#020917}.achievement-missing span{line-height:1.25}
+.achievement-master-progress{display:flex;align-items:center;justify-content:center;gap:8px;margin-top:13px;padding:9px;border:1px solid rgba(255,255,255,.08);border-radius:999px;background:rgba(0,0,0,.24)}
+.achievement-master-progress strong{margin-left:3px;color:#aab8ce;font-size:9px}.achievement-progress-gem{width:14px;aspect-ratio:1;transform:rotate(45deg);border:1px solid #56647a;background:#111c2e;box-shadow:inset 0 0 4px #000}.achievement-progress-gem.is-lit{border-color:var(--gem);background:var(--gem);box-shadow:0 0 11px var(--gem)}.achievement-progress-gem.achievement-common{--gem:#d6dde7}.achievement-progress-gem.achievement-uncommon{--gem:#5de18f}.achievement-progress-gem.achievement-rare{--gem:#58a7ff}.achievement-progress-gem.achievement-epic{--gem:#c873ff}.achievement-progress-gem.achievement-legendary{--gem:#ffd159}
+.achievement-celebration{overflow:hidden}.achievement-celebration-dialog{overflow:hidden;text-align:center}.achievement-celebration-dialog .achievement-badge-art{width:min(230px,72%);margin:18px auto;animation:achievement-arrive .9s cubic-bezier(.16,.9,.28,1.2) both}.achievement-celebration-dialog>p{font-size:13px}.achievement-reward{display:block;margin:0 0 18px;padding:10px;border:1px solid rgba(255,215,112,.25);border-radius:11px;color:#ffdc7d;background:rgba(0,0,0,.22);font-size:11px}.achievement-spotlight{position:absolute;left:50%;top:-35%;width:76%;aspect-ratio:1;transform:translateX(-50%);background:conic-gradient(from 170deg,transparent 0 37%,rgba(255,242,191,.22) 43%,transparent 49% 58%,rgba(255,242,191,.14) 64%,transparent 71%);animation:achievement-light 8s linear infinite;pointer-events:none}
+@keyframes achievement-arrive{0%{opacity:0;transform:scale(.25) rotate(-22deg)}65%{opacity:1;transform:scale(1.08) rotate(3deg)}100%{transform:scale(1) rotate(0)}}@keyframes achievement-light{to{transform:translateX(-50%) rotate(360deg)}}
+
 @media(max-width:620px){
   .miguel-market{padding:12px}
   .miguel-commerce-grid{grid-template-columns:1fr}
@@ -1026,6 +1056,7 @@ hr{border:0;border-top:1px solid var(--line);margin:18px 0}
   .badge-nameplate{min-height:43px;padding:4px 2px}
   .badge-nameplate strong{font-size:7.5px}.badge-nameplate span{font-size:6px}
   .badge-choice-grid{grid-template-columns:repeat(2,minmax(0,1fr))}
+  .badge-hall-of-honor{padding:13px}.achievement-display-grid{grid-template-columns:repeat(2,minmax(0,1fr));gap:7px}.achievement-pedestal{min-height:104px}.achievement-nameplate{min-height:120px}.achievement-master-progress{flex-wrap:wrap;border-radius:14px}
 }
 @media(max-width:390px){
   .miguel-trade-card{grid-template-columns:74px minmax(0,1fr);padding:11px;gap:9px}
@@ -1035,7 +1066,9 @@ hr{border:0;border-top:1px solid var(--line);margin:18px 0}
   .badge-rarity-heading>strong{padding:5px 7px;font-size:9px}
   .badge-jewel-slot{padding:3px}
   .badge-nameplate{min-height:40px;margin-top:4px}.badge-nameplate strong{font-size:6.7px}.badge-nameplate span{font-size:5.5px}
+  .badge-hall-heading{flex-direction:column}.achievement-display-card{padding:6px}.achievement-pedestal{min-height:92px}.achievement-nameplate{min-height:118px;padding-inline:3px}.achievement-nameplate strong{font-size:9px}.achievement-nameplate p{font-size:7px}
 }
+@media(prefers-reduced-motion:reduce){.achievement-celebration-dialog .achievement-badge-art,.achievement-spotlight{animation:none}}
 
 .collection-item-button {
   border: 1px solid rgba(255, 255, 255, 0.12);

@@ -79,6 +79,7 @@ const ACTIVE_PROFILE_KEY = 'disney_active_profile';
 const COCO_PROFILE_STORE_CODE = 'COCO-PROFILES-V1';
 const BADGE_COLLECTION_KEY = 'disney_badge_collections';
 const BADGE_MARKET_KEY = 'disney_badge_market';
+const BADGE_ACHIEVEMENT_KEY = 'disney_badge_achievements';
 const BADGE_PACK_COST = 5;
 const BADGE_SELL_VALUE = 2;
 const ENABLE_LEGACY_SHOP = false;
@@ -123,10 +124,53 @@ const BADGE_DEFINITIONS = BADGE_RARITIES.flatMap(rarity =>
       park: park.id,
       parkName: park.name,
       parkShort: park.short,
-      number: index + 1
+      number: index + 1,
+      image: `badges/collection/${park.id}-${rarity.id}-${index + 1}.png`
     }))
   )
 );
+
+const BADGE_ACHIEVEMENTS = [
+  {
+    id: 'special-common-complete', rarity: 'common', name: 'De Eerste Vonk',
+    subtitle: 'Alle 24 Common-badges verzameld', emblem: '✦',
+    reward: 'Profieltitel: Verzamelaar', image: 'badges/special/special_common_complete.png'
+  },
+  {
+    id: 'special-uncommon-complete', rarity: 'uncommon', name: 'Ontdekkingsreiziger van Twee Werelden',
+    subtitle: 'Alle 16 Uncommon-badges verzameld', emblem: '⌁',
+    reward: 'Smaragdgroene profielrand', image: 'badges/special/special_uncommon_complete.png'
+  },
+  {
+    id: 'special-rare-complete', rarity: 'rare', name: 'Hoeder van de Magie',
+    subtitle: 'Alle 16 Rare-badges verzameld', emblem: '⚿',
+    reward: 'Saffierblauwe fonkelrand', image: 'badges/special/special_rare_complete.png'
+  },
+  {
+    id: 'special-epic-complete', rarity: 'epic', name: 'Meester van Dromen en Avontuur',
+    subtitle: 'Alle 12 Epic-badges verzameld', emblem: '✧',
+    reward: 'Paarse profielgloed', image: 'badges/special/special_epic_complete.png'
+  },
+  {
+    id: 'special-legendary-complete', rarity: 'legendary', name: 'Legende van de Twee Parken',
+    subtitle: 'Alle 8 Legendary-badges verzameld', emblem: '♛',
+    reward: 'Gouden profielrand en titel: Legende', image: 'badges/special/special_legendary_complete.png'
+  },
+  {
+    id: 'special-master-collector', rarity: 'ultimate', name: 'Het Hart van Disneyland Paris',
+    subtitle: 'Alle vijf badgecollecties voltooid', emblem: '♥',
+    reward: 'Iriserende profielrand en titel: Hoeder van de Magie', image: 'badges/special/special_master_collector.png',
+    ultimate: true
+  }
+];
+
+const BADGE_CATEGORY_ACHIEVEMENTS = BADGE_ACHIEVEMENTS.filter(achievement => !achievement.ultimate);
+const getAchievement = achievementId => BADGE_ACHIEVEMENTS.find(achievement => achievement.id === achievementId);
+const getRarityBadgeProgress = (ownedBadges, rarity) => {
+  const badges = BADGE_DEFINITIONS.filter(badge => badge.rarity === rarity);
+  const owned = badges.filter(badge => Number(ownedBadges?.[badge.id]) > 0);
+  return { badges, owned, missing: badges.filter(badge => Number(ownedBadges?.[badge.id]) <= 0), total: badges.length };
+};
 
 const getBadge = badgeId => BADGE_DEFINITIONS.find(badge => badge.id === badgeId);
 const getMarketHour = () => Math.floor(Date.now() / 3600000);
@@ -255,15 +299,45 @@ function BadgeArtwork({ badge, count = 0, compact = false }) {
       <span className="disney-badge-park">{badge.parkShort}</span>
       <strong>{initials}</strong>
       <span className="disney-badge-spark">✦</span>
+      <img
+        className="disney-badge-image"
+        src={assetPath(badge.image)}
+        alt=""
+        aria-hidden="true"
+        onError={event => { event.currentTarget.hidden = true; }}
+      />
       {count > 1 && <span className="disney-badge-count">×{count}</span>}
+    </div>
+  );
+}
+
+function AchievementBadgeArtwork({ achievement, unlocked = false, compact = false }) {
+  if (!achievement) return null;
+  return (
+    <div
+      className={`achievement-badge-art achievement-${achievement.rarity}${unlocked ? ' is-unlocked' : ' is-locked'}${compact ? ' is-compact' : ''}`}
+      aria-label={`${achievement.name}${unlocked ? ', behaald' : ', vergrendeld'}`}
+    >
+      <span className="achievement-badge-placeholder" aria-hidden="true">
+        <span className="achievement-gem-ring" />
+        <strong>{achievement.emblem}</strong>
+        {achievement.ultimate && <span className="achievement-five-gems"><i /><i /><i /><i /><i /></span>}
+      </span>
+      <img
+        src={assetPath(achievement.image)}
+        alt=""
+        aria-hidden="true"
+        onError={event => { event.currentTarget.hidden = true; }}
+      />
+      {!unlocked && <span className="achievement-lock" aria-hidden="true">◆</span>}
     </div>
   );
 }
 
 function MiguelMarket({
   activeName, balance, ownedBadges, badgeMarket, badgeMarketNow,
-  tradeOfferIndex, sellOpen, openedPack,
-  onOpenPack, onChooseTrade, onTrade, onOpenSell, onCloseSell, onSell, onClosePack, onInspectCoin
+  ownedAchievements, achievementCelebration, tradeOfferIndex, sellOpen, openedPack,
+  onOpenPack, onChooseTrade, onTrade, onOpenSell, onCloseSell, onSell, onClosePack, onCloseAchievement, onInspectCoin
 }) {
   const uniqueOwned = Object.values(ownedBadges).filter(count => Number(count) > 0).length;
   const totalOwned = Object.values(ownedBadges).reduce((sum, count) => sum + (Number(count) || 0), 0);
@@ -271,6 +345,7 @@ function MiguelMarket({
   const refreshTime = `${String(Math.floor(secondsUntilRefresh / 60)).padStart(2, '0')}:${String(secondsUntilRefresh % 60).padStart(2, '0')}`;
   const sellableBadges = BADGE_DEFINITIONS.filter(badge => ownedBadges[badge.id] > 0);
   const offeredBadge = tradeOfferIndex === null ? null : getBadge(badgeMarket.offers[tradeOfferIndex]);
+  const categoryAchievementsUnlocked = BADGE_CATEGORY_ACHIEVEMENTS.filter(achievement => ownedAchievements?.[achievement.id]);
 
   return (
     <section className="card portal-shop-content miguel-market">
@@ -284,6 +359,53 @@ function MiguelMarket({
           <CocoCoinIcon size={30} onInspect={onInspectCoin} /><strong>{balance}</strong>
         </div>
       </div>
+
+      <section className="badge-hall-of-honor" aria-labelledby="badge-hall-title">
+        <header className="badge-hall-heading">
+          <div>
+            <span className="portal-section-kicker">Permanente prestatiebadges</span>
+            <h3 id="badge-hall-title">Eregalerij</h3>
+            <p>Voltooi collecties, verlicht de vijf edelstenen en ontgrendel uiteindelijk Het Hart van Disneyland Paris.</p>
+          </div>
+          <strong>{Object.keys(ownedAchievements || {}).filter(id => getAchievement(id)).length}/6 behaald</strong>
+        </header>
+
+        <div className="achievement-display-grid">
+          {BADGE_ACHIEVEMENTS.map(achievement => {
+            const unlocked = Boolean(ownedAchievements?.[achievement.id]);
+            const progress = achievement.ultimate
+              ? { owned: categoryAchievementsUnlocked, total: BADGE_CATEGORY_ACHIEVEMENTS.length, missing: BADGE_CATEGORY_ACHIEVEMENTS.filter(item => !ownedAchievements?.[item.id]) }
+              : getRarityBadgeProgress(ownedBadges, achievement.rarity);
+            const progressCount = progress.owned.length;
+            return (
+              <article key={achievement.id} className={`achievement-display-card achievement-${achievement.rarity}${unlocked ? ' is-unlocked' : ''}`}>
+                <div className="achievement-pedestal">
+                  <AchievementBadgeArtwork achievement={achievement} unlocked={unlocked} />
+                </div>
+                <div className="achievement-nameplate">
+                  <span>{unlocked ? 'Behaald' : `${progressCount}/${progress.total}`}</span>
+                  <strong>{achievement.name}</strong>
+                  <p>{achievement.subtitle}</p>
+                  <em>{unlocked ? achievement.reward : 'Nog vergrendeld'}</em>
+                </div>
+                {!unlocked && progress.missing.length > 0 && (
+                  <details className="achievement-missing">
+                    <summary>Wat ontbreekt er?</summary>
+                    <div>{progress.missing.map(item => <span key={item.id}>{item.name}</span>)}</div>
+                  </details>
+                )}
+              </article>
+            );
+          })}
+        </div>
+
+        <div className="achievement-master-progress" aria-label={`${categoryAchievementsUnlocked.length} van 5 collectie-edelstenen verlicht`}>
+          {BADGE_CATEGORY_ACHIEVEMENTS.map(achievement => (
+            <span key={achievement.id} className={`achievement-progress-gem achievement-${achievement.rarity}${ownedAchievements?.[achievement.id] ? ' is-lit' : ''}`} title={achievement.name} />
+          ))}
+          <strong>{categoryAchievementsUnlocked.length}/5 edelstenen verlicht</strong>
+        </div>
+      </section>
 
       <div className="miguel-commerce-grid">
         <article className="badge-pack-card">
@@ -418,6 +540,20 @@ function MiguelMarket({
               ))}
             </div>
             <button type="button" className="btn primary full" onClick={onClosePack}>Voeg toe aan mijn collectie</button>
+          </div>
+        </div>
+      )}
+
+      {achievementCelebration && (
+        <div className="badge-market-modal achievement-celebration" role="dialog" aria-modal="true" aria-label="Prestatiebadge ontgrendeld">
+          <div className={`badge-market-dialog achievement-celebration-dialog achievement-${achievementCelebration.rarity}`}>
+            <span className="achievement-spotlight" aria-hidden="true" />
+            <span className="portal-section-kicker">Nieuwe prestatiebadge</span>
+            <h2>{achievementCelebration.name}</h2>
+            <AchievementBadgeArtwork achievement={achievementCelebration} unlocked />
+            <p>{achievementCelebration.subtitle}</p>
+            <strong className="achievement-reward">{achievementCelebration.reward}</strong>
+            <button type="button" className="btn primary full" onClick={onCloseAchievement}>Plaats in mijn Eregalerij</button>
           </div>
         </div>
       )}
@@ -1014,6 +1150,8 @@ export default function App() {
   const [collections, setCollections] = useState(() => readJsonStorage('disney_collections', {}));
   const [exclusiveClaims, setExclusiveClaims] = useState(() => readJsonStorage('disney_exclusive_claims', {}));
   const [badgeCollections, setBadgeCollections] = useState(() => readJsonStorage(BADGE_COLLECTION_KEY, {}));
+  const [badgeAchievements, setBadgeAchievements] = useState(() => readJsonStorage(BADGE_ACHIEVEMENT_KEY, {}));
+  const [achievementQueue, setAchievementQueue] = useState([]);
   const [badgeMarket, setBadgeMarket] = useState(() => {
     const saved = readJsonStorage(BADGE_MARKET_KEY, null);
     return saved?.hour === getMarketHour() && Array.isArray(saved.offers) && saved.offers.length === 3
@@ -1459,6 +1597,14 @@ export default function App() {
       }));
     };
 
+    const mergeBadgeAchievements = (remoteAchievements, localAchievements) => {
+      const profileKeys = new Set([...Object.keys(remoteAchievements || {}), ...Object.keys(localAchievements || {})]);
+      return Object.fromEntries([...profileKeys].map(profileKey => [
+        profileKey,
+        { ...(localAchievements?.[profileKey] || {}), ...(remoteAchievements?.[profileKey] || {}) }
+      ]));
+    };
+
     const loadSharedProfiles = async () => {
       const localProfiles = uniqueProfileNames(cocoProfiles);
       const localState = {
@@ -1467,8 +1613,9 @@ export default function App() {
         coco_collections: collections,
         coco_exclusive_claims: exclusiveClaims,
         coco_badge_collections: badgeCollections,
+        coco_badge_achievements: badgeAchievements,
         coco_badge_market: badgeMarket,
-        coco_profile_store_version: 2,
+        coco_profile_store_version: 3,
         updated_at: new Date().toISOString()
       };
 
@@ -1523,6 +1670,7 @@ export default function App() {
         const mergedBadgeCollections = migrateLocalState
           ? mergeBadgeCollections(remoteState.coco_badge_collections, badgeCollections)
           : (remoteState.coco_badge_collections || {});
+        const mergedBadgeAchievements = mergeBadgeAchievements(remoteState.coco_badge_achievements, badgeAchievements);
         const remoteMarket = remoteState.coco_badge_market;
         const mergedBadgeMarket = remoteMarket?.hour === getMarketHour() && Array.isArray(remoteMarket.offers) && remoteMarket.offers.length === 3
           ? remoteMarket
@@ -1533,8 +1681,9 @@ export default function App() {
           coco_collections: mergedCollections,
           coco_exclusive_claims: mergedClaims,
           coco_badge_collections: mergedBadgeCollections,
+          coco_badge_achievements: mergedBadgeAchievements,
           coco_badge_market: mergedBadgeMarket,
-          coco_profile_store_version: 2,
+          coco_profile_store_version: 3,
           updated_at: new Date().toISOString()
         };
 
@@ -1545,12 +1694,14 @@ export default function App() {
           setCollections(mergedCollections);
           setExclusiveClaims(mergedClaims);
           setBadgeCollections(mergedBadgeCollections);
+          setBadgeAchievements(mergedBadgeAchievements);
           setBadgeMarket(mergedBadgeMarket);
           localStorage.setItem(COCO_PROFILES_KEY, JSON.stringify(mergedProfiles));
           localStorage.setItem(COCO_BANK_KEY, JSON.stringify(mergedBank));
           localStorage.setItem('disney_collections', JSON.stringify(mergedCollections));
           localStorage.setItem('disney_exclusive_claims', JSON.stringify(mergedClaims));
           localStorage.setItem(BADGE_COLLECTION_KEY, JSON.stringify(mergedBadgeCollections));
+          localStorage.setItem(BADGE_ACHIEVEMENT_KEY, JSON.stringify(mergedBadgeAchievements));
           localStorage.setItem(BADGE_MARKET_KEY, JSON.stringify(mergedBadgeMarket));
         }
 
@@ -1581,8 +1732,9 @@ export default function App() {
             coco_collections: collections,
             coco_exclusive_claims: exclusiveClaims,
             coco_badge_collections: badgeCollections,
+            coco_badge_achievements: badgeAchievements,
             coco_badge_market: badgeMarket,
-            coco_profile_store_version: 2,
+            coco_profile_store_version: 3,
             updated_at: new Date().toISOString()
           }
         })
@@ -1593,7 +1745,7 @@ export default function App() {
     }, 250);
 
     return () => window.clearTimeout(timeoutId);
-  }, [badgeCollections, badgeMarket, cocoProfiles, cocoProfilesReady, collections, exclusiveClaims, starBank]);
+  }, [badgeAchievements, badgeCollections, badgeMarket, cocoProfiles, cocoProfilesReady, collections, exclusiveClaims, starBank]);
 
   useEffect(() => {
     const updateMarketClock = () => {
@@ -1608,6 +1760,58 @@ export default function App() {
     const intervalId = window.setInterval(updateMarketClock, 1000);
     return () => window.clearInterval(intervalId);
   }, []);
+
+  useEffect(() => {
+    const profileKeys = new Set([
+      ...Object.keys(badgeCollections || {}),
+      ...Object.keys(badgeAchievements || {})
+    ]);
+    if (!profileKeys.size) return;
+
+    const nextAchievements = { ...(badgeAchievements || {}) };
+    const newlyUnlocked = [];
+    let changed = false;
+
+    profileKeys.forEach(profileKey => {
+      const ownedBadges = badgeCollections?.[profileKey] || {};
+      const profileAchievements = { ...(nextAchievements[profileKey] || {}) };
+
+      BADGE_CATEGORY_ACHIEVEMENTS.forEach(achievement => {
+        if (profileAchievements[achievement.id]) return;
+        const progress = getRarityBadgeProgress(ownedBadges, achievement.rarity);
+        if (progress.total > 0 && progress.owned.length === progress.total) {
+          profileAchievements[achievement.id] = new Date().toISOString();
+          newlyUnlocked.push({ profileKey, achievementId: achievement.id });
+          changed = true;
+        }
+      });
+
+      const masterAchievement = BADGE_ACHIEVEMENTS.find(achievement => achievement.ultimate);
+      const allCategoriesComplete = BADGE_CATEGORY_ACHIEVEMENTS.every(achievement => profileAchievements[achievement.id]);
+      if (masterAchievement && allCategoriesComplete && !profileAchievements[masterAchievement.id]) {
+        profileAchievements[masterAchievement.id] = new Date().toISOString();
+        newlyUnlocked.push({ profileKey, achievementId: masterAchievement.id });
+        changed = true;
+      }
+
+      nextAchievements[profileKey] = profileAchievements;
+    });
+
+    const activeName = activeProfileName || shopPlayerName.trim() || playerNameInput.trim() || 'Speler 1';
+    const activeKey = getCollectorKey(activeName);
+    const activeUnlocks = newlyUnlocked.filter(item => item.profileKey === activeKey).map(item => item.achievementId);
+    if (!changed) return;
+
+    const unlockTimer = window.setTimeout(() => {
+      setBadgeAchievements(nextAchievements);
+      localStorage.setItem(BADGE_ACHIEVEMENT_KEY, JSON.stringify(nextAchievements));
+      if (activeUnlocks.length) {
+        setAchievementQueue(current => [...current, ...activeUnlocks.filter(id => !current.includes(id))]);
+      }
+    }, 0);
+
+    return () => window.clearTimeout(unlockTimer);
+  }, [activeProfileName, badgeAchievements, badgeCollections, playerNameInput, shopPlayerName]);
 
   useEffect(() => {
     const dagobertProfile = cocoProfiles.find(name => norm(name) === 'dagobert');
@@ -1938,14 +2142,23 @@ export default function App() {
       nextBadgeCollections[newKey] = mergedBadges;
       delete nextBadgeCollections[oldKey];
 
+      const nextBadgeAchievements = { ...badgeAchievements };
+      nextBadgeAchievements[newKey] = {
+        ...(nextBadgeAchievements[newKey] || {}),
+        ...(nextBadgeAchievements[oldKey] || {})
+      };
+      delete nextBadgeAchievements[oldKey];
+
       setStarBank(nextBank);
       setCollections(nextCollections);
       setExclusiveClaims(nextClaims);
       setBadgeCollections(nextBadgeCollections);
+      setBadgeAchievements(nextBadgeAchievements);
       localStorage.setItem(COCO_BANK_KEY, JSON.stringify(nextBank));
       localStorage.setItem('disney_collections', JSON.stringify(nextCollections));
       localStorage.setItem('disney_exclusive_claims', JSON.stringify(nextClaims));
       localStorage.setItem(BADGE_COLLECTION_KEY, JSON.stringify(nextBadgeCollections));
+      localStorage.setItem(BADGE_ACHIEVEMENT_KEY, JSON.stringify(nextBadgeAchievements));
     }
 
     setShopPlayerName(nextName);
@@ -1976,9 +2189,11 @@ export default function App() {
     const nextBank = { ...starBank };
     const nextCollections = { ...collections };
     const nextBadgeCollections = { ...badgeCollections };
+    const nextBadgeAchievements = { ...badgeAchievements };
     delete nextBank[currentKey];
     delete nextCollections[currentKey];
     delete nextBadgeCollections[currentKey];
+    delete nextBadgeAchievements[currentKey];
 
     const nextClaims = Object.fromEntries(
       Object.entries(exclusiveClaims).filter(([, ownerKey]) => ownerKey !== currentKey)
@@ -1988,6 +2203,7 @@ export default function App() {
     setCollections(nextCollections);
     setExclusiveClaims(nextClaims);
     setBadgeCollections(nextBadgeCollections);
+    setBadgeAchievements(nextBadgeAchievements);
     setShopPlayerName(nextName);
     setActiveProfileName(keepProfileChooserOpen ? '' : nextName);
     setPlayerNameInput(nextName);
@@ -1996,6 +2212,7 @@ export default function App() {
     localStorage.setItem('disney_collections', JSON.stringify(nextCollections));
     localStorage.setItem('disney_exclusive_claims', JSON.stringify(nextClaims));
     localStorage.setItem(BADGE_COLLECTION_KEY, JSON.stringify(nextBadgeCollections));
+    localStorage.setItem(BADGE_ACHIEVEMENT_KEY, JSON.stringify(nextBadgeAchievements));
     if (keepProfileChooserOpen) {
       localStorage.removeItem(ACTIVE_PROFILE_KEY);
       localStorage.removeItem('disney_player_name');
@@ -4855,6 +5072,8 @@ export default function App() {
                         activeName={activeName}
                         balance={starBank[activeKey] || 0}
                         ownedBadges={badgeCollections[activeKey] || {}}
+                        ownedAchievements={badgeAchievements[activeKey] || {}}
+                        achievementCelebration={getAchievement(achievementQueue[0])}
                         badgeMarket={badgeMarket}
                         badgeMarketNow={badgeMarketNow}
                         tradeOfferIndex={marketTradeOfferIndex}
@@ -4867,6 +5086,7 @@ export default function App() {
                         onCloseSell={() => setBadgeSellOpen(false)}
                         onSell={handleSellBadge}
                         onClosePack={() => setOpenedBadgePack(null)}
+                        onCloseAchievement={() => setAchievementQueue(current => current.slice(1))}
                         onInspectCoin={openCoinViewer}
                       />
                     );
