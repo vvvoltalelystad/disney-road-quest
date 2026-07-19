@@ -727,21 +727,28 @@ const getCellBorderStyles = (r, c, size, isSelected, hasError) => {
   return styles;
 };
 
-function GameZoomContainer({ children, maxHeight = '420px', aspectRatio = '1 / 1', maxWidth = '100%', resetKey, toolbarContent, footerContent, fluid = false }) {
+function GameZoomContainer({ children, maxHeight = '560px', aspectRatio = '3 / 4', maxWidth = '100%', resetKey, toolbarContent, footerContent, fluid = false, fitContent = true, label = 'Speelveld' }) {
   const [zoom, setZoom] = useState(1);
   const [pan, setPan] = useState({ x: 0, y: 0 });
+  const [fitScale, setFitScale] = useState(1);
   const viewportRef = useRef(null);
+  const contentRef = useRef(null);
+  const contentMetricsRef = useRef({ width: 0, height: 0 });
   const touchRef = useRef(null);
+  const mouseRef = useRef(null);
   const suppressClickRef = useRef(false);
 
-  const clampZoom = (value) => Math.min(2.4, Math.max(1, value));
+  const clampZoom = (value) => Math.min(2.5, Math.max(1, value));
 
   const clampPan = (p, currentZoom = zoom) => {
     const rect = viewportRef.current?.getBoundingClientRect();
-    if (!rect) return p;
-    const basePanAllowance = 22;
-    const maxX = basePanAllowance + Math.max(0, (rect.width * (currentZoom - 1)) / 2);
-    const maxY = basePanAllowance + Math.max(0, (rect.height * (currentZoom - 1)) / 2);
+    if (!rect || currentZoom <= 1) return { x: 0, y: 0 };
+    const metrics = contentMetricsRef.current;
+    const baseScale = fitContent ? fitScale : 1;
+    const scaledWidth = (metrics.width || rect.width) * baseScale * currentZoom;
+    const scaledHeight = (metrics.height || rect.height) * baseScale * currentZoom;
+    const maxX = Math.max(18, (scaledWidth - rect.width) / 2 + 18);
+    const maxY = Math.max(18, (scaledHeight - rect.height) / 2 + 18);
     return {
       x: Math.min(maxX, Math.max(-maxX, p.x)),
       y: Math.min(maxY, Math.max(-maxY, p.y))
@@ -769,7 +776,7 @@ function GameZoomContainer({ children, maxHeight = '420px', aspectRatio = '1 / 1
       };
       return;
     }
-    if (e.touches.length === 1) {
+    if (e.touches.length === 1 && zoom > 1) {
       const touch = e.touches[0];
       touchRef.current = {
         mode: 'pan',
@@ -817,6 +824,58 @@ function GameZoomContainer({ children, maxHeight = '420px', aspectRatio = '1 / 1
     }
   };
 
+  const handleMouseDown = (e) => {
+    if (zoom <= 1 || e.button !== 0) return;
+    mouseRef.current = { startX: e.clientX, startY: e.clientY, pan, moved: false };
+    e.currentTarget.setPointerCapture?.(e.pointerId);
+  };
+
+  const handleMouseMove = (e) => {
+    const gesture = mouseRef.current;
+    if (!gesture) return;
+    const dx = e.clientX - gesture.startX;
+    const dy = e.clientY - gesture.startY;
+    if (!gesture.moved && Math.abs(dx) + Math.abs(dy) > 5) {
+      gesture.moved = true;
+      suppressClickRef.current = true;
+    }
+    setPan(clampPan({ x: gesture.pan.x + dx, y: gesture.pan.y + dy }, zoom));
+  };
+
+  const handleMouseUp = (e) => {
+    const moved = mouseRef.current?.moved;
+    mouseRef.current = null;
+    e.currentTarget.releasePointerCapture?.(e.pointerId);
+    if (moved) window.setTimeout(() => { suppressClickRef.current = false; }, 220);
+  };
+
+  useEffect(() => {
+    if (!fitContent || !viewportRef.current || !contentRef.current) return undefined;
+    let frameId = null;
+    const measure = () => {
+      window.cancelAnimationFrame(frameId);
+      frameId = window.requestAnimationFrame(() => {
+        const viewport = viewportRef.current;
+        const content = contentRef.current;
+        if (!viewport || !content) return;
+        const availableWidth = Math.max(1, viewport.clientWidth - 12);
+        const availableHeight = Math.max(1, viewport.clientHeight - 12);
+        const contentWidth = Math.max(1, content.scrollWidth);
+        const contentHeight = Math.max(1, content.scrollHeight);
+        contentMetricsRef.current = { width: contentWidth, height: contentHeight };
+        setFitScale(Math.min(1, availableWidth / contentWidth, availableHeight / contentHeight));
+      });
+    };
+    const observer = new ResizeObserver(measure);
+    observer.observe(viewportRef.current);
+    observer.observe(contentRef.current);
+    measure();
+    return () => {
+      window.cancelAnimationFrame(frameId);
+      observer.disconnect();
+    };
+  }, [fitContent, resetKey]);
+
   useEffect(() => {
     const keepInView = () => {
       setPan(prev => clampPan(prev, zoom));
@@ -828,6 +887,7 @@ function GameZoomContainer({ children, maxHeight = '420px', aspectRatio = '1 / 1
 
   useEffect(() => {
     touchRef.current = null;
+    mouseRef.current = null;
     suppressClickRef.current = false;
     setZoom(1);
     setPan({ x: 0, y: 0 });
@@ -844,26 +904,30 @@ function GameZoomContainer({ children, maxHeight = '420px', aspectRatio = '1 / 1
   }
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', width: '100%' }}>
-      <div style={{ display: 'flex', gap: '8px', alignItems: 'center', marginBottom: '8px' }}>
-        {toolbarContent && <div style={{ flex: 1, minWidth: 0 }}>{toolbarContent}</div>}
-        <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '8px', alignItems: 'center' }}>
-          <button type="button" className="btn secondary mini" style={{ padding: '4px 8px' }} onClick={() => applyZoom(+(zoom - 0.15).toFixed(2))}>
-            -
-          </button>
-          <span style={{ color: 'var(--muted)', fontSize: '12px', minWidth: '40px', textAlign: 'center' }}>{Math.round(zoom * 100)}%</span>
-          <button type="button" className="btn secondary mini" style={{ padding: '4px 8px' }} onClick={() => applyZoom(+(zoom + 0.15).toFixed(2))}>
-            +
-          </button>
+    <div className="arena-zoom-shell">
+      <div className="arena-zoom-toolbar">
+        <div className="arena-zoom-toolbar-copy">
+          {toolbarContent || <strong>{label}</strong>}
+          <small>{zoom > 1 ? 'Sleep om over het speelveld te bewegen' : '100% toont het volledige speelveld'}</small>
+        </div>
+        <div className="arena-zoom-controls" aria-label={`Zoom ${label}`}>
+          <button type="button" onClick={() => applyZoom(+(zoom - 0.2).toFixed(2))} disabled={zoom <= 1} aria-label={`${label} verkleinen`}>−</button>
+          <span>{Math.round(zoom * 100)}%</span>
+          <button type="button" onClick={() => applyZoom(+(zoom + 0.2).toFixed(2))} disabled={zoom >= 2.5} aria-label={`${label} vergroten`}>+</button>
         </div>
       </div>
 
       <div
+        className="arena-zoom-viewport"
         ref={viewportRef}
         onTouchStart={handleTouchStart}
         onTouchMove={handleTouchMove}
         onTouchEnd={handleTouchEnd}
         onTouchCancel={handleTouchEnd}
+        onPointerDown={(e) => e.pointerType === 'mouse' && handleMouseDown(e)}
+        onPointerMove={(e) => e.pointerType === 'mouse' && handleMouseMove(e)}
+        onPointerUp={(e) => e.pointerType === 'mouse' && handleMouseUp(e)}
+        onPointerCancel={(e) => e.pointerType === 'mouse' && handleMouseUp(e)}
         style={{
           width: '100%',
           maxWidth: maxWidth,
@@ -878,34 +942,29 @@ function GameZoomContainer({ children, maxHeight = '420px', aspectRatio = '1 / 1
           alignItems: 'center',
           justifyContent: 'center',
           position: 'relative',
-          touchAction: 'none',
+          touchAction: zoom > 1 ? 'none' : 'pan-y',
+          cursor: zoom > 1 ? 'grab' : 'default',
           boxSizing: 'border-box'
         }}
       >
-        <div
-          style={{
-            position: 'absolute',
-            inset: '6px',
-            display: 'flex',
-            flexDirection: 'column',
-            justifyContent: 'center',
-            alignItems: 'center',
-            boxSizing: 'border-box',
-            transform: `translate(${pan.x}px, ${pan.y}px) scale(${zoom})`,
-            transformOrigin: 'center center',
-            willChange: 'transform',
-            width: 'calc(100% - 12px)',
-            height: 'calc(100% - 12px)'
-          }}
-          onClickCapture={(e) => {
-            if (suppressClickRef.current) {
-              e.stopPropagation();
-              e.preventDefault();
-              suppressClickRef.current = false;
-            }
-          }}
-        >
-          {children}
+        <div className="arena-zoom-centering-layer">
+          <div
+            ref={contentRef}
+            className="arena-zoom-content"
+            style={{
+              transform: `translate(${pan.x}px, ${pan.y}px) scale(${fitContent ? fitScale * zoom : zoom})`,
+              height: fitContent ? 'auto' : '100%'
+            }}
+            onClickCapture={(e) => {
+              if (suppressClickRef.current) {
+                e.stopPropagation();
+                e.preventDefault();
+                suppressClickRef.current = false;
+              }
+            }}
+          >
+            {children}
+          </div>
         </div>
       </div>
       {footerContent && <div style={{ marginTop: '9px', textAlign: 'center' }}>{footerContent}</div>}
@@ -5675,6 +5734,7 @@ export default function App() {
                             {/* -1. DISNEY DUEL ARENA */}
                             {t.type === "arcade-game" && (() => {
                               const isTinkerGame = t.gameId === 'tictactinker';
+                              const isTallArenaGame = t.gameId === 'piratesplank' || t.gameId === 'yahtzee';
                               const tinkerToolbar = isTinkerGame && arenaToolbar?.gameId === 'tictactinker' ? (
                                 <div style={{ position: 'relative', minHeight: '34px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
                                   <div style={{ position: 'absolute', left: 0 }}>
@@ -5702,9 +5762,12 @@ export default function App() {
 
                               return (
                               <GameZoomContainer
-                                maxHeight={isTinkerGame ? '520px' : '420px'}
-                                aspectRatio="1 / 1"
+                                maxHeight={isTinkerGame ? '520px' : isTallArenaGame ? '620px' : '560px'}
+                                aspectRatio={isTinkerGame ? '1 / 1' : isTallArenaGame ? '2 / 3' : '3 / 4'}
                                 fluid={t.gameId === 'qwixx'}
+                                fitContent={!isTinkerGame}
+                                resetKey={t.gameId}
+                                label={getArenaGame(t.gameId)?.name || 'Speelveld'}
                                 toolbarContent={tinkerToolbar}
                                 footerContent={tinkerFooter}
                               >
@@ -5778,6 +5841,7 @@ export default function App() {
                                       maxWidth="min(100%, 65dvh, 520px)"
                                       aspectRatio="1 / 1"
                                       resetKey={`${sudokuSize}-${sudokuStartTime}`}
+                                      label="Zazu's Sudoku"
                                     >
                                       <div 
                                         style={{ 
@@ -6608,7 +6672,7 @@ export default function App() {
                               const isGuessComplete = mmCurrentGuess.every(val => val !== -1);
 
                               return (
-                                <GameZoomContainer maxHeight="450px" aspectRatio="4 / 5">
+                                <GameZoomContainer maxHeight="520px" aspectRatio="3 / 4" resetKey={`${mmCodeLength}-${mmMaxTurns}`} label="Yzma's Poison Struggle">
                                   <div style={{ width: '100%', height: '100%', boxSizing: 'border-box', overflowY: 'auto', padding: '8px' }}>
                                     <div className="notice" style={{ background: '#0a1c3c', fontSize: '13px', lineHeight: '1.4' }}>
                                       💡 Tik op de Disney-figuren onderaan om de stippen van links naar rechts te vullen. Klik op een stip om die positie handmatig aan te passen.
