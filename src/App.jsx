@@ -5735,6 +5735,13 @@ export default function App() {
                             {t.type === "arcade-game" && (() => {
                               const isTinkerGame = t.gameId === 'tictactinker';
                               const isTallArenaGame = t.gameId === 'piratesplank' || t.gameId === 'yahtzee';
+                              const arenaGameName = getArenaGame(t.gameId)?.name || 'Speelveld';
+                              const standardArenaToolbar = (
+                                <div className="arena-external-rules-row">
+                                  <strong>{arenaGameName}</strong>
+                                  <MiniGameRulesButton gameId={t.gameId} mode={t.mode} compact />
+                                </div>
+                              );
                               const tinkerToolbar = isTinkerGame && arenaToolbar?.gameId === 'tictactinker' ? (
                                 <div style={{ position: 'relative', minHeight: '34px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
                                   <div style={{ position: 'absolute', left: 0 }}>
@@ -5768,7 +5775,7 @@ export default function App() {
                                 fitContent={!isTinkerGame}
                                 resetKey={t.gameId}
                                 label={getArenaGame(t.gameId)?.name || 'Speelveld'}
-                                toolbarContent={tinkerToolbar}
+                                toolbarContent={tinkerToolbar || standardArenaToolbar}
                                 footerContent={tinkerFooter}
                               >
                                 <MiniGameRenderer
@@ -5778,7 +5785,7 @@ export default function App() {
                                   localPlayer={localPlayer}
                                   players={players}
                                   updateRoomState={updateRoomState}
-                                  showRules={!isTinkerGame}
+                                  showRules={false}
                                   onToolbarChange={isTinkerGame || t.gameId === 'qwixx' ? setArenaToolbar : undefined}
                                   onFinish={async (score, detail) => {
                                     const usesDirectReward = t.gameId === 'ricochet' || t.gameId === 'qwixx';

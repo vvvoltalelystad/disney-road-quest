@@ -2034,26 +2034,34 @@ export function AbaloneGame({ mode, room, localPlayer, players, updateRoomState,
 }
 
 const PIRATES_PLANK_WORDS = [
-  { word: "PHANTOM MANOR" },
-  { word: "THUNDER MESA" },
-  { word: "CASEY JR CIRCUS TRAIN" },
-  { word: "NAUTILUS" },
-  { word: "DISCOVERYLAND" },
-  { word: "SKULL ROCK" },
-  { word: "ADMIRAL BOOM" },
-  { word: "CLARABELLE COW" },
-  { word: "PROFESSOR PORTER" },
-  { word: "KRONKS SPINACH PUFFS" },
-  { word: "MAURICES INVENTION" },
-  { word: "YEN SID" },
-  { word: "GREAT MOUSE DETECTIVE" },
-  { word: "SILVERMIST" },
-  { word: "MADAME MEDUSA" },
-  { word: "ROBIN HOOD AND LITTLE JOHN" },
-  { word: "THE RESCUERS DOWN UNDER" },
-  { word: "WALT DISNEY STUDIOS PARK" },
-  { word: "AVENGERS ASSEMBLE FLIGHT FORCE" },
-  { word: "LE PAYS DES CONTES DE FEES" }
+  { word: "PHANTOM MANOR", language: "en" },
+  { word: "THUNDER MESA", language: "en" },
+  { word: "CASEY JR CIRCUS TRAIN", language: "en" },
+  { word: "NAUTILUS", language: "en" },
+  { word: "DISCOVERYLAND", language: "en" },
+  { word: "SKULL ROCK", language: "en" },
+  { word: "ADMIRAL BOOM", language: "en" },
+  { word: "CLARABELLE COW", language: "en" },
+  { word: "PROFESSOR PORTER", language: "en" },
+  { word: "KRONKS SPINACH PUFFS", language: "en" },
+  { word: "MAURICES INVENTION", language: "en" },
+  { word: "YEN SID", language: "en" },
+  { word: "GREAT MOUSE DETECTIVE", language: "en" },
+  { word: "SILVERMIST", language: "en" },
+  { word: "MADAME MEDUSA", language: "en" },
+  { word: "ROBIN HOOD AND LITTLE JOHN", language: "en" },
+  { word: "THE RESCUERS DOWN UNDER", language: "en" },
+  { word: "WALT DISNEY STUDIOS PARK", language: "en" },
+  { word: "AVENGERS ASSEMBLE FLIGHT FORCE", language: "en" },
+  { word: "LAND OF FAIRY TALES", language: "en" },
+  { word: "DE KLEINE ZEEMEERMIN", language: "nl" },
+  { word: "BELLE EN HET BEEST", language: "nl" },
+  { word: "DE PRINSES EN DE KIKKER", language: "nl" },
+  { word: "DE REDDERTJES", language: "nl" },
+  { word: "KNABBEL EN BABBEL", language: "nl" },
+  { word: "HET JUNGLEBOEK", language: "nl" },
+  { word: "DE KLOKKENLUIDER VAN DE NOTRE DAME", language: "nl" },
+  { word: "101 DALMATIERS", language: "nl" }
 ];
 
 const PLANK_LETTERS = "ABCDEFGHIJKLMNOPQRSTUVWXYZ".split("");
@@ -2070,6 +2078,10 @@ const PLANK_EVENT_DIE = [
 ];
 const PLANK_MAX_STRIKES = 3;
 const PLANK_VOWEL_COST = 5;
+const PLANK_LANGUAGES = {
+  en: { flag: "🇬🇧", label: "Engelstalig woord" },
+  nl: { flag: "🇳🇱", label: "Nederlandstalig woord" }
+};
 
 const getPlankOccurrenceCount = (word, letter) => word.split("").filter(char => char === letter).length;
 const isPlankWordSolved = (word, guesses) => (
@@ -2080,6 +2092,7 @@ function createPiratesPlankState() {
   const entry = PIRATES_PLANK_WORDS[Math.floor(Math.random() * PIRATES_PLANK_WORDS.length)];
   return {
     plankWord: entry.word,
+    plankLanguage: entry.language || "en",
     plankGuesses: [],
     plankWrongGuesses: [],
     plankTreasure: 0,
@@ -2247,6 +2260,8 @@ export function PiratesPlankGame({ mode, room, localPlayer, players, updateRoomS
   const myTurn = isSolo || activeIndex === myIndex;
 
   const word = taskState.plankWord || "";
+  const wordLanguage = taskState.plankLanguage || PIRATES_PLANK_WORDS.find(entry => entry.word === word)?.language || "en";
+  const languageInfo = PLANK_LANGUAGES[wordLanguage] || PLANK_LANGUAGES.en;
   const guesses = taskState.plankGuesses || [];
   const wrongGuesses = taskState.plankWrongGuesses || [];
   const treasure = taskState.plankTreasure || 0;
@@ -2523,6 +2538,11 @@ export function PiratesPlankGame({ mode, room, localPlayer, players, updateRoomS
           </div>
           <div className="badge" style={{ justifyContent: 'center' }}>Strikes: {strikes}/{PLANK_MAX_STRIKES}</div>
           <div className="badge" style={{ justifyContent: 'center' }}>Beurten: {turns}</div>
+        </div>
+
+        <div className={`plank-language-hint language-${wordLanguage}`} aria-label={languageInfo.label}>
+          <span className="plank-language-flag" aria-hidden="true">{languageInfo.flag}</span>
+          <span><small>Schatkistcode</small><strong>{languageInfo.label}</strong></span>
         </div>
 
         <div style={{
