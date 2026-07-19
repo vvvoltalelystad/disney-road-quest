@@ -2127,11 +2127,71 @@ function PlankNumberDie({ value }) {
           display: 'grid',
           placeItems: 'center',
           color: '#8b651b',
-          fontSize: '30px',
-          textShadow: '0 1px 0 #fff7d7'
-        }}>⚓</span>
+          filter: 'drop-shadow(0 1px 0 #fff7d7)'
+        }}><PlankEngravedSymbol eventId="neutral-1" size={38} medallion={false} /></span>
       )}
     </div>
+  );
+}
+
+function PlankEngravedSymbol({ eventId, size = 46, medallion = true }) {
+  const commonStroke = { fill: 'none', stroke: 'currentColor', strokeWidth: 3.2, strokeLinecap: 'round', strokeLinejoin: 'round' };
+  let symbol;
+
+  if (eventId === 'neutral-1') {
+    symbol = (
+      <g {...commonStroke}>
+        <circle cx="32" cy="13" r="5" />
+        <path d="M32 18v30M22 28h20M17 40c2 10 8 15 15 15s13-5 15-15M17 40l-5 5M47 40l5 5" />
+      </g>
+    );
+  } else if (eventId === 'neutral-2') {
+    symbol = (
+      <g {...commonStroke}>
+        <circle cx="32" cy="32" r="21" />
+        <path d="M38 26l8-8-8 20-20 8 8-8z" fill="currentColor" stroke="none" />
+        <circle cx="32" cy="32" r="4" fill="#681522" stroke="currentColor" />
+        <path d="M32 7v5M32 52v5M7 32h5M52 32h5" />
+      </g>
+    );
+  } else if (eventId === 'double') {
+    symbol = (
+      <g {...commonStroke}>
+        <path d="M15 13l27 31M49 13L22 44M12 10l8 2-6 6zM52 10l-8 2 6 6z" />
+        <path d="M37 44l8 8M27 44l-8 8M40 48l5-5M24 48l-5-5" strokeWidth="4" />
+      </g>
+    );
+  } else if (eventId === 'shipwreck') {
+    symbol = (
+      <g {...commonStroke}>
+        <path d="M9 45c6-6 11 6 17 0s11 6 17 0 9 4 13 1M12 53c6-6 11 6 17 0s11 6 17 0" />
+        <path d="M23 39l6-25M29 15l18 10-20 5M30 24l10 13M42 35l7-5" />
+      </g>
+    );
+  } else if (eventId === 'chest') {
+    symbol = (
+      <g {...commonStroke}>
+        <path d="M13 28c0-9 8-16 19-16s19 7 19 16M12 28h40v25H12zM12 36h40M32 28v25" />
+        <rect x="27" y="34" width="10" height="12" rx="2" fill="currentColor" stroke="none" />
+        <circle cx="32" cy="39" r="2" fill="#681522" stroke="none" />
+      </g>
+    );
+  } else {
+    symbol = (
+      <g {...commonStroke}>
+        <path d="M16 27c0-11 7-18 16-18s16 7 16 18c0 7-3 11-8 14v10H24V41c-5-3-8-7-8-14z" fill="currentColor" fillOpacity=".14" />
+        <circle cx="25" cy="28" r="5" fill="currentColor" stroke="none" />
+        <circle cx="39" cy="28" r="5" fill="currentColor" stroke="none" />
+        <path d="M32 33l-4 7h8zM25 47v7M32 47v7M39 47v7" />
+      </g>
+    );
+  }
+
+  return (
+    <svg width={size} height={size} viewBox="0 0 64 64" aria-hidden="true" style={{ display: 'block', overflow: 'visible', filter: 'drop-shadow(0 2px 1px rgba(48,14,2,.85)) drop-shadow(0 -1px 0 rgba(255,246,190,.42))' }}>
+      {medallion && <circle cx="32" cy="32" r="28" fill="rgba(49,4,11,.2)" stroke="currentColor" strokeWidth="1.5" opacity=".75" />}
+      {symbol}
+    </svg>
   );
 }
 
@@ -2145,14 +2205,12 @@ function PlankEventDie({ roll }) {
       display: 'grid',
       placeItems: 'center',
       overflow: 'hidden',
-      color: roll?.tone || '#f5d98e',
+      color: '#f5d98e',
       background: 'radial-gradient(circle at 32% 22%, #c94651 0%, #8f1f2d 47%, #3c0912 100%)',
       border: '2px solid #e9bd68',
       boxShadow: 'inset 0 2px 3px rgba(255,255,255,.3), inset 0 -7px 12px rgba(24,0,5,.45), 0 8px 16px rgba(0,0,0,.4), 0 0 0 1px rgba(255,205,106,.28)'
     }} aria-label={roll ? `Rode gebeurtenisdobbelsteen: ${roll.eventName}` : 'Rode gebeurtenisdobbelsteen, nog niet gegooid'}>
-      <span aria-hidden="true" style={{ fontSize: '31px', lineHeight: 1, filter: 'drop-shadow(0 2px 2px rgba(0,0,0,.55))' }}>
-        {roll?.icon || '☠'}
-      </span>
+      <PlankEngravedSymbol eventId={roll?.eventId || 'curse'} size={48} />
       <span style={{ position: 'absolute', left: '5px', right: '5px', bottom: '5px', color: '#fff4d1', fontSize: '7px', fontWeight: 900, letterSpacing: '.7px', textTransform: 'uppercase' }}>
         {roll?.eventName || 'Gebeurtenis'}
       </span>
