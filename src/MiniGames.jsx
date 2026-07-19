@@ -2086,6 +2086,105 @@ const PLANK_LANGUAGES = {
   nl: { flag: "🇳🇱", label: "Nederlandstalig woord" }
 };
 
+function PlankNumberDie({ value }) {
+  const pipPositions = {
+    1: [5],
+    2: [1, 9],
+    3: [1, 5, 9]
+  };
+  const positions = pipPositions[value] || [];
+  return (
+    <div style={{
+      width: '76px',
+      aspectRatio: '1',
+      borderRadius: '18px',
+      position: 'relative',
+      display: 'grid',
+      gridTemplateColumns: 'repeat(3, 1fr)',
+      gridTemplateRows: 'repeat(3, 1fr)',
+      padding: '13px',
+      background: 'radial-gradient(circle at 30% 22%, #fffef8 0%, #f5f0df 56%, #c9bea3 100%)',
+      border: '2px solid #f0d78b',
+      boxShadow: 'inset 0 2px 3px rgba(255,255,255,.95), inset 0 -5px 9px rgba(80,58,18,.18), 0 8px 16px rgba(0,0,0,.38), 0 0 0 1px rgba(255,221,125,.35)',
+      flex: '0 0 auto'
+    }} aria-label={value ? `Witte dobbelsteen: ${value}` : 'Witte buitdobbelsteen, nog niet gegooid'}>
+      {Array.from({ length: 9 }, (_, index) => {
+        const position = index + 1;
+        const visible = positions.includes(position);
+        return <span key={position} style={{
+          width: visible ? '11px' : 0,
+          height: visible ? '11px' : 0,
+          placeSelf: 'center',
+          borderRadius: '50%',
+          background: 'radial-gradient(circle at 35% 30%, #4d3a16, #090d16 72%)',
+          boxShadow: visible ? 'inset 0 1px 1px rgba(255,224,135,.5), 0 1px 1px rgba(255,255,255,.7)' : 'none'
+        }} />;
+      })}
+      {!value && (
+        <span aria-hidden="true" style={{
+          position: 'absolute',
+          inset: '12px',
+          display: 'grid',
+          placeItems: 'center',
+          color: '#8b651b',
+          fontSize: '30px',
+          textShadow: '0 1px 0 #fff7d7'
+        }}>⚓</span>
+      )}
+    </div>
+  );
+}
+
+function PlankEventDie({ roll }) {
+  return (
+    <div style={{
+      width: '76px',
+      aspectRatio: '1',
+      borderRadius: '18px',
+      position: 'relative',
+      display: 'grid',
+      placeItems: 'center',
+      overflow: 'hidden',
+      color: roll?.tone || '#f5d98e',
+      background: 'radial-gradient(circle at 32% 22%, #c94651 0%, #8f1f2d 47%, #3c0912 100%)',
+      border: '2px solid #e9bd68',
+      boxShadow: 'inset 0 2px 3px rgba(255,255,255,.3), inset 0 -7px 12px rgba(24,0,5,.45), 0 8px 16px rgba(0,0,0,.4), 0 0 0 1px rgba(255,205,106,.28)'
+    }} aria-label={roll ? `Rode gebeurtenisdobbelsteen: ${roll.eventName}` : 'Rode gebeurtenisdobbelsteen, nog niet gegooid'}>
+      <span aria-hidden="true" style={{ fontSize: '31px', lineHeight: 1, filter: 'drop-shadow(0 2px 2px rgba(0,0,0,.55))' }}>
+        {roll?.icon || '☠'}
+      </span>
+      <span style={{ position: 'absolute', left: '5px', right: '5px', bottom: '5px', color: '#fff4d1', fontSize: '7px', fontWeight: 900, letterSpacing: '.7px', textTransform: 'uppercase' }}>
+        {roll?.eventName || 'Gebeurtenis'}
+      </span>
+    </div>
+  );
+}
+
+function PlankShipMarker() {
+  return (
+    <svg width="62" height="46" viewBox="0 0 124 92" aria-label="The Black Pearl" role="img" style={{ display: 'block', filter: 'drop-shadow(0 5px 5px rgba(0,0,0,.65))' }}>
+      <path d="M13 63h99l-14 17H29z" fill="#111722" stroke="#d0a950" strokeWidth="3" />
+      <path d="M34 64V19M62 64V7M91 64V23" stroke="#dbc47c" strokeWidth="3" />
+      <path d="M59 11L30 23l29 15zM65 14l31 12-31 17zM88 28L68 38l20 15zM37 27L18 38l19 12z" fill="#121622" stroke="#73684d" strokeWidth="2" />
+      <path d="M49 77h37" stroke="#f4ce68" strokeWidth="3" strokeLinecap="round" strokeDasharray="3 7" />
+      <path d="M62 7v-5l14 5-14 6" fill="#8e1823" />
+    </svg>
+  );
+}
+
+function PlankTreasureIsland() {
+  return (
+    <svg width="70" height="56" viewBox="0 0 140 112" aria-label="Schatteneiland" role="img" style={{ display: 'block', filter: 'drop-shadow(0 6px 5px rgba(0,0,0,.55))' }}>
+      <ellipse cx="72" cy="88" rx="59" ry="13" fill="#398db2" opacity=".75" />
+      <path d="M23 84c11-24 29-31 54-27 21 3 33 13 42 27z" fill="#d6ad55" stroke="#f4dc8b" strokeWidth="3" />
+      <path d="M77 58c-1-22 3-35 13-47" stroke="#64401e" strokeWidth="6" strokeLinecap="round" />
+      <path d="M88 14c-14-7-26-4-34 4 14 1 23 5 29 12M91 13c14-5 25-1 33 9-14-1-24 2-31 9M90 13c2 10 0 19-6 28" fill="#2f8b4e" stroke="#66c56e" strokeWidth="3" strokeLinejoin="round" />
+      <path d="M44 64l24 24M68 64L44 88" stroke="#a81420" strokeWidth="8" strokeLinecap="round" />
+      <path d="M44 64l24 24M68 64L44 88" stroke="#ff626b" strokeWidth="3" strokeLinecap="round" />
+    </svg>
+  );
+}
+
 const getPlankOccurrenceCount = (word, letter) => word.split("").filter(char => char === letter).length;
 const getPlankLetterCount = word => word.split("").filter(char => /[A-Z0-9]/.test(char)).length;
 const getPlankWordCount = word => word.trim().split(/\s+/).filter(Boolean).length;
@@ -2585,13 +2684,17 @@ export function PiratesPlankGame({ mode, room, localPlayer, players, updateRoomS
       )}
 
       <div style={{ display: 'grid', gap: '10px' }}>
-        <div style={{ position: 'relative', height: '76px', maxWidth: '360px', width: '100%', margin: '0 auto' }}>
-          <div style={{ position: 'absolute', left: '24px', right: '24px', top: '35px', borderTop: '3px dashed rgba(216,232,255,0.35)' }} />
-          <div style={{ position: 'absolute', left: `${Math.min(82, shipProgress * 82)}%`, top: '10px', transform: 'translateX(-50%)', transition: 'left 0.35s ease' }}>
-            <ShipImage type="blackPearl" />
+        <div style={{ position: 'relative', height: '88px', maxWidth: '380px', width: '100%', margin: '0 auto', overflow: 'hidden' }}>
+          <svg viewBox="0 0 380 88" preserveAspectRatio="none" aria-hidden="true" style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', display: 'block' }}>
+            <path d="M28 57 C120 50 212 65 340 53" fill="none" stroke="rgba(9,15,27,.7)" strokeWidth="8" strokeLinecap="round" />
+            <path d="M28 55 C120 48 212 63 340 51" fill="none" stroke="#98743c" strokeWidth="5" strokeLinecap="round" />
+            <path d="M28 54 C120 47 212 62 340 50" fill="none" stroke="#e2c27a" strokeWidth="1.5" strokeLinecap="round" opacity=".85" />
+          </svg>
+          <div style={{ position: 'absolute', left: `${6 + Math.min(1, shipProgress) * 69}%`, top: '10px', transform: 'translateX(-50%)', transition: 'left 0.35s ease-out' }}>
+            <PlankShipMarker />
           </div>
-          <div style={{ position: 'absolute', right: '0', top: '15px' }}>
-            <ShipImage type="boat" />
+          <div style={{ position: 'absolute', right: '-2px', top: '8px' }}>
+            <PlankTreasureIsland />
           </div>
         </div>
 
@@ -2648,14 +2751,9 @@ export function PiratesPlankGame({ mode, room, localPlayer, players, updateRoomS
           </div>
         ) : (
           <div style={{ display: 'grid', gap: '10px' }}>
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px', maxWidth: '320px', margin: '0 auto' }}>
-              <div style={{ background: '#fff', color: '#07152c', borderRadius: '12px', padding: '10px', fontWeight: 900, fontSize: '28px', minHeight: '58px', display: 'grid', placeItems: 'center' }}>
-                {pendingRoll ? pendingRoll.number : '?'}
-              </div>
-              <div style={{ background: '#8f1f2d', color: pendingRoll?.tone || '#fff', borderRadius: '12px', padding: '10px', fontWeight: 900, fontSize: '24px', minHeight: '58px', display: 'grid', placeItems: 'center' }}>
-                {pendingRoll ? pendingRoll.icon : '?'}
-                {pendingRoll && <span style={{ display: 'block', color: '#fff', fontSize: '10px', marginTop: '2px' }}>{pendingRoll.eventName}</span>}
-              </div>
+            <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', gap: '14px', margin: '0 auto' }}>
+              <PlankNumberDie value={pendingRoll?.number} />
+              <PlankEventDie roll={pendingRoll} />
             </div>
 
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px', maxWidth: '360px', margin: '0 auto' }}>
