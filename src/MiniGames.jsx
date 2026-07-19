@@ -490,8 +490,8 @@ export function DotsBoxesGame({ mode, room, localPlayer, players, updateRoomStat
 
         const nextH = [...hLines];
         const nextV = [...vLines];
-        if (isH) nextH[selectedMove] = true;
-        else nextV[selectedMove] = true;
+        if (isH) nextH[selectedMove] = 2;
+        else nextV[selectedMove] = 2;
 
         const nextBoxes = [...boxes];
         let boxCompleted = false;
@@ -527,8 +527,8 @@ export function DotsBoxesGame({ mode, room, localPlayer, players, updateRoomStat
 
     const nextH = [...hLines];
     const nextV = [...vLines];
-    if (isHorizontal) nextH[index] = true;
-    else nextV[index] = true;
+    if (isHorizontal) nextH[index] = myIndex + 1;
+    else nextV[index] = myIndex + 1;
 
     const nextBoxes = [...boxes];
     let boxCompleted = false;
@@ -570,8 +570,8 @@ export function DotsBoxesGame({ mode, room, localPlayer, players, updateRoomStat
   const handleEndGame = () => {
     const myScore = scores[myIndex];
     const maxScore = Math.max(...scores);
-    const win = myScore === maxScore;
     const tie = scores.filter(s => s === maxScore).length > 1;
+    const win = myScore === maxScore && !tie;
 
     const pts = win ? 3 : tie ? 2 : 1;
     const details = win ? "Kamertje verhuren gewonnen!" : tie ? "Gelijkspel" : "Verloren";
@@ -665,18 +665,29 @@ export function DotsBoxesGame({ mode, room, localPlayer, players, updateRoomStat
           const x1 = boardPadding + c * boardStep;
           const y1 = boardPadding + r * boardStep;
           return (
-            <line
-              key={`h-${idx}`}
-              x1={x1}
-              y1={y1}
-              x2={x1 + boardStep}
-              y2={y1}
-              stroke={line ? (playerColors[0]) : 'rgba(255,255,255,0.1)'}
-              strokeWidth={line ? 6 : 5}
-              strokeDasharray={line ? "none" : "3,3"}
-              style={{ cursor: myTurn ? 'pointer' : 'default' }}
-              onClick={() => handleLineClick(idx, true)}
-            />
+            <g key={`h-${idx}`}>
+              <line
+                x1={x1}
+                y1={y1}
+                x2={x1 + boardStep}
+                y2={y1}
+                stroke="transparent"
+                strokeWidth="18"
+                pointerEvents="stroke"
+                style={{ cursor: myTurn && !line ? 'pointer' : 'default' }}
+                onClick={() => handleLineClick(idx, true)}
+              />
+              <line
+                x1={x1}
+                y1={y1}
+                x2={x1 + boardStep}
+                y2={y1}
+                stroke={line ? (playerColors[Math.max(0, Number(line) - 1)] || playerColors[0]) : 'rgba(255,255,255,0.1)'}
+                strokeWidth={line ? 6 : 5}
+                strokeDasharray={line ? "none" : "3,3"}
+                pointerEvents="none"
+              />
+            </g>
           );
         })}
 
@@ -686,18 +697,29 @@ export function DotsBoxesGame({ mode, room, localPlayer, players, updateRoomStat
           const x1 = boardPadding + c * boardStep;
           const y1 = boardPadding + r * boardStep;
           return (
-            <line
-              key={`v-${idx}`}
-              x1={x1}
-              y1={y1}
-              x2={x1}
-              y2={y1 + boardStep}
-              stroke={line ? (playerColors[0]) : 'rgba(255,255,255,0.1)'}
-              strokeWidth={line ? 6 : 5}
-              strokeDasharray={line ? "none" : "3,3"}
-              style={{ cursor: myTurn ? 'pointer' : 'default' }}
-              onClick={() => handleLineClick(idx, false)}
-            />
+            <g key={`v-${idx}`}>
+              <line
+                x1={x1}
+                y1={y1}
+                x2={x1}
+                y2={y1 + boardStep}
+                stroke="transparent"
+                strokeWidth="18"
+                pointerEvents="stroke"
+                style={{ cursor: myTurn && !line ? 'pointer' : 'default' }}
+                onClick={() => handleLineClick(idx, false)}
+              />
+              <line
+                x1={x1}
+                y1={y1}
+                x2={x1}
+                y2={y1 + boardStep}
+                stroke={line ? (playerColors[Math.max(0, Number(line) - 1)] || playerColors[0]) : 'rgba(255,255,255,0.1)'}
+                strokeWidth={line ? 6 : 5}
+                strokeDasharray={line ? "none" : "3,3"}
+                pointerEvents="none"
+              />
+            </g>
           );
         })}
 
@@ -2681,12 +2703,7 @@ export function PiratesPlankGame({ mode, room, localPlayer, players, updateRoomS
 
   const handleFinish = () => {
     const won = winnerId === localPlayer.id || (isSolo && winnerId);
-    const boughtVowels = boughtVowelLetters.length;
-    const speedBonus = turns <= 5 ? 2 : turns <= 8 ? 1 : 0;
-    const strikeBonus = strikes === 0 ? 2 : strikes === 1 ? 1 : 0;
-    const thriftBonus = boughtVowels === 0 ? 1 : 0;
-    const treasureBonus = Math.min(1, Math.floor(treasure / 10));
-    const pts = won ? Math.min(6, 1 + speedBonus + strikeBonus + thriftBonus + treasureBonus) : 0;
+    const pts = won ? 2 : 0;
     const detail = winnerId
       ? `Black Pearl's Plank opgelost: ${word} (${treasure} munten, ${strikes} strikes, ${turns} beurten)`
       : `Black Pearl's Plank gezonken: ${word}`;
@@ -3302,11 +3319,17 @@ export function DisneyYahtzeeGame({ mode, room, localPlayer, players, updateRoom
                 alignItems: 'center',
                 justifyContent: 'center',
                 fontSize: '12px',
-                lineHeight: 1.1
+                lineHeight: 1.1,
+                color: '#17120a',
+                background: held[index]
+                  ? 'radial-gradient(circle at 32% 22%, #fff8d6 0%, #f0cb63 58%, #9b6714 100%)'
+                  : 'radial-gradient(circle at 32% 22%, #ffffff 0%, #f4f0e4 58%, #c8bea5 100%)',
+                border: `2px solid ${held[index] ? '#ffd45c' : '#e7d29a'}`,
+                boxShadow: 'inset 0 2px 3px rgba(255,255,255,.95), inset 0 -5px 9px rgba(80,58,18,.16), 0 6px 13px rgba(0,0,0,.32)'
               }}
             >
-              <strong style={{ fontSize: '24px' }}>{value || "?"}</strong>
-              <span style={{ fontSize: '9px' }}>{die?.label || "Worp"}</span>
+              <strong style={{ fontSize: '24px' }}>{value || "✦"}</strong>
+              <span style={{ fontSize: '9px' }}>{die?.label || "Klaar"}</span>
             </button>
           );
         })}
@@ -3750,7 +3773,11 @@ export function DisneyQwixxGame({ mode, room, localPlayer, players, updateRoomSt
   const visibleMarks = marks[viewedPlayerIndex] || createQwixxMarks();
   const whiteOptions = getQwixxWhiteOptions(dice, myMarks, lockedRows);
   const colorOptions = getQwixxColorOptions(dice, myMarks, lockedRows);
-  const canChooseWhite = rolled && phase === 'white' && !whiteDone[myIndex] && !complete;
+  // Process the shared white-sum action in a deterministic order. Both players
+  // still get the action, but their JSON state updates can no longer overwrite
+  // each other when two phones tap at almost the same moment.
+  const whiteChooserIndex = whiteDone[activeIndex] ? (activeIndex + 1) % 2 : activeIndex;
+  const canChooseWhite = rolled && phase === 'white' && !whiteDone[myIndex] && myIndex === whiteChooserIndex && !complete;
   const canChooseColor = rolled && phase === 'color' && myTurn && !complete;
   const currentOptions = phase === 'white' ? whiteOptions : colorOptions;
 
@@ -3893,6 +3920,7 @@ export function DisneyQwixxGame({ mode, room, localPlayer, players, updateRoomSt
     if (aiTurnRef.current === aiKey) return;
     if (!rolled && activeIndex !== aiIndex) return;
     if (rolled && phase === 'white' && whiteDone[aiIndex]) return;
+    if (rolled && phase === 'white' && whiteChooserIndex !== aiIndex) return;
     if (rolled && phase === 'color' && activeIndex !== aiIndex) return;
     aiTurnRef.current = aiKey;
 
@@ -4150,7 +4178,7 @@ export function DisneyQwixxGame({ mode, room, localPlayer, players, updateRoomSt
               boxShadow: 'inset 0 -8px 14px rgba(0,0,0,0.18)'
             }}
           >
-            <strong style={{ fontSize: '20px' }}>{value || "?"}</strong>
+            <strong style={{ fontSize: '20px' }}>{value || "✦"}</strong>
             <span style={{ fontSize: '10px', fontWeight: 800 }}>{label}</span>
           </div>
         ))}

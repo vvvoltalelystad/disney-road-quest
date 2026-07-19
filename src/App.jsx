@@ -973,15 +973,15 @@ function GameZoomContainer({ children, maxHeight = '560px', aspectRatio = '3 / 4
 }
 
 export default function App() {
-  const [screen, setScreen] = useState('portal');
+  const [screen, setScreen] = useState(() => new URLSearchParams(window.location.search).get('join') ? 'home' : 'portal');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
 
   const [localPlayer, setLocalPlayer] = useState(null);
-  const [roomCodeInput, setRoomCodeInput] = useState('');
+  const [roomCodeInput, setRoomCodeInput] = useState(() => (new URLSearchParams(window.location.search).get('join') || '').toUpperCase());
   const [activeProfileName, setActiveProfileName] = useState(() => {
     const params = new URLSearchParams(window.location.search);
-    if (params.get('portal') !== '1') return '';
+    if (params.get('portal') !== '1' && !params.get('join')) return '';
     return localStorage.getItem(ACTIVE_PROFILE_KEY) || localStorage.getItem('disney_player_name') || '';
   });
   const [logPopupOpen, setLogPopupOpen] = useState(false);
@@ -992,6 +992,10 @@ export default function App() {
 
   useEffect(() => {
     window.scrollTo({ top: 0, left: 0, behavior: 'auto' });
+    const frame = window.requestAnimationFrame(() => {
+      window.scrollTo({ top: 0, left: 0, behavior: 'auto' });
+    });
+    return () => window.cancelAnimationFrame(frame);
   }, [screen, showPortalShop]);
 
   const [setupMode, setSetupMode] = useState('mix');
@@ -2156,6 +2160,8 @@ export default function App() {
 
   const handleStartArcadeSolo = (gameId) => {
     if (getArenaGame(gameId)?.comingSoon) return;
+    setArcadeOptionsOpen(false);
+    setArcadePlayMode(null);
     const name = activeProfileName || playerNameInput.trim() || localStorage.getItem('disney_player_name') || 'Solo Speler';
     localStorage.setItem('disney_player_name', name);
     localStorage.setItem('disney_ai_level', aiLevel);
@@ -2305,6 +2311,9 @@ export default function App() {
   // Session recovery
   useEffect(() => {
     async function recoverSession() {
+      // A direct join link must always open the join form, even when this
+      // device still remembers an older room.
+      if (new URLSearchParams(window.location.search).get('join')) return;
       const savedRoomId = localStorage.getItem('disney_room_id');
       const savedPlayerId = localStorage.getItem('disney_player_id');
       const savedPlayerName = localStorage.getItem('disney_player_name');
@@ -2541,10 +2550,13 @@ export default function App() {
       return { id: "quiz-choice", cat: "Quiz", type: "quizChoice", title: "Kies je niveau", text: "Kies voor 1, 2 of 3 sterren.", points: 0 };
     }
     if (room.current_task_id === 'solo-sudoku') {
+      const sudokuTitle = room.current_task_state?.sudokuSize === 6 ? "Tinker Bell Sudoku" : "Zazu's Sudoku";
       return { 
         id: "solo-sudoku", 
-        cat: room.current_task_state?.sudokuSize === 6 ? "Tinker Bell Sudoku" : "Zazu's Sudoku",
-        type: "sudoku" 
+        cat: sudokuTitle,
+        type: "sudoku",
+        title: sudokuTitle,
+        text: "Vul elk leeg vakje met het juiste Disney-symbool. Ieder symbool mag per rij, kolom en blok maar één keer voorkomen."
       };
     }
     if (room.game_mode === 'arcade-mastermind') {
@@ -5075,8 +5087,12 @@ export default function App() {
                   {ARENA_GAMES.map(game => {
                     const isSelected = selectedArcadeGame === game.id;
                     return (
-                      <div
+                      <button
+                        type="button"
                         key={game.id}
+                        disabled={game.comingSoon}
+                        aria-pressed={isSelected}
+                        aria-label={`${game.name}. ${game.desc}`}
                         onClick={() => {
                           if (game.comingSoon) return;
                           if (isSelected) {
@@ -5099,7 +5115,10 @@ export default function App() {
                           background: isSelected ? '#122d56' : '#081730',
                           border: isSelected ? '2px solid var(--gold)' : '2px solid var(--line)',
                           opacity: game.comingSoon ? 0.65 : 1,
-                          transition: 'all 0.15s ease'
+                          transition: 'all 0.15s ease',
+                          width: '100%',
+                          font: 'inherit',
+                          color: 'inherit'
                         }}
                       >
                         {game.image ? (
@@ -5112,7 +5131,7 @@ export default function App() {
                           {game.comingSoon ? 'binnenkort' : getArenaGame(game.id)?.maxPlayers === 1 ? 'solo' : getArenaGame(game.id)?.maxPlayers === 4 ? 'max 4 spelers' : '2 spelers'}
                         </span>
                         <span style={{ fontSize: '11px', color: 'var(--muted)', lineHeight: '1.3' }}>{game.desc}</span>
-                      </div>
+                      </button>
                     );
                   })}
                 </div>
@@ -5829,7 +5848,7 @@ export default function App() {
                                   showRules={false}
                                   onToolbarChange={isTinkerGame || t.gameId === 'qwixx' ? setArenaToolbar : undefined}
                                   onFinish={async (score, detail) => {
-                                    const usesDirectReward = t.gameId === 'ricochet' || t.gameId === 'qwixx';
+                                    const usesDirectReward = t.gameId === 'ricochet' || t.gameId === 'qwixx' || t.gameId === 'piratesplank';
                                     const coinsEarned = usesDirectReward ? score : (score === 3 ? 2 : (score === 2 ? 1 : 0));
                                     const gameTitle = {
                                       othello: "Othello",
@@ -5889,7 +5908,7 @@ export default function App() {
                                       maxWidth="min(100%, 65dvh, 520px)"
                                       aspectRatio="1 / 1"
                                       resetKey={`${sudokuSize}-${sudokuStartTime}`}
-                                      label="Zazu's Sudoku"
+                                      label={t.title || "Zazu's Sudoku"}
                                     >
                                       <div 
                                         style={{ 
@@ -5913,8 +5932,11 @@ export default function App() {
                                             const borderStyles = getCellBorderStyles(rIdx, cIdx, sudokuSize, isSelected, hasError);
 
                                             return (
-                                              <div
+                                              <button
+                                                type="button"
                                                 key={`${rIdx}-${cIdx}`}
+                                                disabled={isClue}
+                                                aria-label={`Rij ${rIdx + 1}, kolom ${cIdx + 1}: ${cell || 'leeg'}${isClue ? ' (gegeven)' : ''}`}
                                                 onClick={() => {
                                                   if (isClue) return;
                                                   setSudokuSelectedCell({ row: rIdx, col: cIdx });
@@ -5941,11 +5963,12 @@ export default function App() {
                                                       : 'none',
                                                   color: isClue ? 'var(--gold)' : '#fff',
                                                   fontWeight: isClue ? 'bold' : 'normal',
+                                                  padding: 0,
                                                   ...borderStyles
                                                 }}
                                               >
                                                 {cell || ""}
-                                              </div>
+                                              </button>
                                             );
                                           })
                                         )}
