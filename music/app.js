@@ -489,7 +489,7 @@ function powerButton(){
 }
 async function activatePower(p){let r=await state.sb.rpc('dmq_activate_power',{p_round_id:state.round.id,p_power:p});if(r.error)toast(r.error.message);else schedule()}
 function renderClaim(){let s=currentSong(),claimed=state.round.claimed_by_user_id,mine=claimed===state.user.id,cp=state.players.find(p=>p.user_id===claimed);app().innerHTML=`${topbar('Song starten')}${scorebar()}${progress()}<section class="card question" style="--accent:${myAccentColor()}"><div class="badge">${esc(state.round.question_type)}</div><div class="songnumber">${esc(s?.label||'Song')}</div><p>Scan de code met de Hitster-telefoon.</p><div class="qrwrap" id="qrArea"></div>${rules(state.round.question_type,power())}${powerButton()}${!claimed?'<button class="btn primary full" onclick="claimSong()">▶ Ik laat deze song afspelen</button>':mine?'<div class="notice green">Jij bedient de muziek.</div><button class="btn primary full" onclick="confirmPlaying()">🔊 De song wordt afgespeeld</button><button class="btn ghost full" style="margin-top:8px" onclick="releaseSong()">Afspeelbeurt vrijgeven</button>':`<div class="notice blue">${esc(cp?.name||'Een speler')} laat de song afspelen.</div>${leader()?'<button class="btn ghost full" onclick="releaseSong()">Claim vrijgeven</button>':''}`}</section>`;setTimeout(()=>showCode(s),0)}
-function showCode(s){let e=document.getElementById('qrArea');if(!e)return;e.innerHTML='';if(s?.code_image_url)e.innerHTML=`<img src="${esc(s.code_image_url)}">`;else if(s?.spotify_url&&window.QRCode)new QRCode(e,{text:s.spotify_url,width:200,height:200,colorDark:'#07152e',colorLight:'#fff'});else e.innerHTML='<div class="qrplaceholder">Nog geen scancode ingesteld.</div>'}
+function showCode(s){let e=document.getElementById('qrArea');if(!e)return;e.innerHTML='';if(s?.code_image_url)e.innerHTML=`<img src="${esc(s.code_image_url)}">`;else if(s?.spotify_url&&window.QRCode)new window.QRCode(e,{text:s.spotify_url,width:200,height:200,colorDark:'#07152e',colorLight:'#fff'});else e.innerHTML='<div class="qrplaceholder">Nog geen scancode ingesteld.</div>'}
 async function claimSong(){let r=await state.sb.rpc('dmq_claim_song',{p_round_id:state.round.id});if(r.error)toast(r.error.message);else if(!r.data)toast('Iemand anders was sneller.');else schedule()}
 async function releaseSong(){let r=await state.sb.rpc('dmq_release_song',{p_round_id:state.round.id});if(r.error)toast(r.error.message);else schedule()}
 async function confirmPlaying(){let r=await state.sb.rpc('dmq_confirm_playing',{p_round_id:state.round.id});if(r.error)toast(r.error.message);else schedule()}
@@ -543,13 +543,14 @@ function collect(t){
   const reqArtist = t.includes('artist') || t === 'artist';
   
   let res = {};
-  if (reqFilm) res.film = ansFilm.value.trim();
-  if (reqTitle) res.title = ansTitle.value.trim();
-  if (reqYear) res.year = +ansYear.value || null;
-  if (reqArtist) res.artist = ansArtist.value.trim();
+  const fieldValue = id => document.getElementById(id)?.value?.trim() || '';
+  if (reqFilm) res.film = fieldValue('ansFilm');
+  if (reqTitle) res.title = fieldValue('ansTitle');
+  if (reqYear) res.year = +fieldValue('ansYear') || null;
+  if (reqArtist) res.artist = fieldValue('ansArtist');
   
   if (!reqFilm && !reqTitle && !reqYear && !reqArtist) {
-    res[t] = ansText.value.trim();
+    res[t] = fieldValue('ansText');
   }
   if (state.currentAnswer.final_bet !== undefined) {
     res.final_bet = state.currentAnswer.final_bet;
@@ -809,10 +810,11 @@ function renderFinal(){
   }
 }
 function renderAdmin(){let s=state.songs.find(x=>+x.song_number===+state.adminSelectedSong)||{};app().innerHTML=`${topbar('Songbeheer · 150 songs',"state.view='home';render()")}
-<section class="card"><div class="field"><label>Beheer-PIN</label><input id="adminPin" type="password" value="${esc(state.adminPin)}"></div><div class="field"><label>Song</label><select id="songSelect" onchange="state.adminPin=adminPin.value;state.adminSelectedSong=+this.value;renderAdmin()">${state.songs.map(x=>`<option value="${x.song_number}" ${+x.song_number===+state.adminSelectedSong?'selected':''}>${esc(x.label)} · ${esc(x.title||'leeg')}</option>`).join('')}</select></div></section>
+<section class="card"><div class="field"><label>Beheer-PIN</label><input id="adminPin" type="password" value="${esc(state.adminPin)}"></div><div class="field"><label>Song</label><select id="songSelect" onchange="selectAdminSong(this.value)">${state.songs.map(x=>`<option value="${x.song_number}" ${+x.song_number===+state.adminSelectedSong?'selected':''}>${esc(x.label)} · ${esc(x.title||'leeg')}</option>`).join('')}</select></div></section>
 <section class="card"><div class="field"><label>Titel</label><input id="songTitle" value="${esc(s.title||'')}"></div><div class="field"><label>Film</label><input id="songFilm" value="${esc(s.film||'')}"></div><div class="grid2"><div class="field"><label>Jaar</label><input id="songYear" type="number" value="${esc(s.year||'')}"></div><div class="field"><label>Uitvoerder</label><input id="songArtist" value="${esc(s.artist||'')}"></div></div><div class="field"><label>Spotify-link</label><input id="songSpotify" value="${esc(s.spotify_url||'')}"></div><div class="field"><label>Codeafbeelding-URL</label><input id="songCode" value="${esc(s.code_image_url||'')}"></div><div class="field"><label>Film-aliases</label><input id="filmAliases" value="${esc((s.film_aliases||[]).join(', '))}"></div><div class="field"><label>Titel-aliases</label><input id="titleAliases" value="${esc((s.title_aliases||[]).join(', '))}"></div><div class="field"><label>Uitvoerder-aliases</label><input id="artistAliases" value="${esc((s.artist_aliases||[]).join(', '))}"></div><label class="toggleline">Song actief<input id="songEnabled" type="checkbox" ${s.enabled?'checked':''}></label><button class="btn primary full" onclick="saveSong()">Opslaan</button></section>`}
 function list(v){return String(v||'').split(',').map(x=>x.trim()).filter(Boolean)}
-async function saveSong(){state.adminPin=adminPin.value;let s=state.songs.find(x=>+x.song_number===+state.adminSelectedSong);let r=await state.sb.rpc('dmq_admin_upsert_song',{p_pin:state.adminPin,p_song_number:s.song_number,p_title:songTitle.value.trim(),p_film:songFilm.value.trim(),p_year:+songYear.value||null,p_artist:songArtist.value.trim(),p_spotify_url:songSpotify.value.trim(),p_code_image_url:songCode.value.trim(),p_film_aliases:list(filmAliases.value),p_title_aliases:list(titleAliases.value),p_artist_aliases:list(artistAliases.value),p_enabled:songEnabled.checked});if(r.error)toast(r.error.message);else{await fetchSongs();toast('Song opgeslagen.');renderAdmin()}}
+function selectAdminSong(value){state.adminPin=document.getElementById('adminPin')?.value||'';state.adminSelectedSong=+value;renderAdmin()}
+async function saveSong(){const value=id=>document.getElementById(id)?.value?.trim()||'';state.adminPin=value('adminPin');let s=state.songs.find(x=>+x.song_number===+state.adminSelectedSong);let r=await state.sb.rpc('dmq_admin_upsert_song',{p_pin:state.adminPin,p_song_number:s.song_number,p_title:value('songTitle'),p_film:value('songFilm'),p_year:+value('songYear')||null,p_artist:value('songArtist'),p_spotify_url:value('songSpotify'),p_code_image_url:value('songCode'),p_film_aliases:list(value('filmAliases')),p_title_aliases:list(value('titleAliases')),p_artist_aliases:list(value('artistAliases')),p_enabled:!!document.getElementById('songEnabled')?.checked});if(r.error)toast(r.error.message);else{await fetchSongs();toast('Song opgeslagen.');renderAdmin()}}
 async function shareRoom(){
   const url=`${location.origin}${location.pathname}?join=${state.room.code}&v=${DMQ_VERSION}`;
   const shareData={title:"Mickey's Music Match",text:`Doe mee met Mickey's Music Match! Kamercode: ${state.room.code}`,url:url};
@@ -1202,7 +1204,7 @@ Object.assign(window,{
   leaveRoom,openSongAdminFromLobby,regenerateRoomCode,resetRoomToLobby,
   removeManagedPlayer,updateManagedPlayer,startGame,refreshAll,shareRoom,adjustRoundCount,
   createRoom,goJoin,resumeHost,resumePlayer,chooseJoinColor,chooseJoinAvatar,joinRoom,render,
-  renderLobby,saveSong,nextRound,confirmMyPoints,completeMyRound,
+  renderLobby,saveSong,selectAdminSong,nextRound,confirmPoints,completeRound,
   showPowersInfo,closePowersInfo,openStealDialog,closeStealDialog,stealFromPlayer,
   closeCelebration,removeBg,P
 });
