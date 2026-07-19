@@ -82,6 +82,7 @@ const BADGE_MARKET_KEY = 'disney_badge_market';
 const BADGE_ACHIEVEMENT_KEY = 'disney_badge_achievements';
 const BADGE_PACK_COST = 5;
 const BADGE_SELL_VALUE = 2;
+const BADGE_SHOWCASE_SEED_VERSION = 1;
 const ENABLE_LEGACY_SHOP = false;
 
 const BADGE_RARITIES = [
@@ -101,7 +102,7 @@ const BADGE_NAMES = {
     legendary: ['Disneyland Hotel', 'Walt & Mickey', 'Sleeping Beauty Castle Gold', 'Disneyland Park Icon']
   },
   adventure: {
-    common: ['Front Lot', 'Studio Theater', 'Toon Studio', 'World Premiere Plaza', 'Animation Celebration', 'Cars Road Trip', 'Toy Story Playland', 'Slinky Dog Zigzag Spin', 'Cars Quatre Roues Rallye', 'Flying Carpets over Agrabah', 'Stitch Live!', 'Studio D'],
+    common: ['World Premiere Entrance', 'Studio Theater', 'Toon Studio', 'World Premiere Plaza', 'Animation Celebration', 'Cars Road Trip', 'Toy Story Playland', 'Slinky Dog Zigzag Spin', 'Cars Quatre Roues Rallye', 'Flying Carpets over Agrabah', 'Stitch Live!', 'Studio D'],
     uncommon: ['Ratatouille Courtyard', 'Place de Rémy', 'Spider-Man W.E.B.', 'Avengers Headquarters', 'Training Center', 'Frozen Promenade', 'Arendelle Village', 'Raiponce Tangled Spin'],
     rare: ['Ratatouille Adventure', 'Crush’s Coaster', 'Tower of Terror', 'RC Racer', 'Toy Soldiers Parachute Drop', 'Avengers Flight Force', 'Frozen Ever After', 'Mickey and the Magician'],
     epic: ['World of Frozen', 'Avengers Campus', 'Together: Pixar Adventure', 'Disney Studio 1', 'Adventure Bay', 'Adventure Way'],
@@ -165,6 +166,21 @@ const BADGE_ACHIEVEMENTS = [
 ];
 
 const BADGE_CATEGORY_ACHIEVEMENTS = BADGE_ACHIEVEMENTS.filter(achievement => !achievement.ultimate);
+const JACCO_BADGE_SHOWCASE_COUNTS = {
+  'disneyland-common-1': 3,
+  'disneyland-common-2': 2,
+  'disneyland-common-3': 4,
+  'disneyland-common-4': 1,
+  'disneyland-common-5': 2,
+  'disneyland-common-6': 3,
+  'disneyland-common-7': 1,
+  'disneyland-common-8': 2,
+  'disneyland-common-9': 4,
+  'disneyland-common-10': 2,
+  'disneyland-common-11': 3,
+  'disneyland-common-12': 2,
+  'adventure-common-1': 3
+};
 const getAchievement = achievementId => BADGE_ACHIEVEMENTS.find(achievement => achievement.id === achievementId);
 const getRarityBadgeProgress = (ownedBadges, rarity) => {
   const badges = BADGE_DEFINITIONS.filter(badge => badge.rarity === rarity);
@@ -282,6 +298,7 @@ const renderCollectableVisual = (item, className = '', style = {}) => {
 };
 
 function BadgeArtwork({ badge, count = 0, compact = false }) {
+  const [customImageLoaded, setCustomImageLoaded] = useState(false);
   if (!badge) return null;
   const initials = badge.name
     .split(/\s+/)
@@ -292,7 +309,7 @@ function BadgeArtwork({ badge, count = 0, compact = false }) {
     .toUpperCase();
   return (
     <div
-      className={`disney-badge-art rarity-${badge.rarity} park-${badge.park}${compact ? ' is-compact' : ''}`}
+      className={`disney-badge-art rarity-${badge.rarity} park-${badge.park}${customImageLoaded ? ' has-custom-image' : ''}${compact ? ' is-compact' : ''}`}
       aria-label={`${badge.name}, ${badge.rarityName}, ${badge.parkName}`}
     >
       <span className="disney-badge-rim" />
@@ -306,7 +323,8 @@ function BadgeArtwork({ badge, count = 0, compact = false }) {
         aria-hidden="true"
         loading="lazy"
         decoding="async"
-        onError={event => { event.currentTarget.hidden = true; }}
+        onLoad={() => setCustomImageLoaded(true)}
+        onError={event => { setCustomImageLoaded(false); event.currentTarget.hidden = true; }}
       />
       {count > 1 && <span className="disney-badge-count">×{count}</span>}
     </div>
@@ -341,6 +359,9 @@ function MiguelMarket({
   ownedAchievements, achievementCelebration, tradeOfferIndex, sellOpen, openedPack,
   onOpenPack, onChooseTrade, onTrade, onOpenSell, onCloseSell, onSell, onClosePack, onCloseAchievement, onInspectCoin
 }) {
+  const [selectedCollectionBadgeId, setSelectedCollectionBadgeId] = useState(null);
+  const [viewerBadgeId, setViewerBadgeId] = useState(null);
+  const [viewerFlipped, setViewerFlipped] = useState(false);
   const uniqueOwned = Object.values(ownedBadges).filter(count => Number(count) > 0).length;
   const totalOwned = Object.values(ownedBadges).reduce((sum, count) => sum + (Number(count) || 0), 0);
   const secondsUntilRefresh = Math.max(0, Math.ceil((((badgeMarket.hour + 1) * 3600000) - badgeMarketNow) / 1000));
@@ -348,6 +369,24 @@ function MiguelMarket({
   const sellableBadges = BADGE_DEFINITIONS.filter(badge => ownedBadges[badge.id] > 0);
   const offeredBadge = tradeOfferIndex === null ? null : getBadge(badgeMarket.offers[tradeOfferIndex]);
   const categoryAchievementsUnlocked = BADGE_CATEGORY_ACHIEVEMENTS.filter(achievement => ownedAchievements?.[achievement.id]);
+  const viewerBadge = getBadge(viewerBadgeId);
+  const viewerRarity = BADGE_RARITIES.find(rarity => rarity.id === viewerBadge?.rarity);
+  const viewerCount = Number(ownedBadges?.[viewerBadgeId]) || 0;
+
+  const handleCollectionBadgeClick = badgeId => {
+    if ((Number(ownedBadges?.[badgeId]) || 0) <= 0) return;
+    if (selectedCollectionBadgeId !== badgeId) {
+      setSelectedCollectionBadgeId(badgeId);
+      return;
+    }
+    setViewerBadgeId(badgeId);
+    setViewerFlipped(false);
+  };
+
+  const closeBadgeViewer = () => {
+    setViewerBadgeId(null);
+    setViewerFlipped(false);
+  };
 
   return (
     <section className="card portal-shop-content miguel-market">
@@ -473,14 +512,26 @@ function MiguelMarket({
                     {rarityBadges.filter(badge => badge.park === park.id).map(badge => {
                       const count = Number(ownedBadges[badge.id]) || 0;
                       return (
-                        <div key={badge.id} className={`badge-jewel-slot${count ? ' is-owned' : ' is-empty'}`}>
+                        <button
+                          key={badge.id}
+                          type="button"
+                          className={`badge-jewel-slot${count ? ' is-owned' : ' is-empty'}${selectedCollectionBadgeId === badge.id ? ' is-selected' : ''}`}
+                          onClick={() => handleCollectionBadgeClick(badge.id)}
+                          aria-pressed={count > 0 ? selectedCollectionBadgeId === badge.id : undefined}
+                          aria-label={count > 0 ? `${badge.name}, ${count} in bezit. ${selectedCollectionBadgeId === badge.id ? 'Nogmaals indrukken om groot te bekijken.' : 'Indrukken om te selecteren.'}` : `${badge.name}, nog niet verzameld`}
+                          disabled={count <= 0}
+                        >
                           <div className="badge-recess">
                             {count > 0
                               ? <BadgeArtwork badge={badge} count={count} />
                               : <img className="badge-empty-frame" src={assetPath(rarity.frame)} alt="" aria-hidden="true" />}
                           </div>
-                          <div className="badge-nameplate"><strong>{badge.name}</strong><span>{count ? `${badge.rarityName} · ×${count}` : 'Nog niet verzameld'}</span></div>
-                        </div>
+                          <div className="badge-nameplate">
+                            <strong>{badge.name}</strong>
+                            <span>{count ? `${badge.rarityName} · ×${count}` : 'Nog niet verzameld'}</span>
+                            {selectedCollectionBadgeId === badge.id && <em>Nogmaals tikken om te bekijken</em>}
+                          </div>
+                        </button>
                       );
                     })}
                   </div>
@@ -490,6 +541,42 @@ function MiguelMarket({
           );
         })}
       </div>
+
+      {viewerBadge && viewerRarity && viewerCount > 0 && (
+        <div className="badge-viewer-modal" role="dialog" aria-modal="true" aria-label={`${viewerBadge.name} bekijken`} onClick={closeBadgeViewer}>
+          <section className={`badge-viewer-shell rarity-${viewerBadge.rarity}`} onClick={event => event.stopPropagation()}>
+            <header className="badge-viewer-header">
+              <div>
+                <span className="portal-section-kicker">Jouw Disney-badge</span>
+                <strong>{viewerBadge.name}</strong>
+                <small>{viewerBadge.parkName} · {viewerBadge.rarityName} · ×{viewerCount}</small>
+              </div>
+              <button type="button" className="badge-dialog-close" onClick={closeBadgeViewer} aria-label="Badgeviewer sluiten">×</button>
+            </header>
+
+            <button
+              type="button"
+              className="badge-flip-stage"
+              onClick={() => setViewerFlipped(current => !current)}
+              aria-label={`${viewerBadge.name} omdraaien. Nu wordt de ${viewerFlipped ? 'achterkant' : 'voorkant'} getoond.`}
+            >
+              <span className={`badge-flip-card${viewerFlipped ? ' is-flipped' : ''}`}>
+                <span className="badge-flip-face badge-flip-front">
+                  <img src={assetPath(viewerBadge.image)} alt={`Voorkant van ${viewerBadge.name}`} />
+                </span>
+                <span className="badge-flip-face badge-flip-back">
+                  <img src={assetPath(viewerRarity.frame)} alt="" aria-hidden="true" />
+                  <span className="badge-back-name">
+                    <strong>{viewerBadge.name}</strong>
+                  </span>
+                </span>
+              </span>
+            </button>
+
+            <p className="badge-viewer-hint">Tik op de badge om hem om te draaien</p>
+          </section>
+        </div>
+      )}
 
       {tradeOfferIndex !== null && (
         <div className="badge-market-modal" role="dialog" aria-modal="true" aria-label="Kies een badge om te ruilen" onClick={() => onChooseTrade(null)}>
@@ -1153,6 +1240,7 @@ export default function App() {
   const [exclusiveClaims, setExclusiveClaims] = useState(() => readJsonStorage('disney_exclusive_claims', {}));
   const [badgeCollections, setBadgeCollections] = useState(() => readJsonStorage(BADGE_COLLECTION_KEY, {}));
   const [badgeAchievements, setBadgeAchievements] = useState(() => readJsonStorage(BADGE_ACHIEVEMENT_KEY, {}));
+  const [badgeShowcaseSeedVersion, setBadgeShowcaseSeedVersion] = useState(0);
   const [achievementQueue, setAchievementQueue] = useState([]);
   const [badgeMarket, setBadgeMarket] = useState(() => {
     const saved = readJsonStorage(BADGE_MARKET_KEY, null);
@@ -1616,8 +1704,9 @@ export default function App() {
         coco_exclusive_claims: exclusiveClaims,
         coco_badge_collections: badgeCollections,
         coco_badge_achievements: badgeAchievements,
+        coco_badge_showcase_seed_version: badgeShowcaseSeedVersion,
         coco_badge_market: badgeMarket,
-        coco_profile_store_version: 3,
+        coco_profile_store_version: 4,
         updated_at: new Date().toISOString()
       };
 
@@ -1669,9 +1758,22 @@ export default function App() {
         const mergedClaims = migrateLocalState
           ? { ...(exclusiveClaims || {}), ...(remoteState.coco_exclusive_claims || {}) }
           : (remoteState.coco_exclusive_claims || {});
-        const mergedBadgeCollections = migrateLocalState
+        let mergedBadgeCollections = (migrateLocalState
           ? mergeBadgeCollections(remoteState.coco_badge_collections, badgeCollections)
-          : (remoteState.coco_badge_collections || {});
+          : remoteState.coco_badge_collections) || {};
+        let mergedBadgeShowcaseSeedVersion = Number(remoteState.coco_badge_showcase_seed_version) || 0;
+        if (mergedBadgeShowcaseSeedVersion < BADGE_SHOWCASE_SEED_VERSION) {
+          const jaccoProfile = mergedProfiles.find(profileName => norm(profileName) === 'jacco');
+          if (jaccoProfile) {
+            const jaccoKey = getCollectorKey(jaccoProfile);
+            const currentJaccoBadges = { ...(mergedBadgeCollections[jaccoKey] || {}) };
+            Object.entries(JACCO_BADGE_SHOWCASE_COUNTS).forEach(([badgeId, count]) => {
+              currentJaccoBadges[badgeId] = Math.max(Number(currentJaccoBadges[badgeId]) || 0, count);
+            });
+            mergedBadgeCollections = { ...mergedBadgeCollections, [jaccoKey]: currentJaccoBadges };
+            mergedBadgeShowcaseSeedVersion = BADGE_SHOWCASE_SEED_VERSION;
+          }
+        }
         const mergedBadgeAchievements = mergeBadgeAchievements(remoteState.coco_badge_achievements, badgeAchievements);
         const remoteMarket = remoteState.coco_badge_market;
         const mergedBadgeMarket = remoteMarket?.hour === getMarketHour() && Array.isArray(remoteMarket.offers) && remoteMarket.offers.length === 3
@@ -1684,8 +1786,9 @@ export default function App() {
           coco_exclusive_claims: mergedClaims,
           coco_badge_collections: mergedBadgeCollections,
           coco_badge_achievements: mergedBadgeAchievements,
+          coco_badge_showcase_seed_version: mergedBadgeShowcaseSeedVersion,
           coco_badge_market: mergedBadgeMarket,
-          coco_profile_store_version: 3,
+          coco_profile_store_version: 4,
           updated_at: new Date().toISOString()
         };
 
@@ -1697,6 +1800,7 @@ export default function App() {
           setExclusiveClaims(mergedClaims);
           setBadgeCollections(mergedBadgeCollections);
           setBadgeAchievements(mergedBadgeAchievements);
+          setBadgeShowcaseSeedVersion(mergedBadgeShowcaseSeedVersion);
           setBadgeMarket(mergedBadgeMarket);
           localStorage.setItem(COCO_PROFILES_KEY, JSON.stringify(mergedProfiles));
           localStorage.setItem(COCO_BANK_KEY, JSON.stringify(mergedBank));
@@ -1735,8 +1839,9 @@ export default function App() {
             coco_exclusive_claims: exclusiveClaims,
             coco_badge_collections: badgeCollections,
             coco_badge_achievements: badgeAchievements,
+            coco_badge_showcase_seed_version: badgeShowcaseSeedVersion,
             coco_badge_market: badgeMarket,
-            coco_profile_store_version: 3,
+            coco_profile_store_version: 4,
             updated_at: new Date().toISOString()
           }
         })
@@ -1747,7 +1852,7 @@ export default function App() {
     }, 250);
 
     return () => window.clearTimeout(timeoutId);
-  }, [badgeAchievements, badgeCollections, badgeMarket, cocoProfiles, cocoProfilesReady, collections, exclusiveClaims, starBank]);
+  }, [badgeAchievements, badgeCollections, badgeMarket, badgeShowcaseSeedVersion, cocoProfiles, cocoProfilesReady, collections, exclusiveClaims, starBank]);
 
   useEffect(() => {
     const updateMarketClock = () => {
