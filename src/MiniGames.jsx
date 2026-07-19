@@ -2086,7 +2086,7 @@ const PLANK_LANGUAGES = {
   nl: { flag: "🇳🇱", label: "Nederlandstalig woord" }
 };
 
-function PlankNumberDie({ value }) {
+function PlankNumberDie({ value, rolling = false }) {
   const pipPositions = {
     1: [5],
     2: [1, 9],
@@ -2094,7 +2094,7 @@ function PlankNumberDie({ value }) {
   };
   const positions = pipPositions[value] || [];
   return (
-    <div style={{
+    <div className={`plank-die plank-number-die${rolling ? ' is-rolling' : ''}`} style={{
       width: '76px',
       aspectRatio: '1',
       borderRadius: '18px',
@@ -2195,9 +2195,9 @@ function PlankEngravedSymbol({ eventId, size = 46, medallion = true }) {
   );
 }
 
-function PlankEventDie({ roll }) {
+function PlankEventDie({ roll, rolling = false }) {
   return (
-    <div style={{
+    <div className={`plank-die plank-event-die${rolling ? ' is-rolling' : ''}`} style={{
       width: '76px',
       aspectRatio: '1',
       borderRadius: '18px',
@@ -2277,6 +2277,7 @@ function createPiratesPlankState(difficulty = "normal") {
     plankTurns: 0,
     plankWrongStreak: 0,
     plankPendingRoll: null,
+    plankLastRoll: null,
     plankLastMove: startingGuesses.length
       ? `Startletter${startingGuesses.length > 1 ? "s" : ""}: ${startingGuesses.join(", ")}. Gooi de dobbelstenen.`
       : "Gooi de dobbelstenen om de jacht op buit te starten.",
@@ -2434,6 +2435,8 @@ function LegacyPiratesPlankGame({ mode, room, localPlayer, players, updateRoomSt
 
 export function PiratesPlankGame({ mode, room, localPlayer, players, updateRoomState, onFinish }) {
   const isSolo = mode === 'solo' || room.id === 'solo';
+  const [isRolling, setIsRolling] = useState(false);
+  const rollTimerRef = useRef(null);
   const taskState = room.current_task_state || {};
   const activeIndex = room.current_player_index || 0;
   const myIndex = Math.max(0, players.findIndex(p => p.id === localPlayer.id));
@@ -2455,6 +2458,7 @@ export function PiratesPlankGame({ mode, room, localPlayer, players, updateRoomS
   const turns = taskState.plankTurns || 0;
   const wrongStreak = taskState.plankWrongStreak || 0;
   const pendingRoll = taskState.plankPendingRoll || null;
+  const lastRoll = taskState.plankLastRoll || null;
   const lastMove = taskState.plankLastMove || "";
   const winnerId = taskState.plankWinnerId || null;
   const failed = taskState.plankFailed || false;
@@ -2472,6 +2476,10 @@ export function PiratesPlankGame({ mode, room, localPlayer, players, updateRoomS
     }
   }, []);
 
+  useEffect(() => () => {
+    if (rollTimerRef.current) clearTimeout(rollTimerRef.current);
+  }, []);
+
   const visibleWord = word.split("").map(char => {
     if (!PLANK_LETTERS.includes(char)) return char;
     return guesses.includes(char) ? char : "_";
@@ -2479,8 +2487,9 @@ export function PiratesPlankGame({ mode, room, localPlayer, players, updateRoomS
 
   const totalPlayers = isSolo ? 1 : players.length;
   const passTurnIndex = isSolo ? activeIndex : (activeIndex + 1) % totalPlayers;
-  const canAct = Boolean(word) && !isFinished && myTurn;
+  const canAct = Boolean(word) && !isFinished && myTurn && !isRolling;
   const hasLetterRoll = pendingRoll?.allowsLetter;
+  const shownRoll = pendingRoll || lastRoll;
   const shipProgress = Math.min(1, (strikes / difficultyConfig.maxStrikes) * 0.82 + Math.min(turns, 12) / 12 * 0.18);
   const treasureColor = treasure < difficultyConfig.vowelCost ? '#ff5b5b' : '#050b16';
 
@@ -2521,47 +2530,60 @@ export function PiratesPlankGame({ mode, room, localPlayer, players, updateRoomS
       multiplier: event.multiplier || 1
     };
 
-    if (event.id === "curse") {
-      const curseCost = 2;
-      const lost = Math.min(curseCost, treasure);
-      const getsStrike = treasure < curseCost;
-      const nextStrikes = Math.min(difficultyConfig.maxStrikes, strikes + (getsStrike ? 1 : 0));
-      commitPlankState({
-        plankPendingRoll: null,
-        plankTreasure: treasure - lost,
-        plankStrikes: nextStrikes,
-        plankTurns: turns + 1,
-        plankFailed: nextStrikes >= difficultyConfig.maxStrikes,
-        plankLastMove: getsStrike
-          ? `Vloek! ${localPlayer.name} verliest ${lost} buit en krijgt door te weinig buit 1 strike.`
-          : `Vloek afgekocht: ${localPlayer.name} verliest 2 buit, maar geen strike.`
-      });
-      return;
-    }
+    const applyRoll = () => {
+      if (event.id === "curse") {
+        const curseCost = 2;
+        const lost = Math.min(curseCost, treasure);
+        const getsStrike = treasure < curseCost;
+        const nextStrikes = Math.min(difficultyConfig.maxStrikes, strikes + (getsStrike ? 1 : 0));
+        commitPlankState({
+          plankPendingRoll: null,
+          plankLastRoll: baseRoll,
+          plankTreasure: treasure - lost,
+          plankStrikes: nextStrikes,
+          plankTurns: turns + 1,
+          plankFailed: nextStrikes >= difficultyConfig.maxStrikes,
+          plankLastMove: getsStrike
+            ? `Vloek! ${localPlayer.name} verliest ${lost} buit en krijgt door te weinig buit 1 strike.`
+            : `Vloek afgekocht: ${localPlayer.name} verliest 2 buit, maar geen strike.`
+        });
+        return;
+      }
 
-    if (event.id === "shipwreck") {
-      const lost = Math.ceil(treasure / 2);
+      if (event.id === "shipwreck") {
+        const lost = Math.ceil(treasure / 2);
+        commitPlankState({
+          plankPendingRoll: baseRoll,
+          plankLastRoll: baseRoll,
+          plankTreasure: Math.max(0, treasure - lost),
+          plankLastMove: `Schipbreuk! ${localPlayer.name} verliest ${lost} buit en mag daarna een medeklinker kiezen.`
+        }, false);
+        return;
+      }
+
+      if (event.id === "chest") {
+        commitPlankState({
+          plankPendingRoll: baseRoll,
+          plankLastRoll: baseRoll,
+          plankTreasure: treasure + 5,
+          plankLastMove: `Schatkist! ${localPlayer.name} vindt 5 buit en mag een medeklinker kiezen.`
+        }, false);
+        return;
+      }
+
       commitPlankState({
         plankPendingRoll: baseRoll,
-        plankTreasure: Math.max(0, treasure - lost),
-        plankLastMove: `Schipbreuk! ${localPlayer.name} verliest ${lost} buit en mag daarna een medeklinker kiezen.`
+        plankLastRoll: baseRoll,
+        plankLastMove: `${localPlayer.name} gooide ${number} + ${event.name}. Kies een medeklinker.`
       }, false);
-      return;
-    }
+    };
 
-    if (event.id === "chest") {
-      commitPlankState({
-        plankPendingRoll: baseRoll,
-        plankTreasure: treasure + 5,
-        plankLastMove: `Schatkist! ${localPlayer.name} vindt 5 buit en mag een medeklinker kiezen.`
-      }, false);
-      return;
-    }
-
-    commitPlankState({
-      plankPendingRoll: baseRoll,
-      plankLastMove: `${localPlayer.name} gooide ${number} + ${event.name}. Kies een medeklinker.`
-    }, false);
+    setIsRolling(true);
+    rollTimerRef.current = setTimeout(() => {
+      setIsRolling(false);
+      applyRoll();
+      rollTimerRef.current = null;
+    }, 720);
   };
 
   const handleConsonantGuess = (letter) => {
@@ -2810,8 +2832,8 @@ export function PiratesPlankGame({ mode, room, localPlayer, players, updateRoomS
         ) : (
           <div style={{ display: 'grid', gap: '10px' }}>
             <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', gap: '14px', margin: '0 auto' }}>
-              <PlankNumberDie value={pendingRoll?.number} />
-              <PlankEventDie roll={pendingRoll} />
+              <PlankNumberDie value={shownRoll?.number} rolling={isRolling} />
+              <PlankEventDie roll={shownRoll} rolling={isRolling} />
             </div>
 
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px', maxWidth: '360px', margin: '0 auto' }}>

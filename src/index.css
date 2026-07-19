@@ -1517,3 +1517,28 @@ body.night-theme {
 .btn-play.shop {
   color: #ff9800;
 }
+
+@keyframes plank-dice-roll {
+  0% { transform: translate3d(0, 0, 0) rotate(0deg) scale(1); }
+  18% { transform: translate3d(-7px, -13px, 0) rotate(-24deg) scale(1.07); }
+  38% { transform: translate3d(8px, -7px, 0) rotate(31deg) scale(.96); }
+  58% { transform: translate3d(-5px, -11px, 0) rotate(-18deg) scale(1.05); }
+  78% { transform: translate3d(4px, -3px, 0) rotate(10deg) scale(.99); }
+  100% { transform: translate3d(0, 0, 0) rotate(0deg) scale(1); }
+}
+
+.plank-die.is-rolling {
+  animation: plank-dice-roll 720ms cubic-bezier(.22, .75, .24, 1) both;
+  transform-origin: 50% 65%;
+  pointer-events: none;
+}
+
+.plank-event-die.is-rolling {
+  animation-direction: reverse;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .plank-die.is-rolling {
+    animation: none;
+  }
+}
