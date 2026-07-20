@@ -1,6 +1,6 @@
 // Build trigger: 2026-07-04 23:22
 "use strict";
-const DMQ_VERSION='78';
+const DMQ_VERSION='79';
 const cfg=window.DMQ_CONFIG||{};
 const COLORS=[['blue','Blauw','#00e5ff'],['green','Groen','#2eff7d'],['yellow','Geel','#ffd615'],['pink','Roze','#ff2a85'],['purple','Paars','#bd53ed'],['orange','Oranje','#ff6b00']];
 const AVATARS=[['linguini','Alfredo Linguini','avatars/linguini.webp'],['bruno','Bruno','avatars/bruno.png'],['buzz','Buzz Lightyear','avatars/buzz.png'],['heihei','Heihei','avatars/heihei.png'],['hen-wen','Hen Wen','avatars/hen-wen.png'],['jack','Jack Sparrow','avatars/jack.png'],['kuzco','Kuzco','avatars/kuzco.png'],['medusa','Madame Medusa','avatars/medusa.png'],['maximus','Maximus','avatars/maximus.png'],['miguel','Miguel','avatars/miguel.png'],['mufasa','Mufasa','avatars/mufasa.png'],['mushu','Mushu','avatars/mushu.png'],['olaf','Olaf','avatars/olaf.png'],['pascal','Pascal','avatars/pascal.png'],['percy','Percy','avatars/percy.png'],['peter','Peter Pan','avatars/peter.png'],['redpanda','Red Panda','avatars/redpanda.png'],['remy','Remy','avatars/remy.png'],['stitch','Stitch','avatars/stitch.png'],['taran','Taran','avatars/taran.png']];
@@ -357,7 +357,10 @@ function getSongPopularity(s){
 }
 function qtype(mode,s){
   const allowed=Array.isArray(s.allowed_questions)&&s.allowed_questions.length?s.allowed_questions:['film','title','year','artist'];
-  if(mode!=='mix')return allowed.includes(mode)?mode:allowed[Math.floor(Math.random()*allowed.length)];
+  // Instrumentale herkenningsrondes vragen uitsluitend naar de film. De titel,
+  // uitvoerder of het jaartal van achtergrondmuziek is onnodig specialistisch.
+  if(s.question_profile==='score')return 'film';
+  if(mode!=='mix')return mode;
   const pop=getSongPopularity(s);
   if(pop==='low'){
     const opts=['year','title','film'].filter(type=>allowed.includes(type));
@@ -370,12 +373,40 @@ function qtype(mode,s){
   const opts=['year_film_artist','year_title_artist','film_title_artist','full'].filter(type=>(type==='full'?['film','title','year']:type.split('_')).every(part=>allowed.includes(part)));
   return opts[Math.floor(Math.random()*opts.length)];
 }
+function songSupportsMode(song,mode){
+  if(mode==='mix')return true;
+  const allowed=Array.isArray(song.allowed_questions)&&song.allowed_questions.length?song.allowed_questions:['film','title','year','artist'];
+  if(mode==='full')return ['film','title','year'].every(type=>allowed.includes(type));
+  return allowed.includes(mode);
+}
+function buildSongSequence(total,mode){
+  const eligible=activeSongs().filter(song=>songSupportsMode(song,mode));
+  const vocals=shuffle(eligible.filter(song=>song.question_profile!=='score'));
+  const scores=shuffle(eligible.filter(song=>song.question_profile==='score'));
+  // Strikte bovengrens: hoogstens één instrumental per volledige tien rondes.
+  // Een spel korter dan tien rondes bevat dus geen instrumental.
+  const instrumentalCount=(mode==='mix'||mode==='film')?Math.min(scores.length,Math.floor(total/10)):0;
+  if(vocals.length<total-instrumentalCount)return [];
+  const result=[];
+  let vocalIndex=0;
+  let scoreIndex=0;
+  for(let blockStart=0;blockStart<total;blockStart+=10){
+    const blockSize=Math.min(10,total-blockStart);
+    const useInstrumental=scoreIndex<instrumentalCount;
+    const instrumentalPosition=useInstrumental?Math.floor(Math.random()*blockSize):-1;
+    for(let position=0;position<blockSize;position++){
+      if(position===instrumentalPosition)result.push(scores[scoreIndex++]);
+      else result.push(vocals[vocalIndex++]);
+    }
+  }
+  return result;
+}
 async function startGame(){
   state.startError='';
   try{
     const total=state.lobbySettings.roundCount||5;
     const mode=state.lobbySettings.gameMode||'mix';
-    const songs=shuffle(activeSongs()).slice(0,total);
+    const songs=buildSongSequence(total,mode);
     if(state.players.length<2)throw new Error('Er zijn minimaal twee spelers nodig.');
     if(!state.players.every(online))throw new Error('Niet alle spelers worden als online gezien. Laat iedereen de wachtruimte openhouden en druk op ↻.');
     if(songs.length<total)throw new Error(`Er zijn ${songs.length} actieve songs, maar je hebt ${total} rondes gekozen. Activeer meer songs in Songbeheer · 300 songs.`);
