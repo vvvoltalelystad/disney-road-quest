@@ -83,7 +83,7 @@ const BADGE_MARKET_KEY = 'disney_badge_market';
 const BADGE_ACHIEVEMENT_KEY = 'disney_badge_achievements';
 const BADGE_PACK_COST = 5;
 const BADGE_SELL_VALUE = 2;
-const BADGE_SHOWCASE_SEED_VERSION = 1;
+const BADGE_SHOWCASE_SEED_VERSION = 2;
 const ENABLE_LEGACY_SHOP = false;
 
 const BADGE_RARITIES = [
@@ -103,7 +103,7 @@ const BADGE_NAMES = {
     legendary: ['Disneyland Hotel', 'Walt & Mickey', 'Sleeping Beauty Castle Gold', 'Disneyland Park Icon']
   },
   adventure: {
-    common: ['World Premiere Entrance', 'Studio Theater', 'Toon Studio', 'World Premiere Plaza', 'Animation Celebration', 'Cars Road Trip', 'Toy Story Playland', 'Slinky Dog Zigzag Spin', 'Cars Quatre Roues Rallye', 'Flying Carpets over Agrabah', 'Stitch Live!', 'Studio D'],
+    common: ['World Premiere Entrance', 'Studio Theater', 'Worlds of Pixar Entrance', 'World Premiere Plaza', 'Animation Celebration', 'Cars ROAD TRIP', 'Toy Story Playland', 'Slinky Dog Zigzag Spin', 'Cars Quatre Roues Rallye', 'Flying Carpets Over Agrabah', 'Stitch Live!', 'Minnie’s Dream Factory'],
     uncommon: ['Ratatouille Courtyard', 'Place de Rémy', 'Spider-Man W.E.B.', 'Avengers Headquarters', 'Training Center', 'Frozen Promenade', 'Arendelle Village', 'Raiponce Tangled Spin'],
     rare: ['Ratatouille Adventure', 'Crush’s Coaster', 'Tower of Terror', 'RC Racer', 'Toy Soldiers Parachute Drop', 'Avengers Flight Force', 'Frozen Ever After', 'Mickey and the Magician'],
     epic: ['World of Frozen', 'Avengers Campus', 'Together: Pixar Adventure', 'Disney Studio 1', 'Adventure Bay', 'Adventure Way'],
@@ -180,7 +180,20 @@ const JACCO_BADGE_SHOWCASE_COUNTS = {
   'disneyland-common-10': 2,
   'disneyland-common-11': 3,
   'disneyland-common-12': 2,
-  'adventure-common-1': 3
+  'adventure-common-1': 3,
+  'adventure-common-2': 2,
+  'adventure-common-3': 4,
+  'adventure-common-4': 1,
+  'adventure-common-5': 3,
+  'adventure-common-6': 2,
+  'adventure-common-7': 4,
+  'adventure-common-8': 2,
+  'adventure-common-9': 1,
+  'adventure-common-10': 3,
+  'adventure-common-11': 2,
+  'adventure-common-12': 4,
+  'disneyland-uncommon-1': 2,
+  'disneyland-uncommon-2': 3
 };
 const BADGE_FACTS = {
   'disneyland-common-1': 'Een volledige ronde met de Disneyland Railroad duurt ongeveer dertig minuten.',
@@ -195,7 +208,20 @@ const BADGE_FACTS = {
   'disneyland-common-10': 'De kleurrijke theekopjes draaien rond een enorme theepot van de Mad Hatter.',
   'disneyland-common-11': 'In 2024 kreeg deze miniatuurwereld nieuwe scènes van Frozen, Winnie de Poeh en Up.',
   'disneyland-common-12': 'Tijdens de boottocht zie je bijna 300 Audio-Animatronics-poppen uit alle hoeken van de wereld.',
-  'adventure-common-1': 'World Premiere herschept de glitter en spanning van de openingsavond van een Hollywoodfilm.'
+  'adventure-common-1': 'World Premiere herschept de glitter en spanning van de openingsavond van een Hollywoodfilm.',
+  'adventure-common-2': 'In Studio Theater krijgt TOGETHER een live soundtrack van acht muzikanten mee.',
+  'adventure-common-3': 'Worlds of Pixar bracht bij de introductie zeven populaire Pixar-attracties samen in één kleurrijk gebied.',
+  'adventure-common-4': 'De theatergevels van World Premiere Plaza zijn geïnspireerd op Broadway en het Londense West End.',
+  'adventure-common-5': 'Bij Animation Celebration kun je met Anna, Kristoff en Sven dansen en met Elsa meezingen.',
+  'adventure-common-6': 'Deze rit voert over een Cars-versie van Route 66 langs natuurlijke én mechanische wonderen.',
+  'adventure-common-7': 'In Toy Story Playland wandel je door Andy’s tuin alsof je zelf tot speelgoedformaat bent gekrompen.',
+  'adventure-common-8': 'De voertuigen van Slinky Dog Zigzag Spin heten achter de schermen “croquettes”: hondenbrokjes.',
+  'adventure-common-9': 'Bij deze Cars-attractie mag iedere lengte instappen voor een zwierende rit met Lightning McQueen.',
+  'adventure-common-10': 'Na de renovatie werden gouden scarabeeën in het decor verstopt als verwijzing naar de Grot der Wonderen.',
+  'adventure-common-11': 'Stitch reageert tijdens deze interactieve ontmoeting live op wat bezoekers zeggen en doen.',
+  'adventure-common-12': 'Voor de vernieuwde Minnie’s Dream Factory deden meer dan achthonderd artiesten auditie.',
+  'disneyland-uncommon-1': 'Pirates’ Beach is een piratenspeelplaats in Adventureland waar jonge avonturiers zelf kunnen klimmen en klauteren.',
+  'disneyland-uncommon-2': 'Adventure Isle is een wandelavontuur vol smokkelaarspaden, grotten en verborgen plekken.'
 };
 const getAchievement = achievementId => BADGE_ACHIEVEMENTS.find(achievement => achievement.id === achievementId);
 const getRarityBadgeProgress = (ownedBadges, rarity) => {
@@ -406,7 +432,8 @@ function MiguelMarket({
   };
 
   useEffect(() => {
-    if (!viewerBadgeId) return undefined;
+    const marketModalOpen = Boolean(viewerBadgeId || tradeOfferIndex !== null || sellOpen || openedPack || achievementCelebration);
+    if (!marketModalOpen) return undefined;
     const previousOverflow = document.body.style.overflow;
     const closeOnEscape = event => {
       if (event.key === 'Escape') {
@@ -420,7 +447,7 @@ function MiguelMarket({
       document.body.style.overflow = previousOverflow;
       window.removeEventListener('keydown', closeOnEscape);
     };
-  }, [viewerBadgeId]);
+  }, [achievementCelebration, openedPack, sellOpen, tradeOfferIndex, viewerBadgeId]);
 
   return (
     <section className="card portal-shop-content miguel-market">
@@ -607,7 +634,7 @@ function MiguelMarket({
         document.body
       )}
 
-      {tradeOfferIndex !== null && (
+      {tradeOfferIndex !== null && createPortal(
         <div className="badge-market-modal" role="dialog" aria-modal="true" aria-label="Kies een badge om te ruilen" onClick={() => onChooseTrade(null)}>
           <div className="badge-market-dialog" onClick={event => event.stopPropagation()}>
             <button className="badge-dialog-close" type="button" onClick={() => onChooseTrade(null)} aria-label="Sluiten">×</button>
@@ -623,10 +650,11 @@ function MiguelMarket({
               ))}
             </div>
           </div>
-        </div>
+        </div>,
+        document.body
       )}
 
-      {sellOpen && (
+      {sellOpen && createPortal(
         <div className="badge-market-modal" role="dialog" aria-modal="true" aria-label="Verkoop badges aan Miguel" onClick={onCloseSell}>
           <div className="badge-market-dialog" onClick={event => event.stopPropagation()}>
             <button className="badge-dialog-close" type="button" onClick={onCloseSell} aria-label="Sluiten">×</button>
@@ -642,10 +670,11 @@ function MiguelMarket({
               ))}
             </div> : <div className="empty-badge-message">Je hebt nog geen badge om te verkopen.</div>}
           </div>
-        </div>
+        </div>,
+        document.body
       )}
 
-      {openedPack && (
+      {openedPack && createPortal(
         <div className="badge-market-modal badge-pack-reveal" role="dialog" aria-modal="true" aria-label="Nieuwe badges" onClick={onClosePack}>
           <div className="badge-market-dialog" onClick={event => event.stopPropagation()}>
             <span className="portal-section-kicker">Pakje geopend</span>
@@ -659,10 +688,11 @@ function MiguelMarket({
             </div>
             <button type="button" className="btn primary full" onClick={onClosePack}>Voeg toe aan mijn collectie</button>
           </div>
-        </div>
+        </div>,
+        document.body
       )}
 
-      {achievementCelebration && (
+      {achievementCelebration && createPortal(
         <div className="badge-market-modal achievement-celebration" role="dialog" aria-modal="true" aria-label="Prestatiebadge ontgrendeld">
           <div className={`badge-market-dialog achievement-celebration-dialog achievement-${achievementCelebration.rarity}`}>
             <span className="achievement-spotlight" aria-hidden="true" />
@@ -673,7 +703,8 @@ function MiguelMarket({
             <strong className="achievement-reward">{achievementCelebration.reward}</strong>
             <button type="button" className="btn primary full" onClick={onCloseAchievement}>Plaats in mijn Eregalerij</button>
           </div>
-        </div>
+        </div>,
+        document.body
       )}
     </section>
   );
