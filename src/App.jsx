@@ -5657,8 +5657,8 @@ export default function App() {
                     e.stopPropagation();
                     if (selectedPortalGame === 'music_match') {
                       window.location.href = room?.code
-                        ? `./music/index.html?room=${room.code}&v=74`
-                        : './music/index.html?v=74';
+                        ? `./music/index.html?room=${room.code}&v=76`
+                        : './music/index.html?v=76';
                     } else {
                       setSelectedPortalGame('music_match');
                     }
