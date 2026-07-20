@@ -20,17 +20,6 @@ const GAME_MODES = [
   { id: "Samen", name: "Samen", icon: "🤝", description: "Werk samen om groepsdoelen te halen." }
 ];
 
-const GAME_VERSIONS = [
-  { id: 1, name: "Sterrenroute", icon: "✨" },
-  { id: 2, name: "Avonturenroute", icon: "🧭" },
-  { id: 3, name: "Fantasieroute", icon: "🏰" },
-  { id: 4, name: "Magische route", icon: "🎆" },
-  { id: 5, name: "Pioniersroute", icon: "🤠" },
-  { id: 6, name: "Toekomstroute", icon: "🚀" },
-  { id: 7, name: "Sprookjesroute", icon: "👑" },
-  { id: 8, name: "Hollywoodroute", icon: "🎬" }
-];
-
 const STAGES = [
   "Start de motor!",
   "Grens oversteken",
@@ -76,6 +65,8 @@ const hasArenaAi = gameId => AI_ARENA_GAME_IDS.has(gameId);
 
 const COCO_BANK_KEY = 'disney_coco_coin_bank';
 const COCO_PROFILES_KEY = 'disney_coco_profiles';
+const PROFILE_PREFERENCES_KEY = 'disney_profile_preferences';
+const ARENA_SAVES_KEY = 'disney_arena_saves';
 const ACTIVE_PROFILE_KEY = 'disney_active_profile';
 const COCO_PROFILE_STORE_CODE = 'COCO-PROFILES-V1';
 const BADGE_COLLECTION_KEY = 'disney_badge_collections';
@@ -85,6 +76,28 @@ const BADGE_PACK_COST = 5;
 const BADGE_SELL_VALUE = 2;
 const BADGE_SHOWCASE_SEED_VERSION = 2;
 const ENABLE_LEGACY_SHOP = false;
+
+const DISNEY_PROFILE_COLORS = [
+  { id: 'blue', name: 'Blauw', hex: '#00c9ff' },
+  { id: 'green', name: 'Groen', hex: '#2ee77d' },
+  { id: 'yellow', name: 'Geel', hex: '#ffd615' },
+  { id: 'pink', name: 'Roze', hex: '#ff3b91' },
+  { id: 'purple', name: 'Paars', hex: '#bd62ed' },
+  { id: 'orange', name: 'Oranje', hex: '#ff7a1a' }
+];
+
+const DISNEY_PROFILE_AVATARS = [
+  ['linguini', 'Alfredo Linguini', 'linguini.webp'], ['bruno', 'Bruno', 'bruno.png'],
+  ['buzz', 'Buzz Lightyear', 'buzz.png'], ['heihei', 'Heihei', 'heihei.png'],
+  ['hen-wen', 'Hen Wen', 'hen-wen.png'], ['jack', 'Jack Sparrow', 'jack.png'],
+  ['kuzco', 'Kuzco', 'kuzco.png'], ['maximus', 'Maximus', 'maximus.png'],
+  ['medusa', 'Madame Medusa', 'medusa.png'], ['miguel', 'Miguel', 'miguel.png'],
+  ['mufasa', 'Mufasa', 'mufasa.png'], ['mushu', 'Mushu', 'mushu.png'],
+  ['olaf', 'Olaf', 'olaf.png'], ['pascal', 'Pascal', 'pascal.png'],
+  ['percy', 'Percy', 'percy.png'], ['peter', 'Peter Pan', 'peter.png'],
+  ['redpanda', 'Rode panda', 'redpanda.png'], ['remy', 'Remy', 'remy.png'],
+  ['stitch', 'Stitch', 'stitch.png'], ['taran', 'Taran', 'taran.png']
+].map(([id, name, file]) => ({ id, name, image: `music/avatars/${file}` }));
 
 const BADGE_RARITIES = [
   { id: 'common', name: 'Common', subtitle: 'De eerste stap van ieder Disney-avontuur', perPark: 12, frame: 'badges/frames/common-silver.png' },
@@ -1284,7 +1297,6 @@ export default function App() {
   }, [screen, showPortalShop]);
 
   const [setupMode, setSetupMode] = useState('mix');
-  const [setupVersion, setSetupVersion] = useState(1);
   const [roundsPerPlayer, setRoundsPerPlayer] = useState(10);
   const [playerNames, setPlayerNames] = useState(['Speler 1', 'Speler 2', 'Speler 3', 'Speler 4']);
 
@@ -1331,6 +1343,11 @@ export default function App() {
       })
       .slice(0, 12);
   });
+  const [profilePreferences, setProfilePreferences] = useState(() => readJsonStorage(PROFILE_PREFERENCES_KEY, {}));
+  const [profileRewardReceipts, setProfileRewardReceipts] = useState({});
+  const [profileSetupOpen, setProfileSetupOpen] = useState(false);
+  const [profileDraftAvatar, setProfileDraftAvatar] = useState('miguel');
+  const [profileDraftColor, setProfileDraftColor] = useState('blue');
   const [newShopPlayerName, setNewShopPlayerName] = useState('');
   const [startupProfileName, setStartupProfileName] = useState('');
   const [donationTargetName, setDonationTargetName] = useState('');
@@ -1354,6 +1371,21 @@ export default function App() {
   const [arcadeOptionsOpen, setArcadeOptionsOpen] = useState(false);
   const [arcadeLobbyCode, setArcadeLobbyCode] = useState('');
   const [arenaToolbar, setArenaToolbar] = useState(null);
+  const [arenaSaves, setArenaSaves] = useState(() => readJsonStorage(ARENA_SAVES_KEY, {}));
+
+  useEffect(() => {
+    if (room?.id !== 'solo' || !room?.game_mode?.startsWith('arcade-') || !activeProfileName) return undefined;
+    const gameId = room.game_mode.replace('arcade-', '');
+    const saveKey = `${getCollectorKey(activeProfileName)}:${gameId}`;
+    const timeoutId = window.setTimeout(() => {
+      setArenaSaves(current => {
+        const nextSaves = { ...current, [saveKey]: { gameId, room, players, localPlayer, savedAt: new Date().toISOString(), version: 1 } };
+        localStorage.setItem(ARENA_SAVES_KEY, JSON.stringify(nextSaves));
+        return nextSaves;
+      });
+    }, 180);
+    return () => window.clearTimeout(timeoutId);
+  }, [activeProfileName, localPlayer, players, room]);
 
   // Sudoku states
   const [sudokuGrid, setSudokuGrid] = useState([]);
@@ -1681,6 +1713,53 @@ export default function App() {
 
   const getCollectorKey = (name) => norm(name || 'speler') || 'speler';
 
+  const createProfilePreference = (name, index = 0) => ({
+    id: globalThis.crypto?.randomUUID?.() || `profile-${Date.now()}-${Math.random().toString(36).slice(2)}`,
+    name: String(name || '').trim(),
+    avatar: DISNEY_PROFILE_AVATARS[index % DISNEY_PROFILE_AVATARS.length].id,
+    color: DISNEY_PROFILE_COLORS[index % DISNEY_PROFILE_COLORS.length].id,
+    theme: 'day',
+    configured: false
+  });
+
+  const getProfilePreference = (name = activeProfileName) => profilePreferences[getCollectorKey(name)] || null;
+
+  const openProfileAppearance = (name = activeProfileName) => {
+    const key = getCollectorKey(name);
+    const preference = profilePreferences[key] || createProfilePreference(name, cocoProfiles.findIndex(profileName => getCollectorKey(profileName) === key));
+    if (!profilePreferences[key]) {
+      const nextPreferences = { ...profilePreferences, [key]: preference };
+      setProfilePreferences(nextPreferences);
+      localStorage.setItem(PROFILE_PREFERENCES_KEY, JSON.stringify(nextPreferences));
+    }
+    setProfileDraftAvatar(preference.avatar || 'miguel');
+    setProfileDraftColor(preference.color || 'blue');
+    setProfileSetupOpen(true);
+  };
+
+  const getAvailableProfileColors = (name = activeProfileName) => {
+    const currentKey = getCollectorKey(name);
+    const usedByOthers = new Set(Object.entries(profilePreferences)
+      .filter(([key]) => key !== currentKey)
+      .map(([, preference]) => preference?.color)
+      .filter(Boolean));
+    if (usedByOthers.size >= DISNEY_PROFILE_COLORS.length) return DISNEY_PROFILE_COLORS;
+    return DISNEY_PROFILE_COLORS.filter(color => !usedByOthers.has(color.id) || color.id === profilePreferences[currentKey]?.color);
+  };
+
+  const saveProfileAppearance = () => {
+    const key = getCollectorKey(activeProfileName);
+    if (!key || !activeProfileName) return;
+    const current = profilePreferences[key] || createProfilePreference(activeProfileName);
+    const nextPreferences = {
+      ...profilePreferences,
+      [key]: { ...current, name: activeProfileName, avatar: profileDraftAvatar, color: profileDraftColor, configured: true }
+    };
+    setProfilePreferences(nextPreferences);
+    localStorage.setItem(PROFILE_PREFERENCES_KEY, JSON.stringify(nextPreferences));
+    setProfileSetupOpen(false);
+  };
+
   const uniqueProfileNames = (names) => {
     const seen = new Set();
     return names
@@ -1711,6 +1790,17 @@ export default function App() {
     setPlayerNameInput(cleanName);
     localStorage.setItem(ACTIVE_PROFILE_KEY, cleanName);
     localStorage.setItem('disney_player_name', cleanName);
+    const key = getCollectorKey(cleanName);
+    const existingPreference = profilePreferences[key];
+    if (!existingPreference?.configured || !existingPreference?.avatar || !existingPreference?.color) {
+      const nextPreference = existingPreference || createProfilePreference(cleanName, cocoProfiles.length);
+      const nextPreferences = { ...profilePreferences, [key]: nextPreference };
+      setProfilePreferences(nextPreferences);
+      localStorage.setItem(PROFILE_PREFERENCES_KEY, JSON.stringify(nextPreferences));
+      setProfileDraftAvatar(nextPreference.avatar);
+      setProfileDraftColor(nextPreference.color);
+      setProfileSetupOpen(true);
+    }
   };
 
   const getDisplayShopPlayers = () => {
@@ -1755,10 +1845,25 @@ export default function App() {
       ]));
     };
 
+    const mergeProfilePreferences = (remotePreferences, localPreferences, profileNames) => {
+      const merged = { ...(localPreferences || {}), ...(remotePreferences || {}) };
+      profileNames.forEach((profileName, index) => {
+        const key = getCollectorKey(profileName);
+        merged[key] = {
+          ...createProfilePreference(profileName, index),
+          ...(merged[key] || {}),
+          name: profileName
+        };
+      });
+      return merged;
+    };
+
     const loadSharedProfiles = async () => {
       const localProfiles = uniqueProfileNames(cocoProfiles);
       const localState = {
         coco_profiles: localProfiles,
+        coco_profile_preferences: profilePreferences,
+        coco_reward_receipts: profileRewardReceipts,
         coco_bank: starBank,
         coco_collections: collections,
         coco_exclusive_claims: exclusiveClaims,
@@ -1766,7 +1871,7 @@ export default function App() {
         coco_badge_achievements: badgeAchievements,
         coco_badge_showcase_seed_version: badgeShowcaseSeedVersion,
         coco_badge_market: badgeMarket,
-        coco_profile_store_version: 4,
+        coco_profile_store_version: 5,
         updated_at: new Date().toISOString()
       };
 
@@ -1813,6 +1918,8 @@ export default function App() {
         const remoteProfiles = uniqueProfileNames(remoteState.coco_profiles || []);
         const migrateLocalState = remoteProfiles.length === 0 && localProfiles.length > 0;
         const mergedProfiles = migrateLocalState ? uniqueProfileNames([...remoteProfiles, ...localProfiles]) : remoteProfiles;
+        const mergedProfilePreferences = mergeProfilePreferences(remoteState.coco_profile_preferences, profilePreferences, mergedProfiles);
+        const mergedRewardReceipts = { ...profileRewardReceipts, ...(remoteState.coco_reward_receipts || {}) };
         const mergedBank = migrateLocalState ? mergeBank(remoteState.coco_bank, starBank) : (remoteState.coco_bank || {});
         const mergedCollections = migrateLocalState ? mergeCollections(remoteState.coco_collections, collections) : (remoteState.coco_collections || {});
         const mergedClaims = migrateLocalState
@@ -1841,6 +1948,8 @@ export default function App() {
           : createHourlyBadgeMarket();
         const mergedState = {
           coco_profiles: mergedProfiles,
+          coco_profile_preferences: mergedProfilePreferences,
+          coco_reward_receipts: mergedRewardReceipts,
           coco_bank: mergedBank,
           coco_collections: mergedCollections,
           coco_exclusive_claims: mergedClaims,
@@ -1848,13 +1957,15 @@ export default function App() {
           coco_badge_achievements: mergedBadgeAchievements,
           coco_badge_showcase_seed_version: mergedBadgeShowcaseSeedVersion,
           coco_badge_market: mergedBadgeMarket,
-          coco_profile_store_version: 4,
+          coco_profile_store_version: 5,
           updated_at: new Date().toISOString()
         };
 
         if (!cancelled) {
           cocoProfileStoreIdRef.current = store?.id || null;
           setCocoProfiles(mergedProfiles);
+          setProfilePreferences(mergedProfilePreferences);
+          setProfileRewardReceipts(mergedRewardReceipts);
           setStarBank(mergedBank);
           setCollections(mergedCollections);
           setExclusiveClaims(mergedClaims);
@@ -1863,6 +1974,7 @@ export default function App() {
           setBadgeShowcaseSeedVersion(mergedBadgeShowcaseSeedVersion);
           setBadgeMarket(mergedBadgeMarket);
           localStorage.setItem(COCO_PROFILES_KEY, JSON.stringify(mergedProfiles));
+          localStorage.setItem(PROFILE_PREFERENCES_KEY, JSON.stringify(mergedProfilePreferences));
           localStorage.setItem(COCO_BANK_KEY, JSON.stringify(mergedBank));
           localStorage.setItem('disney_collections', JSON.stringify(mergedCollections));
           localStorage.setItem('disney_exclusive_claims', JSON.stringify(mergedClaims));
@@ -1894,6 +2006,8 @@ export default function App() {
         .update({
           current_task_state: {
             coco_profiles: uniqueProfileNames(cocoProfiles),
+            coco_profile_preferences: profilePreferences,
+            coco_reward_receipts: profileRewardReceipts,
             coco_bank: starBank,
             coco_collections: collections,
             coco_exclusive_claims: exclusiveClaims,
@@ -1901,7 +2015,7 @@ export default function App() {
             coco_badge_achievements: badgeAchievements,
             coco_badge_showcase_seed_version: badgeShowcaseSeedVersion,
             coco_badge_market: badgeMarket,
-            coco_profile_store_version: 4,
+            coco_profile_store_version: 5,
             updated_at: new Date().toISOString()
           }
         })
@@ -1912,7 +2026,7 @@ export default function App() {
     }, 250);
 
     return () => window.clearTimeout(timeoutId);
-  }, [badgeAchievements, badgeCollections, badgeMarket, badgeShowcaseSeedVersion, cocoProfiles, cocoProfilesReady, collections, exclusiveClaims, starBank]);
+  }, [badgeAchievements, badgeCollections, badgeMarket, badgeShowcaseSeedVersion, cocoProfiles, cocoProfilesReady, collections, exclusiveClaims, profilePreferences, profileRewardReceipts, starBank]);
 
   useEffect(() => {
     const updateMarketClock = () => {
@@ -2272,7 +2386,7 @@ export default function App() {
     setStartupProfileName('');
   };
 
-  const handleRenameShopProfile = () => {
+  const handleRenameShopProfile = async () => {
     const currentName = activeProfileName || shopPlayerName.trim() || 'Speler 1';
     const keepProfileChooserOpen = !activeProfileName;
     const nextName = window.prompt('Nieuwe profielnaam', currentName)?.trim();
@@ -2286,7 +2400,16 @@ export default function App() {
       return;
     }
 
-    persistCocoProfiles(cocoProfiles.map(name => getCollectorKey(name) === oldKey ? nextName : name));
+    const nextProfiles = uniqueProfileNames(cocoProfiles.map(name => getCollectorKey(name) === oldKey ? nextName : name));
+    setCocoProfiles(nextProfiles);
+    localStorage.setItem(COCO_PROFILES_KEY, JSON.stringify(nextProfiles));
+
+    let persistedBank = starBank;
+    let persistedCollections = collections;
+    let persistedClaims = exclusiveClaims;
+    let persistedBadgeCollections = badgeCollections;
+    let persistedBadgeAchievements = badgeAchievements;
+    let persistedPreferences = profilePreferences;
 
     if (oldKey !== newKey) {
       const nextBank = { ...starBank };
@@ -2316,16 +2439,32 @@ export default function App() {
       };
       delete nextBadgeAchievements[oldKey];
 
+      const nextPreferences = { ...profilePreferences };
+      nextPreferences[newKey] = {
+        ...(nextPreferences[oldKey] || createProfilePreference(nextName)),
+        name: nextName
+      };
+      delete nextPreferences[oldKey];
+
       setStarBank(nextBank);
       setCollections(nextCollections);
       setExclusiveClaims(nextClaims);
       setBadgeCollections(nextBadgeCollections);
       setBadgeAchievements(nextBadgeAchievements);
+      setProfilePreferences(nextPreferences);
       localStorage.setItem(COCO_BANK_KEY, JSON.stringify(nextBank));
       localStorage.setItem('disney_collections', JSON.stringify(nextCollections));
       localStorage.setItem('disney_exclusive_claims', JSON.stringify(nextClaims));
       localStorage.setItem(BADGE_COLLECTION_KEY, JSON.stringify(nextBadgeCollections));
       localStorage.setItem(BADGE_ACHIEVEMENT_KEY, JSON.stringify(nextBadgeAchievements));
+      localStorage.setItem(PROFILE_PREFERENCES_KEY, JSON.stringify(nextPreferences));
+
+      persistedBank = nextBank;
+      persistedCollections = nextCollections;
+      persistedClaims = nextClaims;
+      persistedBadgeCollections = nextBadgeCollections;
+      persistedBadgeAchievements = nextBadgeAchievements;
+      persistedPreferences = nextPreferences;
     }
 
     setShopPlayerName(nextName);
@@ -2338,7 +2477,63 @@ export default function App() {
       localStorage.setItem(ACTIVE_PROFILE_KEY, nextName);
       localStorage.setItem('disney_player_name', nextName);
     }
+
+    if (cocoProfileStoreIdRef.current) {
+      const { error: renameSaveError } = await supabase.from('rooms').update({
+        current_task_state: {
+          coco_profiles: nextProfiles,
+          coco_profile_preferences: persistedPreferences,
+          coco_reward_receipts: profileRewardReceipts,
+          coco_bank: persistedBank,
+          coco_collections: persistedCollections,
+          coco_exclusive_claims: persistedClaims,
+          coco_badge_collections: persistedBadgeCollections,
+          coco_badge_achievements: persistedBadgeAchievements,
+          coco_badge_showcase_seed_version: badgeShowcaseSeedVersion,
+          coco_badge_market: badgeMarket,
+          coco_profile_store_version: 5,
+          updated_at: new Date().toISOString()
+        }
+      }).eq('id', cocoProfileStoreIdRef.current);
+      if (renameSaveError) {
+        window.alert('De naam staat lokaal goed, maar kon nog niet online worden opgeslagen. Controleer je verbinding en probeer het opnieuw.');
+      }
+    }
   };
+
+  const getCompetitionRank = (player, standings = players) => {
+    const score = Number(player?.score) || 0;
+    return 1 + new Set(standings.filter(other => (Number(other.score) || 0) > score).map(other => Number(other.score) || 0)).size;
+  };
+
+  const getRoadRaceReward = (player, standings = players) => ({ 1: 10, 2: 6, 3: 4 }[getCompetitionRank(player, standings)] || 2);
+
+  const getRankMedal = rank => rank === 1 ? '🥇' : rank === 2 ? '🥈' : rank === 3 ? '🥉' : '🎖️';
+
+  useEffect(() => {
+    if (screen !== 'end' || !room?.id || room.id === 'solo' || !localPlayer?.id || room.game_mode?.startsWith('arcade-')) return;
+    const rewardKey = `road-race-final-reward-${room.id}-${localPlayer.id}`;
+    if (localStorage.getItem(rewardKey)) return;
+    const currentPlayer = players.find(player => player.id === localPlayer.id);
+    if (!currentPlayer) return;
+    const reward = getRoadRaceReward(currentPlayer, players);
+    const rank = getCompetitionRank(currentPlayer, players);
+    localStorage.setItem(rewardKey, String(reward));
+    awardStarsToCollector(currentPlayer.name, reward, `McQueen's Road Race afgerond · plaats ${rank}`);
+    setSoloHistory(previous => {
+      const next = [{
+        profileName: currentPlayer.name,
+        profileKey: getCollectorKey(currentPlayer.name),
+        category: 'road-race',
+        gameType: "McQueen's Road Race",
+        date: new Date().toISOString(),
+        score: currentPlayer.score,
+        details: rank === 1 ? 'Gewonnen' : `Geëindigd op plaats ${rank}`
+      }, ...previous];
+      localStorage.setItem('disney_solo_history', JSON.stringify(next));
+      return next;
+    });
+  }, [localPlayer?.id, room?.id, room?.game_mode, screen]);
 
   const handleDeleteShopProfile = () => {
     const currentName = activeProfileName || shopPlayerName.trim() || 'Speler 1';
@@ -2357,10 +2552,12 @@ export default function App() {
     const nextCollections = { ...collections };
     const nextBadgeCollections = { ...badgeCollections };
     const nextBadgeAchievements = { ...badgeAchievements };
+    const nextPreferences = { ...profilePreferences };
     delete nextBank[currentKey];
     delete nextCollections[currentKey];
     delete nextBadgeCollections[currentKey];
     delete nextBadgeAchievements[currentKey];
+    delete nextPreferences[currentKey];
 
     const nextClaims = Object.fromEntries(
       Object.entries(exclusiveClaims).filter(([, ownerKey]) => ownerKey !== currentKey)
@@ -2371,6 +2568,7 @@ export default function App() {
     setExclusiveClaims(nextClaims);
     setBadgeCollections(nextBadgeCollections);
     setBadgeAchievements(nextBadgeAchievements);
+    setProfilePreferences(nextPreferences);
     setShopPlayerName(nextName);
     setActiveProfileName(keepProfileChooserOpen ? '' : nextName);
     setPlayerNameInput(nextName);
@@ -2380,6 +2578,7 @@ export default function App() {
     localStorage.setItem('disney_exclusive_claims', JSON.stringify(nextClaims));
     localStorage.setItem(BADGE_COLLECTION_KEY, JSON.stringify(nextBadgeCollections));
     localStorage.setItem(BADGE_ACHIEVEMENT_KEY, JSON.stringify(nextBadgeAchievements));
+    localStorage.setItem(PROFILE_PREFERENCES_KEY, JSON.stringify(nextPreferences));
     if (keepProfileChooserOpen) {
       localStorage.removeItem(ACTIVE_PROFILE_KEY);
       localStorage.removeItem('disney_player_name');
@@ -2441,6 +2640,8 @@ export default function App() {
     }
 
     const newEntry = {
+      profileName: activeProfileName || localPlayer?.name || playerNameInput || shopPlayerName,
+      profileKey: getCollectorKey(activeProfileName || localPlayer?.name || playerNameInput || shopPlayerName),
       category: currentTask.type === 'arcade-game' || room?.game_mode?.startsWith('arcade-') ? 'arena' : 'quest-solo',
       gameType: gameName,
       date: new Date().toISOString(),
@@ -2687,7 +2888,7 @@ export default function App() {
   const [factSelected, setFactSelected] = useState(null);
 
   // Upgrade 1: Day/Night Theme and Power Cards Zoom/Flip HUD states
-  const [themeMode, setThemeMode] = useState('day'); // 'day' or 'night'
+  const [themeMode, setThemeMode] = useState(() => localStorage.getItem('disney_theme_mode') || 'day'); // 'day' or 'night'
   const [zoomedCardKey, setZoomedCardKey] = useState(null); // card key like 'fastpass' or null
   const [cardFlipped, setCardFlipped] = useState(false); // boolean flip
   const [strafTargetMode, setStrafTargetMode] = useState(null); // card key if selecting target player
@@ -2736,6 +2937,12 @@ export default function App() {
 
   // Day/Night theme applies everywhere after a Disney profile is active.
   useEffect(() => {
+    if (!activeProfileName) return;
+    const savedTheme = profilePreferences[getCollectorKey(activeProfileName)]?.theme || localStorage.getItem('disney_theme_mode') || 'day';
+    setThemeMode(savedTheme);
+  }, [activeProfileName]);
+
+  useEffect(() => {
     if (activeProfileName && themeMode === 'night') {
       document.body.classList.add('night-theme');
     } else {
@@ -2745,6 +2952,32 @@ export default function App() {
       document.body.classList.remove('night-theme');
     };
   }, [themeMode, activeProfileName]);
+
+  const toggleThemeMode = () => {
+    const nextTheme = themeMode === 'day' ? 'night' : 'day';
+    setThemeMode(nextTheme);
+    localStorage.setItem('disney_theme_mode', nextTheme);
+    if (!activeProfileName) return;
+    const key = getCollectorKey(activeProfileName);
+    const current = profilePreferences[key] || createProfilePreference(activeProfileName);
+    const nextPreferences = { ...profilePreferences, [key]: { ...current, name: activeProfileName, theme: nextTheme } };
+    setProfilePreferences(nextPreferences);
+    localStorage.setItem(PROFILE_PREFERENCES_KEY, JSON.stringify(nextPreferences));
+  };
+
+  const getArenaSave = gameId => arenaSaves[`${getCollectorKey(activeProfileName)}:${gameId}`] || null;
+
+  const handleResumeArenaSave = gameId => {
+    const saved = getArenaSave(gameId);
+    if (!saved?.room) return;
+    setRoom(saved.room);
+    setPlayers(saved.players || []);
+    setLocalPlayer(saved.localPlayer || saved.players?.[0] || null);
+    setArcadeOptionsOpen(false);
+    setArcadePlayMode(null);
+    soloLoggedRef.current = false;
+    setScreen('game');
+  };
 
   const clearSession = () => {
     localStorage.removeItem('disney_room_id');
@@ -3015,13 +3248,6 @@ export default function App() {
     }
   }, [room?.current_task_id]);
 
-  const taskDeck = (task) => {
-    if (!task || String(task.id).startsWith("custom-")) return room?.game_version || 1;
-    const match = String(task.id).match(/\d+/);
-    const number = match ? Number(match[0]) : 1;
-    return ((number - 1) % 8) + 1;
-  };
-
   const selectNextTask = async (currentRoom, currentPlayers, forcePersonal = false) => {
     const usedTasks = currentRoom.current_task_state?.usedTasks || [];
     const taskHistory = currentRoom.current_task_state?.taskHistory || [];
@@ -3038,25 +3264,40 @@ export default function App() {
       return;
     }
 
-    if (currentRoom.game_mode === "Quiz" || (currentRoom.game_mode === "mix" && enabledCats.includes("Quiz") && Math.random() < 0.25)) {
+    const categoryHistory = currentRoom.current_task_state?.categoryHistory || [];
+    const recentCategories = categoryHistory.slice(-4);
+    let eligibleCategories = currentRoom.game_mode === 'mix'
+      ? enabledCats.filter(category => category === 'Quiz' || activeTasks.some(task => task.cat === category))
+      : [currentRoom.game_mode];
+    if (eligibleCategories.length > 1 && currentRoom.current_task_state?.lastCat) {
+      eligibleCategories = eligibleCategories.filter(category => category !== currentRoom.current_task_state.lastCat);
+    }
+    if (recentCategories.filter(category => category === 'Quiz').length >= 2 && eligibleCategories.length > 1) {
+      eligibleCategories = eligibleCategories.filter(category => category !== 'Quiz');
+    }
+    const selectedCategory = eligibleCategories[Math.floor(Math.random() * eligibleCategories.length)] || eligibleCategories[0];
+
+    if (selectedCategory === "Quiz") {
       // Direct choice of quiz difficulty
       await updateRoomState(currentRoom.id, {
         current_task_id: 'quiz-choice',
-        current_task_state: { ...currentRoom.current_task_state, stagePause: false }
+        current_task_state: {
+          ...currentRoom.current_task_state,
+          categoryHistory: [...categoryHistory, 'Quiz'],
+          lastCat: 'Quiz',
+          stagePause: false
+        }
       });
       return;
     }
 
-    let pool = activeTasks;
+    let pool = activeTasks.filter(task => task.cat === selectedCategory);
     if (currentRoom.game_mode === "mix" && forcePersonal) {
       pool = pool.filter(t => t.type !== "group");
     }
 
     const player = currentPlayers[currentRoom.current_player_index];
     const unused = pool.filter(t => !usedTasks.includes(t.id));
-    const primary = pool.filter(t => taskDeck(t) === currentRoom.game_version);
-    const primaryUnused = primary.filter(t => !usedTasks.includes(t.id));
-
     const wasSeen = (tid) => taskHistory.some(h => h.taskId === tid);
     const wasSeenByPlayer = (tid, pid) => taskHistory.some(h => h.taskId === tid && h.playerId === pid);
 
@@ -3064,15 +3305,10 @@ export default function App() {
     const notForPlayer = list => currentRoom.game_mode === "Samen" ? list : list.filter(t => !wasSeenByPlayer(t.id, player.id));
 
     const stages = [
-      neverSeen(primaryUnused),
       neverSeen(unused),
-      notForPlayer(primaryUnused),
       notForPlayer(unused),
-      primaryUnused,
       unused,
-      notForPlayer(primary),
       notForPlayer(pool),
-      primary,
       pool
     ];
 
@@ -3103,6 +3339,7 @@ export default function App() {
         ...currentRoom.current_task_state,
         usedTasks: newUsed,
         taskHistory: newHistory,
+        categoryHistory: [...categoryHistory, selected.cat],
         lastCat: selected.cat,
         stagePause: false,
         part: selected.type === 'diary' ? 1 : undefined,
@@ -3132,8 +3369,8 @@ export default function App() {
     setError(null);
     try {
       const mode = (selectedCats.length === 1 && selectedCats[0] === "Samen") ? "Samen" : "mix";
-      const totalRounds = mode === 'Samen' ? roundsPerPlayer : roundsPerPlayer * 4;
-      const { room: r, player: p } = await createRoom(mode, setupVersion, roundsPerPlayer, profileName);
+      const totalRounds = roundsPerPlayer;
+      const { room: r, player: p } = await createRoom(mode, 1, roundsPerPlayer, profileName);
       
       await updateRoomState(r.id, { total_rounds: totalRounds });
       r.total_rounds = totalRounds;
@@ -4259,6 +4496,9 @@ export default function App() {
   const renderAppHeader = () => {
     const key = getCollectorKey(activeProfileName);
     const balance = starBank[key] || 0;
+    const profilePreference = getProfilePreference(activeProfileName);
+    const profileAvatar = DISNEY_PROFILE_AVATARS.find(avatar => avatar.id === profilePreference?.avatar);
+    const profileColor = DISNEY_PROFILE_COLORS.find(color => color.id === profilePreference?.color)?.hex || 'var(--gold)';
 
     return (
       <header className="topbar global-app-header">
@@ -4267,12 +4507,10 @@ export default function App() {
             <button
               type="button"
               className="global-profile-segment global-profile-name-segment"
-              onClick={() => {
-                setLogProfileName(activeProfileName);
-                setLogPopupOpen(true);
-              }}
-              title="Open Captain's Log"
+              onClick={() => openProfileAppearance(activeProfileName)}
+              title="Wijzig avatar en spelerskleur"
             >
+              {profileAvatar && <img className="global-profile-avatar" src={assetPath(profileAvatar.image)} alt="" style={{ borderColor: profileColor }} />}
               <span className="global-profile-name">{activeProfileName}</span>
             </button>
             <span className="global-profile-divider" aria-hidden="true">·</span>
@@ -4290,7 +4528,7 @@ export default function App() {
               aria-label="Open Captain's Log"
             >⚓</button>
           </div>
-          <button className="iconbtn" onClick={() => setThemeMode(prev => prev === 'day' ? 'night' : 'day')} aria-label={themeMode === 'day' ? 'Nachtstand inschakelen' : 'Dagstand inschakelen'}>
+          <button className="iconbtn" onClick={toggleThemeMode} aria-label={themeMode === 'day' ? 'Nachtstand inschakelen' : 'Dagstand inschakelen'}>
             {themeMode === 'day' ? "🌙" : "☀️"}
           </button>
           <button className="iconbtn" onClick={handleGlobalHeaderBack} aria-label="Terug">
@@ -4618,7 +4856,7 @@ export default function App() {
       `}</style>
 
       {/* Render Night theme animated stars overlays */}
-      {screen === 'game' && themeMode === 'night' && (
+      {activeProfileName && themeMode === 'night' && (
         <div className="star-bg">
           {Array.from({ length: 15 }).map((_, i) => (
             <div 
@@ -4829,51 +5067,52 @@ export default function App() {
           className="captains-log-modal"
           onClick={() => setLogPopupOpen(false)}
         >
-          <div className="captains-log-paper" onClick={(e) => e.stopPropagation()}>
+          <div className="captains-log-paper player-dashboard" onClick={(e) => e.stopPropagation()}>
             <div className="captains-log-header">
-              <h2 className="captains-log-title">⚓ Captain's Log ⚓</h2>
-              <p className="captains-log-subtitle">Scheepsjournaal van Kapitein {logProfileName}</p>
+              <h2 className="captains-log-title">Spelersoverzicht</h2>
+              <p className="captains-log-subtitle">Alle avonturen en Coco Coins van {logProfileName}</p>
             </div>
 
             <div className="captains-log-content">
               {(() => {
                 const entries = getOrGenerateCaptainsLog(logProfileName);
-                if (entries.length === 0) {
-                  return (
-                    <div style={{ textAlign: 'center', padding: '30px 10px', fontStyle: 'italic', color: '#8d6e63' }}>
-                      Geen aantekeningen in het logboek gevonden voor dit profiel.
+                const profileKey = getCollectorKey(logProfileName);
+                const games = soloHistory.filter(item => !item.profileKey || item.profileKey === profileKey);
+                const groupedGames = Object.values(games.reduce((groups, item) => {
+                  const gameName = item.gameType || 'Onbekend spel';
+                  const text = `${item.details || ''}`.toLowerCase();
+                  const result = /gelijk|draw/.test(text) ? 'draw' : /verloren|verlies|niet gekraakt|niet opgelost/.test(text) ? 'loss' : Number(item.score) > 0 || /gewonnen|winst|opgelost|gekraakt/.test(text) ? 'win' : 'played';
+                  const current = groups[gameName] || { name: gameName, played: 0, win: 0, draw: 0, loss: 0 };
+                  current.played += 1;
+                  if (result !== 'played') current[result] += 1;
+                  groups[gameName] = current;
+                  return groups;
+                }, {}));
+                const earned = entries.filter(entry => entry.type === 'earn' && Number(entry.amount) > 0);
+                const spent = entries.filter(entry => entry.type === 'spend' || Number(entry.amount) < 0);
+                const renderMutations = list => list.length ? [...list].reverse().map((entry, idx) => (
+                  <div key={`${entry.timestamp}-${idx}`} className="dashboard-mutation">
+                    <span><strong>{entry.description}</strong><small>{new Date(entry.timestamp).toLocaleString('nl-NL')}</small></span>
+                    <b className={Number(entry.amount) >= 0 ? 'earn' : 'spend'}>{Number(entry.amount) >= 0 ? '+' : '−'}{Math.abs(Number(entry.amount) || 0)}</b>
+                  </div>
+                )) : <p className="small">Nog geen mutaties.</p>;
+                return (
+                  <>
+                    <div className="dashboard-summary">
+                      <div><strong>{games.length}</strong><span>gespeeld</span></div>
+                      <div><strong>{games.filter(item => Number(item.score) > 0).length}</strong><span>succesvol</span></div>
+                      <div><strong>{starBank[profileKey] || 0}</strong><span>Coco Coins</span></div>
                     </div>
-                  );
-                }
-                return [...entries].reverse().map((entry, idx) => {
-                  const dateStr = new Date(entry.timestamp).toLocaleString('nl-NL', {
-                    day: '2-digit',
-                    month: '2-digit',
-                    year: 'numeric',
-                    hour: '2-digit',
-                    minute: '2-digit'
-                  });
-                  const isEarn = entry.type === 'earn';
-                  const coinClass = isEarn ? 'captains-log-coins earn' : 'captains-log-coins spend';
-                  const displayAmount = isEarn 
-                    ? `+${Math.abs(entry.amount)}` 
-                    : `-${Math.abs(entry.amount)}`;
-                  
-                  return (
-                    <div key={idx} className="captains-log-row">
-                      <div style={{ paddingRight: '12px' }}>
-                        <div className="captains-log-desc">{entry.description}</div>
-                        <div className="captains-log-meta">{dateStr}</div>
-                      </div>
-                      <div style={{ textAlign: 'right' }}>
-                        <div className={coinClass}>{displayAmount} 🪙</div>
-                        <div style={{ fontSize: '11px', color: '#8d6e63', marginTop: '2px' }}>
-                          Saldo: {entry.balanceAfter} 🪙
-                        </div>
-                      </div>
-                    </div>
-                  );
-                });
+                    <h3>Gespeelde spellen</h3>
+                    {groupedGames.length ? <div className="dashboard-games">{groupedGames.map(game => (
+                      <div key={game.name}><strong>{game.name}</strong><span>{game.played}× gespeeld</span><small>{game.win} gewonnen · {game.draw} gelijk · {game.loss} verloren</small></div>
+                    ))}</div> : <p className="small">Nog geen spellen geregistreerd voor dit profiel.</p>}
+                    <h3>Coco Coins</h3>
+                    <details className="dashboard-ledger"><summary><span>Verdiende coins</span><strong>+{earned.reduce((sum, entry) => sum + Math.abs(Number(entry.amount) || 0), 0)}</strong></summary>{renderMutations(earned)}</details>
+                    <details className="dashboard-ledger"><summary><span>Uitgegeven coins</span><strong>−{spent.reduce((sum, entry) => sum + Math.abs(Number(entry.amount) || 0), 0)}</strong></summary>{renderMutations(spent)}</details>
+                    <div className="dashboard-balance"><span>Huidig saldo</span><strong>{starBank[profileKey] || 0} <CocoCoinIcon size={22} /></strong></div>
+                  </>
+                );
               })()}
             </div>
 
@@ -4882,7 +5121,7 @@ export default function App() {
               className="captains-log-close-btn"
               onClick={() => setLogPopupOpen(false)}
             >
-              Logboek Sluiten
+              Overzicht sluiten
             </button>
           </div>
         </div>
@@ -4951,6 +5190,9 @@ export default function App() {
                 const key = getCollectorKey(name);
                 const balance = starBank[key] || 0;
                 const ownedCount = Object.values(badgeCollections[key] || {}).reduce((sum, count) => sum + (Number(count) || 0), 0);
+                const preference = profilePreferences[key];
+                const avatar = DISNEY_PROFILE_AVATARS.find(item => item.id === preference?.avatar);
+                const color = DISNEY_PROFILE_COLORS.find(item => item.id === preference?.color)?.hex || 'var(--gold)';
                 return (
                   <button
                     key={name}
@@ -4958,7 +5200,9 @@ export default function App() {
                     className="versioncard"
                     onClick={() => activateCocoProfile(name)}
                   >
-                    <span style={{ fontSize: '26px', fontWeight: 900, color: 'var(--gold)' }}>{name.slice(0, 1).toUpperCase()}</span>
+                    {avatar
+                      ? <img src={assetPath(avatar.image)} alt="" style={{ width: '48px', height: '48px', objectFit: 'contain', border: `3px solid ${color}`, borderRadius: '50%', background: '#06152d' }} />
+                      : <span style={{ fontSize: '26px', fontWeight: 900, color }}>{name.slice(0, 1).toUpperCase()}</span>}
                     <span>
                       <strong>{name}</strong>
                       <small>{formatCocoCoins(balance)} · {ownedCount} badge{ownedCount === 1 ? '' : 's'}</small>
@@ -5017,6 +5261,46 @@ export default function App() {
       {!loading && activeProfileName && (
         <>
           {renderAppHeader()}
+          {profileSetupOpen && (
+            <div className="profile-appearance-backdrop" role="dialog" aria-modal="true" aria-labelledby="profile-appearance-title">
+              <section className="profile-appearance-dialog">
+                <h2 id="profile-appearance-title">Jouw Disney-profiel</h2>
+                <p>Kies de avatar en spelerskleur die in alle spellen bij {activeProfileName} horen.</p>
+                <h3>Spelerskleur</h3>
+                <div className="profile-color-grid">
+                  {getAvailableProfileColors(activeProfileName).map(color => (
+                    <button
+                      key={color.id}
+                      type="button"
+                      className={`profile-color-choice ${profileDraftColor === color.id ? 'selected' : ''}`}
+                      style={{ '--profile-choice-color': color.hex }}
+                      onClick={() => setProfileDraftColor(color.id)}
+                      aria-pressed={profileDraftColor === color.id}
+                    >
+                      <span aria-hidden="true" />{color.name}
+                    </button>
+                  ))}
+                </div>
+                <h3>Avatar</h3>
+                <div className="profile-avatar-grid">
+                  {DISNEY_PROFILE_AVATARS.map(avatar => (
+                    <button
+                      key={avatar.id}
+                      type="button"
+                      className={`profile-avatar-choice ${profileDraftAvatar === avatar.id ? 'selected' : ''}`}
+                      onClick={() => setProfileDraftAvatar(avatar.id)}
+                      aria-pressed={profileDraftAvatar === avatar.id}
+                      title={avatar.name}
+                    >
+                      <img src={assetPath(avatar.image)} alt={avatar.name} />
+                      <span>{avatar.name}</span>
+                    </button>
+                  ))}
+                </div>
+                <button type="button" className="btn primary full" onClick={saveProfileAppearance}>Profiel opslaan</button>
+              </section>
+            </div>
+          )}
           {selectedCollectionItem && (
             <div
               className="collection-popup-backdrop"
@@ -5574,6 +5858,11 @@ export default function App() {
                         ? 'Deze Arena-kamer ondersteunt maximaal 4 spelers.'
                         : 'Dit spel is ontworpen voor 2 spelers.'}
                   </p>
+                  {getArenaSave(selectedArcadeGame) && (
+                    <button type="button" className="btn secondary full" onClick={() => handleResumeArenaSave(selectedArcadeGame)} style={{ marginBottom: '12px' }}>
+                      Hervat opgeslagen spel · {new Date(getArenaSave(selectedArcadeGame).savedAt).toLocaleString('nl-NL')}
+                    </button>
+                  )}
 
                   {getArenaGame(selectedArcadeGame)?.maxPlayers === 1 ? (
                     <button
@@ -5973,20 +6262,8 @@ export default function App() {
               </section>
 
               <section className="card">
-                <h2 className="sectiontitle">2. Kies een spelversie</h2>
-                <div className="versiongrid">
-                  {GAME_VERSIONS.map(v => (
-                    <button 
-                      key={v.id} 
-                      type="button" 
-                      className={`versioncard ${setupVersion === v.id ? "selected" : ""}`}
-                      onClick={() => setSetupVersion(v.id)}
-                    >
-                      <span className="versionicon">{v.icon}</span>
-                      <span><strong>Game {v.id} · {v.name}</strong></span>
-                    </button>
-                  ))}
-                </div>
+                <h2 className="sectiontitle">2. Slimme opdrachtenmix</h2>
+                <div className="notice">Road Race kiest uit de volledige database. Ongebruikte opdrachten komen eerst, dezelfde categorie verschijnt nooit direct opnieuw en quizvragen worden automatisch afgewisseld.</div>
               </section>
 
               <section className="card">
@@ -7468,15 +7745,15 @@ export default function App() {
                 <div className="medals">
                   {[...players]
                     .sort((a, b) => b.score - a.score)
-                    .map((p, idx) => (
+                    .map(p => (
                       <div key={p.id} className="medal">
                         <div>
                           <span style={{ fontSize: '24px', marginRight: '10px' }}>
-                            {idx === 0 ? "🥇" : idx === 1 ? "🥈" : idx === 2 ? "🥉" : "🎖️"}
+                            {getRankMedal(getCompetitionRank(p, players))}
                           </span>
                           <span className="name">{p.name}</span>
                         </div>
-                        <div className="pts">{p.score} ★</div>
+                        <div className="pts" style={{ textAlign: 'right' }}>{p.score} ★<small style={{ display: 'block', color: 'var(--muted)', fontSize: '10px' }}>{getRoadRaceReward(p, players)} Coco Coins</small></div>
                       </div>
                     ))
                   }
@@ -7589,7 +7866,8 @@ export default function App() {
                 <div className="medals">
                   {[...players]
                     .sort((a, b) => b.score - a.score)
-                    .map((p, idx) => {
+                    .map(p => {
+                      const rank = getCompetitionRank(p, players);
                       const titles = [
                         "De Hercules van de Road Race 🏆",
                         "De Buzz Lightyear van de Bijna-Winst 🚀",
@@ -7599,10 +7877,11 @@ export default function App() {
                       return (
                         <div key={p.id} className="medal" style={{ flexDirection: 'column', alignItems: 'flex-start' }}>
                           <div style={{ display: 'flex', justifyContent: 'space-between', width: '100%', fontWeight: 'bold' }}>
-                            <span>{idx + 1}. {p.name}</span>
+                            <span>{getRankMedal(rank)} {p.name}</span>
                             <span>{p.score} ★</span>
                           </div>
-                          <small style={{ color: 'var(--gold)', marginTop: '4px' }}>{titles[idx] || titles[3]}</small>
+                          <small style={{ color: 'var(--gold)', marginTop: '4px' }}>{rank === 1 ? titles[0] : rank === 2 ? titles[1] : rank === 3 ? titles[2] : titles[3]}</small>
+                          <small style={{ color: 'var(--muted)', marginTop: '3px' }}>Beloning: {getRoadRaceReward(p, players)} Coco Coins</small>
                         </div>
                       );
                     })
