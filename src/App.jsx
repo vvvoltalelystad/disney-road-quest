@@ -1383,17 +1383,15 @@ export default function App() {
   const isFacilitatorHost = () => room?.current_task_state?.facilitator?.id === localPlayer?.id;
 
   useEffect(() => {
-    if (room?.id !== 'solo' || !room?.game_mode?.startsWith('arcade-') || !activeProfileName) return undefined;
+    if (room?.status !== 'playing' || !room?.game_mode?.startsWith('arcade-') || !activeProfileName) return undefined;
     const gameId = room.game_mode.replace('arcade-', '');
     const saveKey = `${getCollectorKey(activeProfileName)}:${gameId}`;
-    const timeoutId = window.setTimeout(() => {
-      setArenaSaves(current => {
-        const nextSaves = { ...current, [saveKey]: { gameId, room, players, localPlayer, savedAt: new Date().toISOString(), version: 1 } };
-        localStorage.setItem(ARENA_SAVES_KEY, JSON.stringify(nextSaves));
-        return nextSaves;
-      });
-    }, 180);
-    return () => window.clearTimeout(timeoutId);
+    setArenaSaves(current => {
+      const nextSaves = { ...current, [saveKey]: { gameId, room, players, localPlayer, savedAt: new Date().toISOString(), version: 2 } };
+      localStorage.setItem(ARENA_SAVES_KEY, JSON.stringify(nextSaves));
+      return nextSaves;
+    });
+    return undefined;
   }, [activeProfileName, localPlayer, players, room]);
 
   // Sudoku states
@@ -2512,6 +2510,16 @@ export default function App() {
         return belongsToRenamedProfile ? { ...item, profileName: nextName, profileKey: newKey } : item;
       });
 
+      const nextArenaSaves = Object.fromEntries(Object.entries(arenaSaves).map(([saveKey, save]) => {
+        if (!saveKey.startsWith(`${oldKey}:`)) return [saveKey, save];
+        const gameId = saveKey.slice(oldKey.length + 1);
+        return [`${newKey}:${gameId}`, {
+          ...save,
+          localPlayer: save.localPlayer ? { ...save.localPlayer, name: nextName } : save.localPlayer,
+          players: (save.players || []).map(player => player.id === save.localPlayer?.id ? { ...player, name: nextName } : player)
+        }];
+      }));
+
       setStarBank(nextBank);
       setCollections(nextCollections);
       setExclusiveClaims(nextClaims);
@@ -2520,6 +2528,7 @@ export default function App() {
       setProfilePreferences(nextPreferences);
       setCaptainsLogs(nextCaptainsLogs);
       setSoloHistory(nextGameHistory);
+      setArenaSaves(nextArenaSaves);
       localStorage.setItem(COCO_BANK_KEY, JSON.stringify(nextBank));
       localStorage.setItem('disney_collections', JSON.stringify(nextCollections));
       localStorage.setItem('disney_exclusive_claims', JSON.stringify(nextClaims));
@@ -2528,6 +2537,7 @@ export default function App() {
       localStorage.setItem(PROFILE_PREFERENCES_KEY, JSON.stringify(nextPreferences));
       localStorage.setItem('disney_captains_log', JSON.stringify(nextCaptainsLogs));
       localStorage.setItem('disney_solo_history', JSON.stringify(nextGameHistory));
+      localStorage.setItem(ARENA_SAVES_KEY, JSON.stringify(nextArenaSaves));
 
       persistedBank = nextBank;
       persistedCollections = nextCollections;
@@ -2629,6 +2639,7 @@ export default function App() {
     const nextPreferences = { ...profilePreferences };
     const nextCaptainsLogs = Object.fromEntries(Object.entries(captainsLogs).filter(([profileName]) => getCollectorKey(profileName) !== currentKey));
     const nextGameHistory = soloHistory.filter(item => (item.profileKey || getCollectorKey(item.profileName || '')) !== currentKey);
+    const nextArenaSaves = Object.fromEntries(Object.entries(arenaSaves).filter(([saveKey]) => !saveKey.startsWith(`${currentKey}:`)));
     delete nextBank[currentKey];
     delete nextCollections[currentKey];
     delete nextBadgeCollections[currentKey];
@@ -2647,6 +2658,7 @@ export default function App() {
     setProfilePreferences(nextPreferences);
     setCaptainsLogs(nextCaptainsLogs);
     setSoloHistory(nextGameHistory);
+    setArenaSaves(nextArenaSaves);
     setShopPlayerName(nextName);
     setActiveProfileName(keepProfileChooserOpen ? '' : nextName);
     setPlayerNameInput(nextName);
@@ -2659,6 +2671,7 @@ export default function App() {
     localStorage.setItem(PROFILE_PREFERENCES_KEY, JSON.stringify(nextPreferences));
     localStorage.setItem('disney_captains_log', JSON.stringify(nextCaptainsLogs));
     localStorage.setItem('disney_solo_history', JSON.stringify(nextGameHistory));
+    localStorage.setItem(ARENA_SAVES_KEY, JSON.stringify(nextArenaSaves));
     if (keepProfileChooserOpen) {
       localStorage.removeItem(ACTIVE_PROFILE_KEY);
       localStorage.removeItem('disney_player_name');
@@ -3048,12 +3061,44 @@ export default function App() {
 
   const getArenaSave = gameId => arenaSaves[`${getCollectorKey(activeProfileName)}:${gameId}`] || null;
 
-  const handleResumeArenaSave = gameId => {
+  const clearArenaSave = gameId => {
+    if (!gameId || !activeProfileName) return;
+    const saveKey = `${getCollectorKey(activeProfileName)}:${gameId}`;
+    setArenaSaves(current => {
+      if (!current[saveKey]) return current;
+      const nextSaves = { ...current };
+      delete nextSaves[saveKey];
+      localStorage.setItem(ARENA_SAVES_KEY, JSON.stringify(nextSaves));
+      return nextSaves;
+    });
+  };
+
+  const handleResumeArenaSave = async gameId => {
     const saved = getArenaSave(gameId);
     if (!saved?.room) return;
-    setRoom(saved.room);
-    setPlayers(saved.players || []);
-    setLocalPlayer(saved.localPlayer || saved.players?.[0] || null);
+    let savedRoom = saved.room;
+    let savedPlayers = saved.players || [];
+    if (savedRoom.id !== 'solo') {
+      try {
+        const fresh = await fetchRoomData(savedRoom.id);
+        if (fresh.room?.status === 'ended') {
+          clearArenaSave(gameId);
+          window.alert('Dit duel is inmiddels afgerond en kan niet meer worden hervat.');
+          return;
+        }
+        savedRoom = fresh.room;
+        savedPlayers = fresh.players;
+        localStorage.setItem('disney_room_id', savedRoom.id);
+        localStorage.setItem('disney_player_id', saved.localPlayer?.id || '');
+      } catch (error) {
+        console.error('Arena save recovery failed', error);
+        window.alert('Dit duel kon niet worden geladen. Controleer je internetverbinding en probeer het opnieuw.');
+        return;
+      }
+    }
+    setRoom(savedRoom);
+    setPlayers(savedPlayers);
+    setLocalPlayer(saved.localPlayer || savedPlayers[0] || null);
     setArcadeOptionsOpen(false);
     setArcadePlayMode(null);
     soloLoggedRef.current = false;
@@ -3721,13 +3766,16 @@ export default function App() {
         logSoloAttempt(0);
         soloLoggedRef.current = true;
       }
-      const targetScreen = room.game_mode?.startsWith('arcade-') ? 'arcade_select' : 'solo_select';
+      const isArenaGame = room.game_mode?.startsWith('arcade-');
+      if (isArenaGame) clearArenaSave(room.game_mode.replace('arcade-', ''));
+      const targetScreen = isArenaGame ? 'arcade_select' : 'solo_select';
       setRoom(null);
       setScreen(targetScreen);
       return;
     }
 
     if (room?.game_mode?.startsWith('arcade-')) {
+      clearArenaSave(room.game_mode.replace('arcade-', ''));
       await updateRoomState(room.id, {
         status: 'ended'
       });
@@ -4645,17 +4693,24 @@ export default function App() {
         return;
       }
       if (room.id === 'solo') {
-        if (!soloLoggedRef.current) {
+        const targetScreen = room.game_mode?.startsWith('arcade-') ? 'arcade_select' : 'solo_select';
+        if (!room.game_mode?.startsWith('arcade-') && !soloLoggedRef.current) {
           logSoloAttempt(0, "Opdracht verlaten");
           soloLoggedRef.current = true;
         }
-        const targetScreen = room.game_mode?.startsWith('arcade-') ? 'arcade_select' : 'solo_select';
         setRoom(null);
         setScreen(targetScreen);
         return;
       }
       if (room.game_mode?.startsWith('arcade-')) {
-        leaveCurrentRoom('arcade_select');
+        if (!window.confirm('Spel bewaren en teruggaan naar de Duel Arena? Je kunt dit duel later hervatten.')) return;
+        localStorage.removeItem('disney_room_id');
+        localStorage.removeItem('disney_player_id');
+        setRoom(null);
+        setPlayers([]);
+        setScoreHistory([]);
+        setLocalPlayer(null);
+        setScreen('arcade_select');
         return;
       }
       setScoreReturnScreen('game');

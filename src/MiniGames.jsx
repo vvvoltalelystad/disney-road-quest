@@ -746,12 +746,15 @@ export function DotsBoxesGame({ mode, room, localPlayer, players, updateRoomStat
 // ----------------------------------------------------
 // 3. COLOR LINES COMPONENT (Pure Solo)
 // ----------------------------------------------------
-export function ColorLinesGame({ onFinish }) {
-  const [board, setBoard] = useState(Array(81).fill(null));
-  const [score, setScore] = useState(0);
+export function ColorLinesGame({ room, updateRoomState, onFinish }) {
+  const taskState = room.current_task_state || {};
+  const board = Array.isArray(taskState.colorLinesBoard) && taskState.colorLinesBoard.length === 81
+    ? taskState.colorLinesBoard
+    : Array(81).fill(null);
+  const score = Number(taskState.colorLinesScore) || 0;
   const [selectedIdx, setSelectedIdx] = useState(null);
-  const [nextColors, setNextColors] = useState([]);
-  const [gameOver, setGameOver] = useState(false);
+  const nextColors = Array.isArray(taskState.colorLinesNextColors) ? taskState.colorLinesNextColors : [];
+  const gameOver = Boolean(taskState.colorLinesGameOver);
 
   const colors = ['#0077ff', '#ff3b30', '#ffcc00', '#4cd964', '#bd53ed', '#ff9500'];
   const makeNextColors = () => [
@@ -761,6 +764,7 @@ export function ColorLinesGame({ onFinish }) {
   ];
 
   useEffect(() => {
+    if (Array.isArray(taskState.colorLinesBoard) && taskState.colorLinesBoard.length === 81) return;
     const initialBoard = Array(81).fill(null);
     const indices = [];
     while (indices.length < 5) {
@@ -770,9 +774,15 @@ export function ColorLinesGame({ onFinish }) {
     indices.forEach(idx => {
       initialBoard[idx] = colors[Math.floor(Math.random() * colors.length)];
     });
-    setBoard(initialBoard);
-
-    setNextColors(makeNextColors());
+    updateRoomState(room.id, {
+      current_task_state: {
+        ...taskState,
+        colorLinesBoard: initialBoard,
+        colorLinesScore: 0,
+        colorLinesNextColors: makeNextColors(),
+        colorLinesGameOver: false
+      }
+    });
   }, []);
 
   const hasPath = (start, end) => {
@@ -842,10 +852,9 @@ export function ColorLinesGame({ onFinish }) {
     if (toClear.size > 0) {
       const nextBoard = [...currentBoard];
       toClear.forEach(idx => { nextBoard[idx] = null; });
-      setScore(prev => prev + toClear.size * 2);
-      return { board: nextBoard, cleared: true };
+      return { board: nextBoard, cleared: true, points: toClear.size * 2 };
     }
-    return { board: currentBoard, cleared: false };
+    return { board: currentBoard, cleared: false, points: 0 };
   };
 
   const handleCellClick = (idx) => {
@@ -865,8 +874,15 @@ export function ColorLinesGame({ onFinish }) {
           nextBoard.forEach((cell, i) => { if (cell === null) emptyIndices.push(i); });
 
           if (emptyIndices.length === 0) {
-            setBoard(nextBoard);
-            setGameOver(true);
+            updateRoomState(room.id, {
+              current_task_state: {
+                ...taskState,
+                colorLinesBoard: nextBoard,
+                colorLinesScore: score,
+                colorLinesNextColors: nextColors,
+                colorLinesGameOver: true
+              }
+            });
             return;
           }
 
@@ -878,10 +894,28 @@ export function ColorLinesGame({ onFinish }) {
           }
 
           resolved = clearLines(nextBoard);
-          setNextColors(makeNextColors());
+          const upcomingColors = makeNextColors();
+          updateRoomState(room.id, {
+            current_task_state: {
+              ...taskState,
+              colorLinesBoard: resolved.board,
+              colorLinesScore: score + resolved.points,
+              colorLinesNextColors: upcomingColors,
+              colorLinesGameOver: resolved.board.every(cell => cell !== null)
+            }
+          });
+          setSelectedIdx(null);
+          return;
         }
-        setBoard(resolved.board);
-        if (resolved.board.every(cell => cell !== null)) setGameOver(true);
+        updateRoomState(room.id, {
+          current_task_state: {
+            ...taskState,
+            colorLinesBoard: resolved.board,
+            colorLinesScore: score + resolved.points,
+            colorLinesNextColors: nextColors.length === 3 ? [...nextColors] : makeNextColors(),
+            colorLinesGameOver: resolved.board.every(cell => cell !== null)
+          }
+        });
         setSelectedIdx(null);
       }
     }
@@ -5406,6 +5440,8 @@ export function MiniGameRenderer({ gameId, mode, room, localPlayer, players, upd
     case 'colorlines':
       gameView = (
         <ColorLinesGame
+          room={room}
+          updateRoomState={safeUpdateRoomState}
           onFinish={(score, detail) => onFinish(score, detail)}
         />
       );
