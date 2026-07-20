@@ -3262,6 +3262,10 @@ export default function App() {
     const usedTasks = currentRoom.current_task_state?.usedTasks || [];
     const taskHistory = currentRoom.current_task_state?.taskHistory || [];
     const enabledCats = currentRoom.current_task_state?.enabledCategories || ["Disney Dagboek", "Pictionary", "Inschattingsvragen", "Dilemma", "Emoji Quiz", "Wie ben ik?", "Feit of Fabel", "Quiz", "Samen"];
+    const isBonusRound = ((currentRoom.round || 0) + 1) % 4 === 0;
+    const automaticBonusChoices = isBonusRound
+      ? Object.fromEntries(currentPlayers.map(player => [player.id, 'normal']))
+      : {};
 
     const activeTasks = DEFAULT_TASKS.filter(t => 
       t.active !== false && 
@@ -3286,7 +3290,13 @@ export default function App() {
     if (recentCategories.filter(category => category === 'Quiz').length >= 2 && eligibleCategories.length > 1) {
       eligibleCategories = eligibleCategories.filter(category => category !== 'Quiz');
     }
-    const selectedCategory = eligibleCategories[Math.floor(Math.random() * eligibleCategories.length)] || eligibleCategories[0];
+    const categoryCounts = Object.fromEntries(enabledCats.map(category => [
+      category,
+      categoryHistory.filter(usedCategory => usedCategory === category).length
+    ]));
+    const lowestCategoryCount = Math.min(...eligibleCategories.map(category => categoryCounts[category] || 0));
+    const balancedCategories = eligibleCategories.filter(category => (categoryCounts[category] || 0) === lowestCategoryCount);
+    const selectedCategory = balancedCategories[Math.floor(Math.random() * balancedCategories.length)] || eligibleCategories[0];
 
     if (selectedCategory === "Quiz") {
       // Direct choice of quiz difficulty
@@ -3297,7 +3307,9 @@ export default function App() {
           categoryHistory: [...categoryHistory, 'Quiz'],
           lastCat: 'Quiz',
           stagePause: false,
-          roundPhase: 'difficulty'
+          roundPhase: 'difficulty',
+          bonusRound: isBonusRound,
+          doubleWishChoices: automaticBonusChoices
         }
       });
       return;
@@ -3373,8 +3385,9 @@ export default function App() {
         genericAwarded: {},
         hintLevel: 1,
         hostReviews: {},
+        bonusRound: isBonusRound,
         roundPhase: 'announcement',
-        doubleWishChoices: {}
+        doubleWishChoices: automaticBonusChoices
       }
     });
   };
@@ -3542,13 +3555,15 @@ export default function App() {
         hintLevel: 1,
         hostReviews: {},
         roundPhase: 'announcement',
-        doubleWishChoices: {}
+        doubleWishChoices: room.current_task_state?.bonusRound
+          ? Object.fromEntries(players.map(player => [player.id, 'normal']))
+          : {}
       }
     });
   };
 
   const getRoundMultiplier = (playerId, state = room?.current_task_state) => (
-    state?.doubleWishChoices?.[playerId] === 'double' ? 2 : 1
+    state?.bonusRound || state?.doubleWishChoices?.[playerId] === 'double' ? 2 : 1
   );
 
   const handleDoubleWishChoice = async (choice) => {
@@ -6737,13 +6752,16 @@ export default function App() {
                             const allPlayersChose = players.length > 0 && players.every(player => wishChoices[player.id]);
                             const canUseWish = !wishUsed[localPlayer?.id];
                             const facilitatorView = isFacilitatorHost();
+                            const bonusRound = !!room.current_task_state?.bonusRound;
                             return (
-                              <div className="round-announcement">
-                                <div className="bigicon" aria-hidden="true">✨</div>
-                                <div className="badge">Volgende ronde</div>
+                              <div className={`round-announcement ${bonusRound ? 'road-bonus-announcement' : ''}`}>
+                                <div className="bigicon" aria-hidden="true">{bonusRound ? '🎆' : '✨'}</div>
+                                <div className="badge">{bonusRound ? 'Disney Parade Bonus' : 'Volgende ronde'}</div>
                                 <h2>{t.cat || t.title}</h2>
-                                <p>{facilitatorView ? 'De spelers kiezen nu of zij hun eenmalige verdubbelaar inzetten.' : 'Iedereen krijgt dezelfde opdracht. Kies nu of je jouw eenmalige verdubbelaar inzet.'}</p>
-                                {facilitatorView ? (
+                                <p>{bonusRound ? 'Verrassing! Deze ronde telt automatisch dubbel voor iedereen. Persoonlijke wensen blijven veilig bewaard.' : facilitatorView ? 'De spelers kiezen nu of zij hun eenmalige verdubbelaar inzetten.' : 'Iedereen krijgt dezelfde opdracht. Kies nu of je jouw eenmalige verdubbelaar inzet.'}</p>
+                                {bonusRound ? (
+                                  <div className="notice green" style={{ marginTop: '14px' }}>🎉 Alle verdiende punten ×2</div>
+                                ) : facilitatorView ? (
                                   <div className="notice" style={{ marginTop: '14px' }}>Spelleiderweergave · je telt niet mee als speler.</div>
                                 ) : !myWishChoice ? (
                                   <div className="btnrow one" style={{ marginTop: '16px' }}>

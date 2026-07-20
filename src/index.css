@@ -67,6 +67,14 @@ button{cursor:pointer}
 .road-portal-hero-mark img{display:block;width:100%;height:100%;object-fit:contain;filter:drop-shadow(0 4px 8px rgba(0,0,0,0.5))}
 .road-home-hero h1{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;font-size:clamp(29px,8vw,40px);font-weight:850;letter-spacing:0;margin:10px 0 12px}
 .road-hostcard{border-color:var(--gold)}
+.round-announcement{text-align:center;padding:18px 10px}
+.road-bonus-announcement{position:relative;overflow:hidden;border-radius:18px;background:radial-gradient(circle at 50% 0%,rgba(255,212,92,.2),transparent 58%),linear-gradient(135deg,rgba(126,61,177,.25),rgba(15,41,86,.2));border:1px solid rgba(255,212,92,.55);animation:roadBonusGlow 1.8s ease-in-out infinite alternate}
+.road-bonus-announcement::before,.road-bonus-announcement::after{content:"✦  ✧  ✦";position:absolute;color:rgba(255,212,92,.8);font-size:22px;letter-spacing:12px;animation:roadBonusFloat 2.4s ease-in-out infinite}
+.road-bonus-announcement::before{left:8px;top:12px}
+.road-bonus-announcement::after{right:2px;bottom:14px;animation-delay:-1.2s}
+@keyframes roadBonusGlow{from{box-shadow:0 0 12px rgba(255,212,92,.12)}to{box-shadow:0 0 28px rgba(255,212,92,.38)}}
+@keyframes roadBonusFloat{0%,100%{transform:translateY(0) rotate(-4deg);opacity:.45}50%{transform:translateY(-8px) rotate(4deg);opacity:1}}
+@media (prefers-reduced-motion:reduce){.road-bonus-announcement,.road-bonus-announcement::before,.road-bonus-announcement::after{animation:none}}
 .portal-destination-hero{
   --destination-accent:var(--gold);
   --destination-glow:rgba(255,212,92,.38);

@@ -6633,4 +6633,57 @@ export const DEFAULT_TASKS = [
   }
 ];
 
+// Hint Quest is bedoeld voor volwassen Disney-kenners. De eerste hint beschrijft
+// daarom een breed archetype, de tweede hint vernauwt het veld en pas de derde
+// bestaande hint bevat de herkenbare doorslaggevende combinatie.
+const ADULT_WHOAMI_HINTS = {
+  'whoami-01': ['Ik opereer vanuit de marge van een koninkrijk en presenteer eigenbelang als hulp aan iemand die zich onbegrepen voelt.', 'Mijn overeenkomsten lijken vrijwillig, maar het onderpand is belangrijker dan wat ik ervoor teruggeef.'],
+  'whoami-02': ['Mijn mogelijkheden lijken vrijwel onbeperkt, terwijl mijn eigen bestaan juist door strenge grenzen wordt bepaald.', 'Ik kan identiteit, omgeving en schaal veranderen, maar mijn belangrijkste wens kan ik niet zelf vervullen.'],
+  'whoami-03': ['Mijn loyaliteit aan mijn gemeenschap botst met mijn nieuwsgierigheid naar mensen die als bedreiging worden gezien.', 'Ik laat mij leiden door natuurtekens en door raad die niet afkomstig is van een mens.'],
+  'whoami-04': ['Ik ben door iemand anders gemaakt en raak gefascineerd door een omgeving die voor mij gevaarlijk zou moeten zijn.', 'Mijn kinderlijke logica gaat samen met losse herinneringen aan de band tussen twee zussen.'],
+  'whoami-05': ['Ik zoek kennis en een ruimer leven dan mijn omgeving voor mij heeft bedacht.', 'Om een ouder te redden lever ik vrijwillig mijn vrijheid in en kom ik terecht bij iemand die door iedereen wordt gevreesd.'],
+  'whoami-06': ['Ik vind dat afkomst en intelligentie mij recht geven op een positie die een ander bezit.', 'Ik gebruik angst en een groep verschoppelingen om een familieconflict in een staatsgreep te veranderen.'],
+  'whoami-07': ['Mijn zelfbeeld is gebaseerd op een functie waarvan ik pas later ontdek dat die niet letterlijk van mij is.', 'Een confrontatie met massaproductie dwingt mij om mijn identiteit opnieuw te begrijpen.'],
+  'whoami-08': ['Mijn obsessie met uiterlijk en bezit maakt levende wezens voor mij tot grondstof.', 'Mijn plan vereist een uitzonderlijk groot aantal dieren met hetzelfde opvallende patroon.'],
+  'whoami-09': ['Ik behoor tot de oudste vaste leden van een beroemde vriendengroep, maar mijn temperament ondermijnt vaak mijn plannen.', 'Mijn familiekring bestaat onder meer uit een partner en drie jonge verwanten die meestal gezamenlijk optreden.'],
+  'whoami-10': ['Mijn culturele betekenis is groter geworden dan de rol die ik in de meeste verhalen speel.', 'Mijn vaste vriendenkring bevat een partner, een hond en twee dieren met zeer verschillende temperamenten.'],
+  'whoami-11': ['Ik groei op buiten de menselijke samenleving en moet kiezen tussen de wereld die mij vormde en die waarin ik geboren ben.', 'Twee beschermers met tegengestelde karakters proberen mij weg te houden van een roofdier dat mensen wantrouwt.'],
+  'whoami-12': ['Mijn maatschappelijke positie wordt mij afgenomen binnen mijn eigen huishouden, maar mijn identiteit blijft intact.', 'Een tijdelijke verandering geeft mij toegang tot een bijeenkomst waar tijd letterlijk mijn grootste tegenstander wordt.'],
+  'whoami-13': ['Ik overtreed de wet vanuit een sterk rechtvaardigheidsgevoel en word daardoor tegelijk gezocht en bewonderd.', 'Mijn tegenstander bestuurt een gemeenschap namens een afwezige machthebber en gebruikt belastingen als wapen.'],
+  'whoami-14': ['Een jeugdtrauma laat mij geloven dat afstand nemen veiliger is dan verantwoordelijkheid aanvaarden.', 'Twee buitenstaanders leren mij een zorgeloze levenshouding, totdat mijn verleden mij opnieuw vindt.'],
+  'whoami-15': ['Een persoonlijke vernedering verandert mijn magische macht in een langdurige wraakactie tegen een hele familie.', 'Mijn vloek bevat zowel een vaste leeftijd als een voorwerp dat in het dagelijks leven onschuldig lijkt.'],
+  'whoami-16': ['Mijn identiteit is volledig opgebouwd rond winnen, totdat stilstand mij dwingt succes anders te definiëren.', 'Een vergeten gemeenschap en een ervaren mentor leren mij dat een trofee niet hetzelfde is als een overwinning.'],
+  'whoami-17': ['Mijn talent botst met wat mijn soort en de menselijke wereld van mij verwachten.', 'Ik werk in het geheim via iemand anders, omdat mijn eigen aanwezigheid op de werkplek onacceptabel zou zijn.'],
+  'whoami-18': ['Mijn lage maatschappelijke status dwingt mij tot kleine overtredingen, terwijl ik verlang naar erkenning om wie ik werkelijk ben.', 'Een verboden voorwerp geeft mij toegang tot macht, maar verleidt mij ook om een nieuwe identiteit te construeren.'],
+  'whoami-19': ['Mijn droom vraagt geen magie maar uitzonderlijke discipline, waardoor ik romantiek aanvankelijk als afleiding beschouw.', 'Een zakelijke ambitie, een familiebelofte en een onverwachte gedaanteverwisseling raken met elkaar verweven.'],
+  'whoami-20': ['Mijn kennis van de buitenwereld komt lange tijd uitsluitend uit observatie, verbeelding en verhalen.', 'Iets dat jaarlijks aan de hemel verschijnt is voor mij belangrijker dan de waarschuwingen van mijn opvoeder.'],
+  'whoami-21': ['Ik handel impulsief vanuit een groot verlangen naar verbinding en interpreteer aandacht daardoor te snel als vertrouwen.', 'Mijn poging om een familieruzie te herstellen voert mij samen met een buitenstaander door een gevaarlijk winterlandschap.'],
+  'whoami-22': ['Mijn reputatie is veel groter dan mijn bereidheid om verantwoordelijkheid te nemen voor de gevolgen van mijn daden.', 'De tekens op mijn lichaam vertellen prestaties, maar verbergen aanvankelijk één beslissende fout.'],
+  'whoami-23': ['Ik behandel gastvrijheid als een voorstelling en blijf optimistisch terwijl mijn toekomst letterlijk aftelt.', 'Mijn houding tegenover een onverwachte gast staat haaks op die van mijn nauwgezette collega.'],
+  'whoami-24': ['Ik probeer orde te bewaren in een huishouden waar bovennatuurlijke omstandigheden elke routine hebben veranderd.', 'Ik wantrouw een onverwachte gast en bots daardoor voortdurend met een veel uitbundiger collega.'],
+  'whoami-25': ['Mijn zorgzame aard maakt mij tot een stabiele ouderfiguur binnen een huishouden dat zijn menselijke vorm is kwijtgeraakt.', 'Mijn jonge familielid is nieuwsgieriger naar de gevangene dan ik verstandig vind.'],
+  'whoami-26': ['Bewondering uit mijn omgeving heeft mij ervan overtuigd dat verlangen hetzelfde is als recht hebben op iemand.', 'Wanneer charme niet werkt, gebruik ik de angst van een gemeenschap voor een onbekend wezen.'],
+  'whoami-27': ['Mijn officiële positie biedt voorrechten maar weinig zeggenschap over mijn eigen toekomst.', 'Ik verlaat incognito een beschermde omgeving en ontmoet iemand die zich later juist als hooggeplaatst voordoet.'],
+  'whoami-28': ['Ik neem een verboden identiteit aan om een familielid te beschermen en moet vervolgens presteren binnen een systeem dat mij uitsluit.', 'Mijn succes hangt af van strategie en doorzettingsvermogen, niet van de fysieke norm waaraan men mij meet.'],
+  'whoami-29': ['Mijn verhalen over mijzelf zijn zelden volledig betrouwbaar, maar mijn improvisatievermogen redt mij uit de gevolgen.', 'Mijn vrijheid is verbonden aan zowel een bijzonder kompas als een schip dat anderen eveneens opeisen.'],
+  'whoami-30': ['Een beperking in mijn geheugen verhindert niet dat ik uitzonderlijk loyaal blijf aan een doel dat ik onderweg telkens opnieuw moet begrijpen.', 'Een korte boodschap uit mijn verleden blijkt belangrijker voor mijn identiteit dan ik aanvankelijk besef.'],
+  'whoami-31': ['Angst na eerder verlies maakt mij overbeschermend tegenover het enige familielid dat mij nog rest.', 'Tijdens een lange zoektocht moet ik leren vertrouwen op een metgezel die informatie niet goed kan vasthouden.'],
+  'whoami-32': ['De bezorgdheid van mijn ouder botst met mijn behoefte om te bewijzen dat een lichamelijk verschil mij niet definieert.', 'Een impulsieve daad brengt mij terecht in een menselijke omgeving waar ontsnappen alleen samen lukt.'],
+  'whoami-33': ['Ik voer mijn taak uit lang nadat de maatschappij die mij ontwierp verdwenen is.', 'Mijn verzameling alledaagse voorwerpen wekt nieuwsgierigheid, maar een onverwachte bezoeker geeft mij voor het eerst een nieuw doel.'],
+  'whoami-34': ['Ik arriveer met een strikt geprogrammeerde opdracht en beschouw emotionele afleiding aanvankelijk als storing.', 'Mijn zoektocht richt zich op één teken dat een verlaten wereld opnieuw leefbaar kan zijn.'],
+  'whoami-35': ['Mijn enthousiasme voor een officieel systeem is groter dan mijn praktische ervaring ermee.', 'Voor mijn laatste onderscheiding heb ik hulp nodig van iemand die juist aan ieder sociaal contact probeert te ontsnappen.'],
+  'whoami-36': ['Mijn openheid en loyaliteit zijn mede het gevolg van technologie, zonder dat ik dat zelf begrijp.', 'Ik kan menselijke gedachten kortstondig uitspreken, maar word telkens afgeleid door één terugkerende prikkel.'],
+  'whoami-37': ['Mijn beroep vraagt dat ik angst oproep, terwijl mijn ware aard veel zorgzamer is dan mijn uiterlijk suggereert.', 'Een verboden vriendschap verandert mijn begrip van wat de energiebron van mijn samenleving kan zijn.'],
+  'whoami-38': ['Mijn talent om onopgemerkt te blijven voedt een rivaliteit waarin status belangrijker wordt dan veiligheid.', 'Ik saboteer een collega door samen te werken met een leidinggevende die vasthoudt aan een achterhaald systeem.'],
+  'whoami-39': ['Een afgedwongen gewoon leven botst met mijn behoefte om mijn uitzonderlijke vermogen zinvol te gebruiken.', 'Mijn wens om weer actief te worden brengt mijn gezin in gevaar, waarna juist samenwerking de oplossing wordt.'],
+  'whoami-40': ['Ik combineer gezinsverantwoordelijkheid met een professionele identiteit die ik lange tijd verborgen moet houden.', 'Mijn vermogen maakt infiltratie en redding mogelijk, maar in mijn gezin is flexibiliteit vooral figuurlijk nodig.']
+};
+
+DEFAULT_TASKS.forEach(task => {
+  const adultHints = ADULT_WHOAMI_HINTS[task.id];
+  if (!adultHints) return;
+  task.hint1 = adultHints[0];
+  task.hint2 = adultHints[1];
+});
+
 export const PRONUNCIATION_MAP = [];
