@@ -1284,6 +1284,7 @@ export default function App() {
   });
   const [logPopupOpen, setLogPopupOpen] = useState(false);
   const [logProfileName, setLogProfileName] = useState('');
+  const [openLedgerSection, setOpenLedgerSection] = useState(null);
   const [selectedPortalGame, setSelectedPortalGame] = useState(null);
   const [showPortalShop, setShowPortalShop] = useState(false);
   const [playerNameInput, setPlayerNameInput] = useState(() => localStorage.getItem(ACTIVE_PROFILE_KEY) || localStorage.getItem('disney_player_name') || '');
@@ -1911,7 +1912,7 @@ export default function App() {
         coco_badge_market: badgeMarket,
         coco_captains_log: captainsLogs,
         coco_game_history: soloHistory,
-        coco_profile_store_version: 6,
+        coco_profile_store_version: 7,
         updated_at: new Date().toISOString()
       };
 
@@ -1982,7 +1983,28 @@ export default function App() {
           }
         }
         const mergedBadgeAchievements = mergeBadgeAchievements(remoteState.coco_badge_achievements, badgeAchievements);
-        const mergedCaptainsLogs = mergeCaptainsLogs(remoteState.coco_captains_log, captainsLogs);
+        let mergedCaptainsLogs = mergeCaptainsLogs(remoteState.coco_captains_log, captainsLogs);
+        const profileStoreVersion = Number(remoteState.coco_profile_store_version) || 0;
+        if (profileStoreVersion < 7) {
+          const ledgerStartedAt = new Date().toISOString();
+          mergedProfiles.forEach(profileName => {
+            const matchingLogName = Object.keys(mergedCaptainsLogs).find(name => getCollectorKey(name) === getCollectorKey(profileName)) || profileName;
+            const existingEntries = mergedCaptainsLogs[matchingLogName] || [];
+            if (existingEntries.some(entry => entry.ledgerOpening)) return;
+            const openingBalance = Number(mergedBank[getCollectorKey(profileName)]) || 0;
+            mergedCaptainsLogs = {
+              ...mergedCaptainsLogs,
+              [matchingLogName]: [...existingEntries, {
+                timestamp: ledgerStartedAt,
+                amount: openingBalance,
+                type: 'earn',
+                description: 'Saldo voor mutaties',
+                balanceAfter: openingBalance,
+                ledgerOpening: true
+              }]
+            };
+          });
+        }
         const mergedGameHistory = mergeGameHistory(remoteState.coco_game_history, soloHistory);
         const remoteMarket = remoteState.coco_badge_market;
         const mergedBadgeMarket = remoteMarket?.hour === getMarketHour() && Array.isArray(remoteMarket.offers) && remoteMarket.offers.length === 3
@@ -2001,7 +2023,7 @@ export default function App() {
           coco_badge_market: mergedBadgeMarket,
           coco_captains_log: mergedCaptainsLogs,
           coco_game_history: mergedGameHistory,
-          coco_profile_store_version: 6,
+          coco_profile_store_version: 7,
           updated_at: new Date().toISOString()
         };
 
@@ -2065,7 +2087,7 @@ export default function App() {
             coco_badge_market: badgeMarket,
             coco_captains_log: captainsLogs,
             coco_game_history: soloHistory,
-            coco_profile_store_version: 6,
+            coco_profile_store_version: 7,
             updated_at: new Date().toISOString()
           }
         })
@@ -2575,7 +2597,7 @@ export default function App() {
           coco_badge_market: badgeMarket,
           coco_captains_log: persistedCaptainsLogs,
           coco_game_history: persistedGameHistory,
-          coco_profile_store_version: 6,
+          coco_profile_store_version: 7,
           updated_at: new Date().toISOString()
         }
       }).eq('id', cocoProfileStoreIdRef.current);
@@ -4750,6 +4772,7 @@ export default function App() {
     if (requestedAction === 'coin') openCoinViewer();
     if (requestedAction === 'log') {
       setLogProfileName(activeProfileName);
+      setOpenLedgerSection(null);
       setLogPopupOpen(true);
     }
     params.delete(requestedAction);
@@ -4787,6 +4810,7 @@ export default function App() {
               className="global-profile-segment global-log-anchor"
               onClick={() => {
                 setLogProfileName(activeProfileName);
+                setOpenLedgerSection(null);
                 setLogPopupOpen(true);
               }}
               aria-label="Open Captain's Log"
@@ -5455,24 +5479,12 @@ export default function App() {
               {(() => {
                 const rawEntries = getOrGenerateCaptainsLog(logProfileName);
                 const profileKey = getCollectorKey(logProfileName);
-                const currentBalance = Number(starBank[profileKey]) || 0;
-                const signedMutationAmount = entry => (
-                  entry.type === 'spend' || Number(entry.amount) < 0
-                    ? -Math.abs(Number(entry.amount) || 0)
-                    : Math.abs(Number(entry.amount) || 0)
-                );
-                const recordedBalance = rawEntries.reduce((sum, entry) => sum + signedMutationAmount(entry), 0);
-                const missingMutation = currentBalance - recordedBalance;
-                const entries = Math.abs(missingMutation) > 0.0001 ? [...rawEntries, {
-                  timestamp: new Date().toISOString(),
-                  amount: missingMutation,
-                  type: missingMutation < 0 ? 'spend' : 'earn',
-                  description: missingMutation < 0
-                    ? 'Historische uitgave (saldo-synchronisatie)'
-                    : 'Historische opbrengst (saldo-synchronisatie)',
-                  balanceAfter: currentBalance,
-                  synthetic: true
-                }] : rawEntries;
+                const ledgerOpening = rawEntries.find(entry => entry.ledgerOpening);
+                const ledgerStartedAt = ledgerOpening ? new Date(ledgerOpening.timestamp || 0).getTime() : null;
+                const entries = ledgerOpening ? [
+                  ledgerOpening,
+                  ...rawEntries.filter(entry => !entry.ledgerOpening && new Date(entry.timestamp || 0).getTime() > ledgerStartedAt)
+                ] : rawEntries;
                 const storedGames = soloHistory.filter(item => {
                   if (item.profileKey) return item.profileKey === profileKey;
                   if (item.profileName) return getCollectorKey(item.profileName) === profileKey;
@@ -5538,14 +5550,14 @@ export default function App() {
                 const totalWins = gameResults.filter(item => item.result === 'win').length;
                 const totalDraws = gameResults.filter(item => item.result === 'draw').length;
                 const totalLosses = gameResults.filter(item => item.result === 'loss').length;
-                const earned = entries.filter(entry => entry.type === 'earn' && Number(entry.amount) > 0);
+                const earned = entries.filter(entry => entry.type === 'earn' && (entry.ledgerOpening || Number(entry.amount) > 0));
                 const spent = entries.filter(entry => entry.type === 'spend' || Number(entry.amount) < 0);
                 const earnedTotal = earned.reduce((sum, entry) => sum + Math.abs(Number(entry.amount) || 0), 0);
                 const spentTotal = spent.reduce((sum, entry) => sum + Math.abs(Number(entry.amount) || 0), 0);
                 const renderMutations = list => list.length ? [...list].reverse().map((entry, idx) => (
                   <div key={`${entry.timestamp}-${idx}`} className="dashboard-mutation">
-                    <span><strong>{entry.description}</strong><small>{entry.synthetic ? 'Automatisch afgestemd op het huidige saldo' : new Date(entry.timestamp).toLocaleString('nl-NL')}</small></span>
-                    <b className={Number(entry.amount) >= 0 ? 'earn' : 'spend'}>{Number(entry.amount) >= 0 ? '+' : '−'}{Math.abs(Number(entry.amount) || 0)}</b>
+                    <span><strong>{entry.description}</strong><small>{entry.ledgerOpening ? 'Beginstand van het nieuwe mutatieoverzicht' : new Date(entry.timestamp).toLocaleString('nl-NL')}</small></span>
+                    <b className={entry.type === 'spend' || Number(entry.amount) < 0 ? 'spend' : 'earn'}>{entry.type === 'spend' || Number(entry.amount) < 0 ? '−' : '+'}{Math.abs(Number(entry.amount) || 0)}</b>
                   </div>
                 )) : <p className="small">Nog geen mutaties.</p>;
                 return (
@@ -5561,9 +5573,18 @@ export default function App() {
                       <div key={game.name}><strong>{game.name}</strong><span>{game.played}× gespeeld</span><small>{game.win} gewonnen · {game.draw} gelijk · {game.loss} verloren</small></div>
                     ))}</div> : <p className="small">Nog geen spellen geregistreerd voor dit profiel.</p>}
                     <h3>Coco Coins</h3>
-                    <details className="dashboard-ledger"><summary><span>Verdiende coins</span><strong>+{earnedTotal}</strong></summary><div className="dashboard-ledger-list">{renderMutations(earned)}</div></details>
-                    <details className="dashboard-ledger"><summary><span>Uitgegeven coins</span><strong>−{spentTotal}</strong></summary><div className="dashboard-ledger-list">{renderMutations(spent)}</div></details>
-                    <div className="dashboard-balance"><span>Huidig saldo<small>{earnedTotal} − {spentTotal} = {currentBalance}</small></span><strong>{currentBalance} <CocoCoinIcon size={22} /></strong></div>
+                    <section className={`dashboard-ledger ${openLedgerSection === 'earned' ? 'is-open' : ''}`}>
+                      <button type="button" className="dashboard-ledger-summary" aria-expanded={openLedgerSection === 'earned'} onClick={() => setOpenLedgerSection(current => current === 'earned' ? null : 'earned')}>
+                        <span>Verdiende coins</span><strong>+{earnedTotal}<span aria-hidden="true">⌄</span></strong>
+                      </button>
+                      {openLedgerSection === 'earned' && <div className="dashboard-ledger-list">{renderMutations(earned)}</div>}
+                    </section>
+                    <section className={`dashboard-ledger ${openLedgerSection === 'spent' ? 'is-open' : ''}`}>
+                      <button type="button" className="dashboard-ledger-summary" aria-expanded={openLedgerSection === 'spent'} onClick={() => setOpenLedgerSection(current => current === 'spent' ? null : 'spent')}>
+                        <span>Uitgegeven coins</span><strong>−{spentTotal}<span aria-hidden="true">⌄</span></strong>
+                      </button>
+                      {openLedgerSection === 'spent' && <div className="dashboard-ledger-list">{renderMutations(spent)}</div>}
+                    </section>
                   </>
                 );
               })()}
