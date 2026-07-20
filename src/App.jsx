@@ -3037,13 +3037,13 @@ export default function App() {
   }, [activeProfileName]);
 
   useEffect(() => {
-    if (activeProfileName && themeMode === 'night') {
-      document.body.classList.add('night-theme');
-    } else {
-      document.body.classList.remove('night-theme');
-    }
+    document.body.classList.toggle('night-theme', Boolean(activeProfileName) && themeMode === 'night');
+    document.body.classList.toggle('day-theme', Boolean(activeProfileName) && themeMode === 'day');
+    const themeMeta = document.querySelector('meta[name="theme-color"]');
+    if (themeMeta) themeMeta.setAttribute('content', !activeProfileName ? '#08162f' : themeMode === 'night' ? '#030713' : '#277bc0');
     return () => {
       document.body.classList.remove('night-theme');
+      document.body.classList.remove('day-theme');
     };
   }, [themeMode, activeProfileName]);
 
@@ -5011,42 +5011,6 @@ export default function App() {
     <div className="app">
       {/* 3D Styles Injection */}
       <style>{`
-        .star-bg {
-          position: fixed;
-          top: 0;
-          left: 0;
-          width: 100vw;
-          height: 100vh;
-          z-index: 1;
-          pointer-events: none;
-          background: transparent;
-          overflow: hidden;
-        }
-        .star {
-          position: absolute;
-          width: 2px;
-          height: 2px;
-          background: white;
-          border-radius: 50%;
-          opacity: 0.8;
-          animation: twinkle 2s infinite ease-in-out;
-        }
-        @keyframes twinkle {
-          0%, 100% { opacity: 0.3; }
-          50% { opacity: 1; transform: scale(1.3); }
-        }
-        .shooting-star {
-          position: absolute;
-          width: 80px;
-          height: 1.5px;
-          background: linear-gradient(90deg, white, transparent);
-          animation: shoot 5s infinite linear;
-          opacity: 0;
-        }
-        @keyframes shoot {
-          0% { transform: translate(-100px, -100px) rotate(35deg); opacity: 1; }
-          15%, 100% { transform: translate(500px, 500px) rotate(35deg); opacity: 0; }
-        }
         .road-progress-container {
           background: rgba(21, 49, 95, 0.45);
           border: 1px solid #31517e;
@@ -5241,23 +5205,35 @@ export default function App() {
         }
       `}</style>
 
-      {/* Render Night theme animated stars overlays */}
-      {activeProfileName && themeMode === 'night' && (
-        <div className="star-bg">
-          {Array.from({ length: 15 }).map((_, i) => (
-            <div 
-              key={i} 
-              className="star" 
-              style={{
-                top: `${Math.random() * 100}%`,
-                left: `${Math.random() * 100}%`,
-                animationDelay: `${Math.random() * 2}s`,
-                animationDuration: `${1.5 + Math.random() * 2.5}s`
-              }}
-            ></div>
-          ))}
-          <div className="shooting-star" style={{ top: '20%', left: '10%' }}></div>
-          <div className="shooting-star" style={{ top: '60%', left: '40%', animationDelay: '3s' }}></div>
+      {/* A shared atmosphere makes day and night visually distinct on every route. */}
+      {activeProfileName && (
+        <div className={`theme-atmosphere theme-atmosphere-${themeMode}`} aria-hidden="true">
+          {themeMode === 'night' ? (
+            <>
+              <div className="theme-moon"></div>
+              {Array.from({ length: 28 }).map((_, i) => (
+                <i
+                  key={i}
+                  className="theme-star"
+                  style={{
+                    top: `${(i * 37 + 7) % 88}%`,
+                    left: `${(i * 61 + 13) % 97}%`,
+                    animationDelay: `${(i % 7) * -0.37}s`,
+                    animationDuration: `${1.8 + (i % 5) * 0.45}s`
+                  }}
+                />
+              ))}
+              <i className="theme-shooting-star theme-shooting-star-one"></i>
+              <i className="theme-shooting-star theme-shooting-star-two"></i>
+            </>
+          ) : (
+            <>
+              <div className="theme-sun"></div>
+              <i className="theme-cloud theme-cloud-one"></i>
+              <i className="theme-cloud theme-cloud-two"></i>
+              <i className="theme-cloud theme-cloud-three"></i>
+            </>
+          )}
         </div>
       )}
 
