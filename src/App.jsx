@@ -1364,6 +1364,7 @@ export default function App() {
 
   // Solo mode states and history
   const [soloHistory, setSoloHistory] = useState(() => JSON.parse(localStorage.getItem('disney_solo_history') || '[]'));
+  const [captainsLogs, setCaptainsLogs] = useState(() => readJsonStorage('disney_captains_log', {}));
   const soloLoggedRef = useRef(false);
 
   // Arcade Arena states
@@ -1866,6 +1867,37 @@ export default function App() {
       return merged;
     };
 
+    const mergeEventLists = (remoteList = [], localList = [], signature, newestFirst = false) => {
+      const seen = new Set();
+      const merged = [...remoteList, ...localList]
+        .filter(item => {
+          const key = signature(item);
+          if (!key || seen.has(key)) return false;
+          seen.add(key);
+          return true;
+        })
+        .sort((a, b) => {
+          const difference = new Date(a.date || a.timestamp || 0) - new Date(b.date || b.timestamp || 0);
+          return newestFirst ? -difference : difference;
+        });
+      return newestFirst ? merged.slice(0, 1500) : merged.slice(-1500);
+    };
+
+    const mergeCaptainsLogs = (remoteLogs = {}, localLogs = {}) => {
+      const profileNames = new Set([...Object.keys(remoteLogs || {}), ...Object.keys(localLogs || {})]);
+      return Object.fromEntries([...profileNames].map(profileName => [
+        profileName,
+        mergeEventLists(remoteLogs?.[profileName], localLogs?.[profileName], entry => [entry?.timestamp, entry?.amount, entry?.type, entry?.description].join('|'))
+      ]));
+    };
+
+    const mergeGameHistory = (remoteHistory = [], localHistory = []) => mergeEventLists(
+      remoteHistory,
+      localHistory,
+      item => [item?.date, item?.profileKey || item?.profileName, item?.gameType, item?.score, item?.details].join('|'),
+      true
+    );
+
     const loadSharedProfiles = async () => {
       const localProfiles = uniqueProfileNames(cocoProfiles);
       const localState = {
@@ -1879,7 +1911,9 @@ export default function App() {
         coco_badge_achievements: badgeAchievements,
         coco_badge_showcase_seed_version: badgeShowcaseSeedVersion,
         coco_badge_market: badgeMarket,
-        coco_profile_store_version: 5,
+        coco_captains_log: captainsLogs,
+        coco_game_history: soloHistory,
+        coco_profile_store_version: 6,
         updated_at: new Date().toISOString()
       };
 
@@ -1950,6 +1984,8 @@ export default function App() {
           }
         }
         const mergedBadgeAchievements = mergeBadgeAchievements(remoteState.coco_badge_achievements, badgeAchievements);
+        const mergedCaptainsLogs = mergeCaptainsLogs(remoteState.coco_captains_log, captainsLogs);
+        const mergedGameHistory = mergeGameHistory(remoteState.coco_game_history, soloHistory);
         const remoteMarket = remoteState.coco_badge_market;
         const mergedBadgeMarket = remoteMarket?.hour === getMarketHour() && Array.isArray(remoteMarket.offers) && remoteMarket.offers.length === 3
           ? remoteMarket
@@ -1965,7 +2001,9 @@ export default function App() {
           coco_badge_achievements: mergedBadgeAchievements,
           coco_badge_showcase_seed_version: mergedBadgeShowcaseSeedVersion,
           coco_badge_market: mergedBadgeMarket,
-          coco_profile_store_version: 5,
+          coco_captains_log: mergedCaptainsLogs,
+          coco_game_history: mergedGameHistory,
+          coco_profile_store_version: 6,
           updated_at: new Date().toISOString()
         };
 
@@ -1981,6 +2019,8 @@ export default function App() {
           setBadgeAchievements(mergedBadgeAchievements);
           setBadgeShowcaseSeedVersion(mergedBadgeShowcaseSeedVersion);
           setBadgeMarket(mergedBadgeMarket);
+          setCaptainsLogs(mergedCaptainsLogs);
+          setSoloHistory(mergedGameHistory);
           localStorage.setItem(COCO_PROFILES_KEY, JSON.stringify(mergedProfiles));
           localStorage.setItem(PROFILE_PREFERENCES_KEY, JSON.stringify(mergedProfilePreferences));
           localStorage.setItem(COCO_BANK_KEY, JSON.stringify(mergedBank));
@@ -1989,6 +2029,8 @@ export default function App() {
           localStorage.setItem(BADGE_COLLECTION_KEY, JSON.stringify(mergedBadgeCollections));
           localStorage.setItem(BADGE_ACHIEVEMENT_KEY, JSON.stringify(mergedBadgeAchievements));
           localStorage.setItem(BADGE_MARKET_KEY, JSON.stringify(mergedBadgeMarket));
+          localStorage.setItem('disney_captains_log', JSON.stringify(mergedCaptainsLogs));
+          localStorage.setItem('disney_solo_history', JSON.stringify(mergedGameHistory));
         }
 
         if (store?.id) {
@@ -2023,7 +2065,9 @@ export default function App() {
             coco_badge_achievements: badgeAchievements,
             coco_badge_showcase_seed_version: badgeShowcaseSeedVersion,
             coco_badge_market: badgeMarket,
-            coco_profile_store_version: 5,
+            coco_captains_log: captainsLogs,
+            coco_game_history: soloHistory,
+            coco_profile_store_version: 6,
             updated_at: new Date().toISOString()
           }
         })
@@ -2034,7 +2078,7 @@ export default function App() {
     }, 250);
 
     return () => window.clearTimeout(timeoutId);
-  }, [badgeAchievements, badgeCollections, badgeMarket, badgeShowcaseSeedVersion, cocoProfiles, cocoProfilesReady, collections, exclusiveClaims, profilePreferences, profileRewardReceipts, starBank]);
+  }, [badgeAchievements, badgeCollections, badgeMarket, badgeShowcaseSeedVersion, captainsLogs, cocoProfiles, cocoProfilesReady, collections, exclusiveClaims, profilePreferences, profileRewardReceipts, soloHistory, starBank]);
 
   useEffect(() => {
     const updateMarketClock = () => {
@@ -2116,18 +2160,20 @@ export default function App() {
   }, [cocoProfiles]);
 
   const logCaptainMutation = (profileName, amount, type, description, balanceAfter) => {
-    const logs = JSON.parse(localStorage.getItem('disney_captains_log') || '{}');
-    if (!logs[profileName]) logs[profileName] = [];
-    
-    logs[profileName].push({
+    const currentLogs = readJsonStorage('disney_captains_log', {});
+    const nextEntry = {
       timestamp: new Date().toISOString(),
       amount,
       type,
       description,
       balanceAfter
-    });
-    
+    };
+    const logs = {
+      ...currentLogs,
+      [profileName]: [...(currentLogs[profileName] || []), nextEntry]
+    };
     localStorage.setItem('disney_captains_log', JSON.stringify(logs));
+    setCaptainsLogs(logs);
   };
 
   const getOrGenerateCaptainsLog = (profileName) => {
@@ -2249,6 +2295,7 @@ export default function App() {
     if (finalEntries.length > 0) {
       logs[profileName] = finalEntries;
       localStorage.setItem('disney_captains_log', JSON.stringify(logs));
+      window.setTimeout(() => setCaptainsLogs(logs), 0);
     }
 
     return finalEntries;
@@ -2418,6 +2465,8 @@ export default function App() {
     let persistedBadgeCollections = badgeCollections;
     let persistedBadgeAchievements = badgeAchievements;
     let persistedPreferences = profilePreferences;
+    let persistedCaptainsLogs = captainsLogs;
+    let persistedGameHistory = soloHistory;
 
     if (oldKey !== newKey) {
       const nextBank = { ...starBank };
@@ -2454,18 +2503,31 @@ export default function App() {
       };
       delete nextPreferences[oldKey];
 
+      const nextCaptainsLogs = { ...captainsLogs };
+      nextCaptainsLogs[nextName] = [...(nextCaptainsLogs[nextName] || []), ...(nextCaptainsLogs[currentName] || [])];
+      delete nextCaptainsLogs[currentName];
+
+      const nextGameHistory = soloHistory.map(item => {
+        const belongsToRenamedProfile = item.profileKey === oldKey || getCollectorKey(item.profileName || '') === oldKey;
+        return belongsToRenamedProfile ? { ...item, profileName: nextName, profileKey: newKey } : item;
+      });
+
       setStarBank(nextBank);
       setCollections(nextCollections);
       setExclusiveClaims(nextClaims);
       setBadgeCollections(nextBadgeCollections);
       setBadgeAchievements(nextBadgeAchievements);
       setProfilePreferences(nextPreferences);
+      setCaptainsLogs(nextCaptainsLogs);
+      setSoloHistory(nextGameHistory);
       localStorage.setItem(COCO_BANK_KEY, JSON.stringify(nextBank));
       localStorage.setItem('disney_collections', JSON.stringify(nextCollections));
       localStorage.setItem('disney_exclusive_claims', JSON.stringify(nextClaims));
       localStorage.setItem(BADGE_COLLECTION_KEY, JSON.stringify(nextBadgeCollections));
       localStorage.setItem(BADGE_ACHIEVEMENT_KEY, JSON.stringify(nextBadgeAchievements));
       localStorage.setItem(PROFILE_PREFERENCES_KEY, JSON.stringify(nextPreferences));
+      localStorage.setItem('disney_captains_log', JSON.stringify(nextCaptainsLogs));
+      localStorage.setItem('disney_solo_history', JSON.stringify(nextGameHistory));
 
       persistedBank = nextBank;
       persistedCollections = nextCollections;
@@ -2473,6 +2535,8 @@ export default function App() {
       persistedBadgeCollections = nextBadgeCollections;
       persistedBadgeAchievements = nextBadgeAchievements;
       persistedPreferences = nextPreferences;
+      persistedCaptainsLogs = nextCaptainsLogs;
+      persistedGameHistory = nextGameHistory;
     }
 
     setShopPlayerName(nextName);
@@ -2499,7 +2563,9 @@ export default function App() {
           coco_badge_achievements: persistedBadgeAchievements,
           coco_badge_showcase_seed_version: badgeShowcaseSeedVersion,
           coco_badge_market: badgeMarket,
-          coco_profile_store_version: 5,
+          coco_captains_log: persistedCaptainsLogs,
+          coco_game_history: persistedGameHistory,
+          coco_profile_store_version: 6,
           updated_at: new Date().toISOString()
         }
       }).eq('id', cocoProfileStoreIdRef.current);
@@ -2561,6 +2627,8 @@ export default function App() {
     const nextBadgeCollections = { ...badgeCollections };
     const nextBadgeAchievements = { ...badgeAchievements };
     const nextPreferences = { ...profilePreferences };
+    const nextCaptainsLogs = Object.fromEntries(Object.entries(captainsLogs).filter(([profileName]) => getCollectorKey(profileName) !== currentKey));
+    const nextGameHistory = soloHistory.filter(item => (item.profileKey || getCollectorKey(item.profileName || '')) !== currentKey);
     delete nextBank[currentKey];
     delete nextCollections[currentKey];
     delete nextBadgeCollections[currentKey];
@@ -2577,6 +2645,8 @@ export default function App() {
     setBadgeCollections(nextBadgeCollections);
     setBadgeAchievements(nextBadgeAchievements);
     setProfilePreferences(nextPreferences);
+    setCaptainsLogs(nextCaptainsLogs);
+    setSoloHistory(nextGameHistory);
     setShopPlayerName(nextName);
     setActiveProfileName(keepProfileChooserOpen ? '' : nextName);
     setPlayerNameInput(nextName);
@@ -2587,6 +2657,8 @@ export default function App() {
     localStorage.setItem(BADGE_COLLECTION_KEY, JSON.stringify(nextBadgeCollections));
     localStorage.setItem(BADGE_ACHIEVEMENT_KEY, JSON.stringify(nextBadgeAchievements));
     localStorage.setItem(PROFILE_PREFERENCES_KEY, JSON.stringify(nextPreferences));
+    localStorage.setItem('disney_captains_log', JSON.stringify(nextCaptainsLogs));
+    localStorage.setItem('disney_solo_history', JSON.stringify(nextGameHistory));
     if (keepProfileChooserOpen) {
       localStorage.removeItem(ACTIVE_PROFILE_KEY);
       localStorage.removeItem('disney_player_name');
@@ -5336,17 +5408,30 @@ export default function App() {
               {(() => {
                 const entries = getOrGenerateCaptainsLog(logProfileName);
                 const profileKey = getCollectorKey(logProfileName);
-                const games = soloHistory.filter(item => !item.profileKey || item.profileKey === profileKey);
-                const groupedGames = Object.values(games.reduce((groups, item) => {
-                  const gameName = item.gameType || 'Onbekend spel';
+                const games = soloHistory.filter(item => {
+                  if (item.profileKey) return item.profileKey === profileKey;
+                  if (item.profileName) return getCollectorKey(item.profileName) === profileKey;
+                  return false;
+                });
+                const classifyResult = item => {
                   const text = `${item.details || ''}`.toLowerCase();
-                  const result = /gelijk|draw/.test(text) ? 'draw' : /verloren|verlies|niet gekraakt|niet opgelost/.test(text) ? 'loss' : Number(item.score) > 0 || /gewonnen|winst|opgelost|gekraakt/.test(text) ? 'win' : 'played';
+                  if (/gelijk|draw/.test(text)) return 'draw';
+                  if (/verloren|verlies|niet gekraakt|niet opgelost|overgeslagen|plaats\s+[2-9]/.test(text)) return 'loss';
+                  if (/gewonnen|winst|wint|opgelost|gekraakt|plaats\s+1/.test(text)) return 'win';
+                  return Number(item.score) > 0 ? 'win' : 'loss';
+                };
+                const gameResults = games.map(item => ({ ...item, result: classifyResult(item) }));
+                const groupedGames = Object.values(gameResults.reduce((groups, item) => {
+                  const gameName = item.gameType || 'Onbekend spel';
                   const current = groups[gameName] || { name: gameName, played: 0, win: 0, draw: 0, loss: 0 };
                   current.played += 1;
-                  if (result !== 'played') current[result] += 1;
+                  current[item.result] += 1;
                   groups[gameName] = current;
                   return groups;
                 }, {}));
+                const totalWins = gameResults.filter(item => item.result === 'win').length;
+                const totalDraws = gameResults.filter(item => item.result === 'draw').length;
+                const totalLosses = gameResults.filter(item => item.result === 'loss').length;
                 const earned = entries.filter(entry => entry.type === 'earn' && Number(entry.amount) > 0);
                 const spent = entries.filter(entry => entry.type === 'spend' || Number(entry.amount) < 0);
                 const renderMutations = list => list.length ? [...list].reverse().map((entry, idx) => (
@@ -5359,8 +5444,9 @@ export default function App() {
                   <>
                     <div className="dashboard-summary">
                       <div><strong>{games.length}</strong><span>gespeeld</span></div>
-                      <div><strong>{games.filter(item => Number(item.score) > 0).length}</strong><span>succesvol</span></div>
-                      <div><strong>{starBank[profileKey] || 0}</strong><span>Coco Coins</span></div>
+                      <div><strong>{totalWins}</strong><span>gewonnen</span></div>
+                      <div><strong>{totalDraws}</strong><span>gelijk</span></div>
+                      <div><strong>{totalLosses}</strong><span>verloren</span></div>
                     </div>
                     <h3>Gespeelde spellen</h3>
                     {groupedGames.length ? <div className="dashboard-games">{groupedGames.map(game => (
@@ -5657,8 +5743,8 @@ export default function App() {
                     e.stopPropagation();
                     if (selectedPortalGame === 'music_match') {
                       window.location.href = room?.code
-                        ? `./music/index.html?room=${room.code}&v=76`
-                        : './music/index.html?v=76';
+                        ? `./music/index.html?room=${room.code}&v=77`
+                        : './music/index.html?v=77';
                     } else {
                       setSelectedPortalGame('music_match');
                     }
