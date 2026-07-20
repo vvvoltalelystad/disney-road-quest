@@ -192,7 +192,7 @@ with new_songs (song_number,label,title,film,year,artist,spotify_url,enabled,que
   (296, 'Song 296', '1 True Love', 'Turning Red', 2022, '4*TOWN', 'https://open.spotify.com/track/2dJ1UJEQQq3jkLSJP4ZIoi', true, 'familiar', array['film','title','year','artist']::text[]),
   (297, 'Song 297', 'U Know What''s Up', 'Turning Red', 2022, '4*TOWN', 'https://open.spotify.com/track/0d83zVs3OmdjrhfoAxg1dE', true, 'familiar', array['film','title','year','artist']::text[]),
   (298, 'Song 298', 'U Know What''s Up - The Panda Hustle Version', 'Turning Red', 2022, '4*TOWN', 'https://open.spotify.com/track/6Xi7ye58IILUXhxcOyibUj', true, 'familiar', array['film','title','year','artist']::text[]),
-  (299, 'Song 299', 'Pandas Unite / Nobody Like U (Reprise)', 'Turning Red', 2022, 'Ludwig Göransson, 4*TOWN, Turning Red Cast', 'https://open.spotify.com/track/4dksoaJqf0k9mwrvAuUcqR', true, 'familiar', array['film','title','year','artist']::text[])
+  (299, 'Song 299', 'Pandas Unite / Nobody Like U (Reprise)', 'Turning Red', 2022, 'Ludwig Göransson, 4*TOWN, Turning Red Cast', 'https://open.spotify.com/track/4dksoaJqf0k9mwrvAuUcqR', true, 'familiar', array['film','title','year','artist']::text[]),
   (300, 'Song 300', 'Born to Play', 'Soul', 2020, 'Jon Batiste', 'https://open.spotify.com/track/4BmuAIPAsCiS2NhqT0gSfL', true, 'familiar', array['film','title','year','artist']::text[])
 )
 insert into public.dmq_songs (song_number,label,title,film,year,artist,spotify_url,enabled,question_profile,allowed_questions)
