@@ -2848,6 +2848,7 @@ export default function App() {
   const [secondsLeft, setSecondsLeft] = useState(0);
   const [quizLocked, setQuizLocked] = useState(false);
   const [quizSelectedAnswer, setQuizSelectedAnswer] = useState(null);
+  const [quizPendingIndex, setQuizPendingIndex] = useState(null);
   const [scoreReturnScreen, setScoreReturnScreen] = useState('game');
   const [stagePause, setStagePause] = useState(false);
 
@@ -3224,6 +3225,7 @@ export default function App() {
     setFactSelected(null);
     setFactLocked(false);
     setQuizSelectedAnswer(null);
+    setQuizPendingIndex(null);
     setQuizLocked(false);
     setDiaryChar('');
     setDiaryMovie('');
@@ -3285,7 +3287,8 @@ export default function App() {
           ...currentRoom.current_task_state,
           categoryHistory: [...categoryHistory, 'Quiz'],
           lastCat: 'Quiz',
-          stagePause: false
+          stagePause: false,
+          roundPhase: 'difficulty'
         }
       });
       return;
@@ -3354,7 +3357,12 @@ export default function App() {
         quizLocked: false,
         selectedAnswer: undefined,
         quizAnswers: {},
-        quizAwarded: {}
+        quizAwarded: {},
+        genericAnswers: {},
+        genericAwarded: {},
+        hintLevel: 1,
+        roundPhase: 'announcement',
+        doubleWishChoices: {}
       }
     });
   };
@@ -3447,20 +3455,8 @@ export default function App() {
         setLoading(false);
         return;
       }
-      const startingIndex = Math.floor(Math.random() * players.length);
-      const totalRounds = isGroupOnly() ? room.rounds_per_player : room.rounds_per_player * players.length;
-
-      // Initialize card hands for all players
-      const startHands = {};
-      players.forEach(p => {
-        const cardKeys = Object.keys(POWER_CARDS);
-        const hand = [];
-        for (let i = 0; i < 3; i++) {
-          const rKey = cardKeys[Math.floor(Math.random() * cardKeys.length)];
-          hand.push(rKey);
-        }
-        startHands[p.id] = hand;
-      });
+      const startingIndex = 0;
+      const totalRounds = room.rounds_per_player;
 
       await updateRoomState(room.id, {
         status: 'playing',
@@ -3469,7 +3465,9 @@ export default function App() {
         total_rounds: totalRounds,
         current_task_state: {
           ...room.current_task_state,
-          player_hands: startHands,
+          player_hands: {},
+          doubleWishUsed: {},
+          doubleWishChoices: {},
           enabledCategories: selectedCats
         }
       });
@@ -3478,6 +3476,9 @@ export default function App() {
       setRoom(updatedRoom);
 
       await selectNextTask(updatedRoom, players);
+      const { room: readyRoom, players: readyPlayers } = await fetchRoomData(room.id);
+      setRoom(readyRoom);
+      setPlayers(readyPlayers);
       setScreen('game');
     } catch (e) {
       console.error("Game start failed", e);
@@ -3512,7 +3513,45 @@ export default function App() {
         quizLocked: false,
         selectedAnswer: undefined,
         quizAnswers: {},
-        quizAwarded: {}
+        quizAwarded: {},
+        genericAnswers: {},
+        genericAwarded: {},
+        hintLevel: 1,
+        roundPhase: 'announcement',
+        doubleWishChoices: {}
+      }
+    });
+  };
+
+  const getRoundMultiplier = (playerId, state = room?.current_task_state) => (
+    state?.doubleWishChoices?.[playerId] === 'double' ? 2 : 1
+  );
+
+  const handleDoubleWishChoice = async (choice) => {
+    if (!localPlayer?.id || !room?.id) return;
+    const { room: freshRoom } = await fetchRoomData(room.id);
+    const freshState = freshRoom.current_task_state || {};
+    const choices = { ...(freshState.doubleWishChoices || {}) };
+    if (choices[localPlayer.id]) return;
+    const used = { ...(freshState.doubleWishUsed || {}) };
+    const selectedChoice = choice === 'double' && !used[localPlayer.id] ? 'double' : 'normal';
+    choices[localPlayer.id] = selectedChoice;
+    if (selectedChoice === 'double') used[localPlayer.id] = true;
+    await updateRoomState(room.id, {
+      current_task_state: {
+        ...freshState,
+        doubleWishChoices: choices,
+        doubleWishUsed: used
+      }
+    });
+  };
+
+  const handleRevealRound = async () => {
+    if (!room?.id || players[0]?.id !== localPlayer?.id) return;
+    await updateRoomState(room.id, {
+      current_task_state: {
+        ...room.current_task_state,
+        roundPhase: 'playing'
       }
     });
   };
@@ -3531,7 +3570,7 @@ export default function App() {
     quizAnswers[localPlayer.id] = answerIndex;
 
     const isCorrect = answerIndex === correctAnswerIndex;
-    const ptsToAward = room.current_task_state?.hyperdriveActive ? points * 2 : points;
+    const ptsToAward = points * getRoundMultiplier(localPlayer.id, freshState);
     const quizAwarded = { ...(freshState.quizAwarded || {}) };
 
     if (isCorrect && !quizAwarded[localPlayer.id]) {
@@ -3584,26 +3623,6 @@ export default function App() {
     }
 
     const currentTask = getCurrentTask();
-
-    if (currentTask?.type === "quiz") {
-      await updateRoomState(room.id, {
-        current_task_state: {
-          ...room.current_task_state,
-          quizLocked: false,
-          selectedAnswer: undefined,
-          quizAnswers: {},
-          quizAwarded: {},
-          timerStartedAt: null,
-          timerDuration: null
-        }
-      });
-
-      const { room: r, players: p } = await fetchRoomData(room.id);
-      setRoom(r);
-      setPlayers(p);
-      await selectNextTask(r, p);
-      return;
-    }
 
     const wasGroup = currentTask?.type === "group";
     const nextRound = (room.round || 0) + 1;
@@ -3687,7 +3706,7 @@ export default function App() {
 
   const handleScoreAward = async (playerIndex, points, type) => {
     const targetPlayer = players[playerIndex];
-    const ptsToAward = (room.current_player_index === playerIndex && room.current_task_state?.hyperdriveActive) ? points * 2 : points;
+    const ptsToAward = points * getRoundMultiplier(targetPlayer?.id);
 
     await addPlayerScore(
       room.id,
@@ -3705,7 +3724,7 @@ export default function App() {
       addPlayerScore(
         room.id,
         p,
-        points,
+        points * getRoundMultiplier(p.id),
         `Gezamenlijke missie: ${getCurrentTask()?.text}`,
         'general',
         getCurrentTask()
@@ -3854,8 +3873,8 @@ export default function App() {
     const drawer = players[room.current_player_index];
     const guesser = players[playerIndex];
     
-    await addPlayerScore(room.id, guesser, 2, "Pictionary: woord correct geraden!", "creative");
-    await addPlayerScore(room.id, drawer, 2, "Pictionary: succesvol getekend!", "creative");
+    await addPlayerScore(room.id, guesser, 2 * getRoundMultiplier(guesser.id), "Pictionary: woord correct geraden!", "creative");
+    await addPlayerScore(room.id, drawer, 2 * getRoundMultiplier(drawer.id), "Pictionary: succesvol getekend!", "creative");
     await handleFinishTask();
   };
 
@@ -3883,7 +3902,7 @@ export default function App() {
     await Promise.all(players.map(p => {
       const pVote = votes[p.id];
       if (winner === 'tie' || pVote === winner) {
-        return addPlayerScore(room.id, p, 1, `Dilemma: gestemd met de meerderheid`, 'general');
+        return addPlayerScore(room.id, p, getRoundMultiplier(p.id), `Dilemma: gestemd met de meerderheid`, 'general');
       }
       return Promise.resolve();
     }));
@@ -3932,7 +3951,7 @@ export default function App() {
     if (activePlayer && wrongVotes.length > 0) {
       const bonus = wrongVotes.length === otherPlayers.length ? 1 : 0;
       const basePts = wrongVotes.length + bonus;
-      const pts = room.current_task_state?.hyperdriveActive ? basePts * 2 : basePts;
+      const pts = basePts * getRoundMultiplier(activePlayer.id);
       await addPlayerScore(
         room.id,
         activePlayer,
@@ -3974,10 +3993,8 @@ export default function App() {
 
   const handleResolveDiary = async (t) => {
     const answers = room.current_task_state.answers || {};
-    const activePlayer = players[room.current_player_index];
 
     await Promise.all(players.map(p => {
-      if (p.id === activePlayer.id) return Promise.resolve();
       const pAns = answers[p.id] || {};
       let score = 0;
 
@@ -3991,7 +4008,7 @@ export default function App() {
       });
 
       if (score > 0) {
-        return addPlayerScore(room.id, p, score, `Disney Dagboek: ${score} beurt(en) correct geraden`, 'knowledge');
+        return addPlayerScore(room.id, p, score * getRoundMultiplier(p.id), `Disney Dagboek: ${score} beurt(en) correct geraden`, 'knowledge');
       }
       return Promise.resolve();
     }));
@@ -4009,7 +4026,7 @@ export default function App() {
       setMmSolved(true);
       const rating = getMmRating(updatedGuesses.length, mmCode.length, mmMaxTurns);
       const basePts = rating.points;
-      const pts = room.current_task_state?.hyperdriveActive ? basePts * 2 : basePts;
+      const pts = basePts * getRoundMultiplier(localPlayer?.id);
       setMmPointsEarned(pts);
     } else if (updatedGuesses.length >= mmMaxTurns) {
       setMmFailed(true);
@@ -4025,49 +4042,61 @@ export default function App() {
 
   // Wie ben ik
   const handleWhoamiAnswer = async (idx, t) => {
-    if (room.current_task_state?.quizLocked) return;
-
-    const isHost = players[0]?.id === localPlayer?.id;
-    const isMyTurn = players[room.current_player_index]?.id === localPlayer?.id;
-    if (!isMyTurn && !isHost) return;
-
+    if (!localPlayer?.id) return;
+    const { room: freshRoom, players: freshPlayers } = await fetchRoomData(room.id);
+    const freshState = freshRoom.current_task_state || {};
+    const genericAnswers = { ...(freshState.genericAnswers || {}) };
+    if (genericAnswers[localPlayer.id] !== undefined) return;
+    genericAnswers[localPlayer.id] = idx;
     const correct = idx === t.correct;
-    const activePlayer = players[room.current_player_index];
-    if (correct && activePlayer) {
-      const basePts = whoamiRevealed === 1 ? 3 : whoamiRevealed === 2 ? 2 : 1;
-      const pts = room.current_task_state?.hyperdriveActive ? basePts * 2 : basePts;
-      await addPlayerScore(room.id, activePlayer, pts, `Hint Quest: correct geraden met ${whoamiRevealed} hint(s)`, 'knowledge');
+    const hintLevel = freshState.hintLevel || 1;
+    const genericAwarded = { ...(freshState.genericAwarded || {}) };
+    if (correct && !genericAwarded[localPlayer.id]) {
+      const basePts = hintLevel === 1 ? 3 : hintLevel === 2 ? 2 : 1;
+      const pts = basePts * getRoundMultiplier(localPlayer.id, freshState);
+      await addPlayerScore(room.id, freshPlayers.find(p => p.id === localPlayer.id) || localPlayer, pts, `Hint Quest: correct geraden met ${hintLevel} hint(s)`, 'knowledge');
+      genericAwarded[localPlayer.id] = true;
     }
-
+    const allAnswered = freshPlayers.every(p => genericAnswers[p.id] !== undefined);
     await updateRoomState(room.id, {
       current_task_state: {
-        ...room.current_task_state,
-        quizLocked: true,
-        selectedAnswer: idx
+        ...freshState,
+        genericAnswers,
+        genericAwarded,
+        quizLocked: allAnswered
       }
+    });
+  };
+
+  const handleRevealWhoamiHint = async (level) => {
+    if (players[0]?.id !== localPlayer?.id) return;
+    await updateRoomState(room.id, {
+      current_task_state: { ...room.current_task_state, hintLevel: level }
     });
   };
 
   // Feit of Fabel
   const handleFactAnswer = async (isTrue, t) => {
-    if (room.current_task_state?.quizLocked) return;
-
-    const isHost = players[0]?.id === localPlayer?.id;
-    const isMyTurn = players[room.current_player_index]?.id === localPlayer?.id;
-    if (!isMyTurn && !isHost) return;
-
+    if (!localPlayer?.id) return;
+    const { room: freshRoom, players: freshPlayers } = await fetchRoomData(room.id);
+    const freshState = freshRoom.current_task_state || {};
+    const genericAnswers = { ...(freshState.genericAnswers || {}) };
+    if (genericAnswers[localPlayer.id] !== undefined) return;
+    genericAnswers[localPlayer.id] = isTrue;
     const correct = isTrue === t.correct;
-    const activePlayer = players[room.current_player_index];
-    if (correct && activePlayer) {
-      const pts = room.current_task_state?.hyperdriveActive ? 4 : 2;
-      await addPlayerScore(room.id, activePlayer, pts, `Feit of Fabel: stelling correct beoordeeld`, 'knowledge');
+    const genericAwarded = { ...(freshState.genericAwarded || {}) };
+    if (correct && !genericAwarded[localPlayer.id]) {
+      const pts = 2 * getRoundMultiplier(localPlayer.id, freshState);
+      await addPlayerScore(room.id, freshPlayers.find(p => p.id === localPlayer.id) || localPlayer, pts, `Feit of Fabel: stelling correct beoordeeld`, 'knowledge');
+      genericAwarded[localPlayer.id] = true;
     }
-
+    const allAnswered = freshPlayers.every(p => genericAnswers[p.id] !== undefined);
     await updateRoomState(room.id, {
       current_task_state: {
-        ...room.current_task_state,
-        quizLocked: true,
-        selectedAnswer: isTrue
+        ...freshState,
+        genericAnswers,
+        genericAwarded,
+        quizLocked: allAnswered
       }
     });
   };
@@ -4085,7 +4114,7 @@ export default function App() {
 
     const isCorrect = match(typed, [t.movie_nl, t.movie_en, ...(t.movie_aliases || [])]);
     if (isCorrect) {
-      const pts = room.current_task_state?.hyperdriveActive ? 4 : 2;
+      const pts = 2 * getRoundMultiplier((players[room.current_player_index] || localPlayer)?.id);
       const activePlayer = players[room.current_player_index] || localPlayer;
       await addPlayerScore(room.id, activePlayer, pts, `Emoji Quiz: correct geraden`, 'knowledge');
     }
@@ -4598,7 +4627,7 @@ export default function App() {
       <div className="road-progress-container">
         <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '11px', color: 'var(--muted)' }}>
           <span>Etappe Routekaart</span>
-          <strong>{pct}% voltooid ({room.round}/{room.total_rounds} beurten)</strong>
+          <strong>{pct}% voltooid ({room.round}/{room.total_rounds} rondes)</strong>
         </div>
         
         <div className="road-strip">
@@ -6286,10 +6315,10 @@ export default function App() {
                     value={roundsPerPlayer}
                     onChange={e => setRoundsPerPlayer(Number(e.target.value))}
                   >
-                    <option value={3}>3 beurten p.p.</option>
-                    <option value={5}>5 beurten p.p.</option>
-                    <option value={10}>10 beurten p.p.</option>
-                    <option value={15}>15 beurten p.p.</option>
+                    <option value={3}>3 gezamenlijke rondes</option>
+                    <option value={5}>5 gezamenlijke rondes</option>
+                    <option value={10}>10 gezamenlijke rondes</option>
+                    <option value={15}>15 gezamenlijke rondes</option>
                   </select>
                 </div>
 
@@ -6404,6 +6433,7 @@ export default function App() {
                       const canControlTurnTask = isMyTurn || isHost;
                       const difficultyLabel = t.difficulty ? { easy: "Makkelijk", medium: "Medium", hard: "Moeilijk" }[t.difficulty] : "";
                       const isSoloAiGame = t.type === 'arcade-game' && t.mode === 'solo' && hasArenaAi(t.gameId);
+                      const isRoundAnnouncement = !room.game_mode?.startsWith('arcade-') && room.current_task_state?.roundPhase === 'announcement';
                       const aiLevelNumber = { easy: 1, normal: 2, hard: 3 }[room.current_task_state?.aiLevel || aiLevel] || 2;
                       const pointsText = t.type === "quizChoice"
                         ? "Kies je niveau"
@@ -6444,17 +6474,60 @@ export default function App() {
                           ) : (
                             <div className="badge">{badgeText}</div>
                           )}
-                          {t.type === "group" ? (
-                            <div className="turn"><strong>Gezamenlijke opdracht</strong> · iedereen helpt mee!</div>
-                          ) : (
+                          {room.game_mode?.startsWith('arcade-') ? (
                             <div className="turn">
                               Aan de beurt: <strong>{activePlayer?.name} {isMyTurn ? "(Jij!)" : ""}</strong>
                             </div>
+                          ) : (
+                            <div className="turn">
+                              <strong>Ronde {(room.round || 0) + 1} van {room.total_rounds}</strong> · iedereen speelt mee
+                            </div>
                           )}
-                          <h2>{t.title}</h2>
-                          <div className="prompt">{t.text}</div>
 
-                           <div className={t.type === 'arcade-game' && t.gameId === 'qwixx' ? 'task-game-content task-game-content-qwixx' : 'task-game-content'} style={{ marginTop: '20px' }}>
+                          {isRoundAnnouncement && (() => {
+                            const wishChoices = room.current_task_state?.doubleWishChoices || {};
+                            const wishUsed = room.current_task_state?.doubleWishUsed || {};
+                            const myWishChoice = wishChoices[localPlayer?.id];
+                            const allPlayersChose = players.length > 0 && players.every(player => wishChoices[player.id]);
+                            const canUseWish = !wishUsed[localPlayer?.id];
+                            return (
+                              <div className="round-announcement">
+                                <div className="bigicon" aria-hidden="true">✨</div>
+                                <div className="badge">Volgende ronde</div>
+                                <h2>{t.cat || t.title}</h2>
+                                <p>Iedereen krijgt dezelfde opdracht. Kies nu of je jouw eenmalige verdubbelaar inzet.</p>
+                                {!myWishChoice ? (
+                                  <div className="btnrow one" style={{ marginTop: '16px' }}>
+                                    {canUseWish && (
+                                      <button className="btn primary" onClick={() => handleDoubleWishChoice('double')}>
+                                        ✨ Wens op een Ster inzetten · dubbele punten
+                                      </button>
+                                    )}
+                                    <button className="btn secondary" onClick={() => handleDoubleWishChoice('normal')}>
+                                      Bewaar mijn wens
+                                    </button>
+                                  </div>
+                                ) : (
+                                  <div className="notice green" style={{ marginTop: '14px' }}>
+                                    {myWishChoice === 'double' ? 'Jouw Wens op een Ster staat aan: deze ronde telt dubbel.' : 'Keuze opgeslagen: je bewaart jouw Wens op een Ster.'}
+                                  </div>
+                                )}
+                                <p className="small" style={{ marginTop: '12px' }}>
+                                  {Object.keys(wishChoices).length}/{players.length} spelers zijn klaar.
+                                </p>
+                                {allPlayersChose && isHost ? (
+                                  <button className="btn primary full" onClick={handleRevealRound}>Toon de opdracht</button>
+                                ) : allPlayersChose ? (
+                                  <div className="notice">De host toont zo de opdracht.</div>
+                                ) : null}
+                              </div>
+                            );
+                          })()}
+
+                          <h2 style={isRoundAnnouncement ? { display: 'none' } : undefined}>{t.title}</h2>
+                          <div className="prompt" style={isRoundAnnouncement ? { display: 'none' } : undefined}>{t.text}</div>
+
+                           <div className={t.type === 'arcade-game' && t.gameId === 'qwixx' ? 'task-game-content task-game-content-qwixx' : 'task-game-content'} style={{ marginTop: '20px', ...(isRoundAnnouncement ? { display: 'none' } : {}) }}>
                             {/* -1. DISNEY DUEL ARENA */}
                             {t.type === "arcade-game" && (() => {
                               const isTinkerGame = t.gameId === 'tictactinker';
@@ -6764,7 +6837,7 @@ export default function App() {
                                 return (
                                   <div>
                                     <div className="notice" style={{ background: '#0a2042', marginBottom: '12px' }}>
-                                      Groepsquiz: iedereen antwoordt zelf. Deze vraag telt niet als beurt.
+                                      Iedereen kiest eerst een antwoord en bevestigt daarna bewust de keuze.
                                       <strong style={{ display: 'block', marginTop: '4px' }}>{answeredCount}/{players.length} spelers hebben geantwoord.</strong>
                                     </div>
                                     <div className="answers">
@@ -6776,6 +6849,7 @@ export default function App() {
                                         if (shouldHide) return null;
 
                                         let btnClass = "answer";
+                                        if (idx === quizPendingIndex && myQuizAnswer === undefined) btnClass += " selected";
                                         if (quizLocked || allAnswered) {
                                           if (idx === t.correct) btnClass += " correct";
                                           else if (idx === myQuizAnswer) btnClass += " wrong";
@@ -6785,13 +6859,31 @@ export default function App() {
                                             key={idx}
                                             className={btnClass}
                                             disabled={quizLocked || myQuizAnswer !== undefined}
-                                            onClick={() => handleAnswerQuiz(idx, t.correct, room.current_task_state.quizPoints || 1)}
+                                            aria-pressed={idx === quizPendingIndex}
+                                            onClick={() => setQuizPendingIndex(idx)}
+                                            style={idx === quizPendingIndex && myQuizAnswer === undefined ? { borderColor: 'var(--gold)', boxShadow: '0 0 0 2px rgba(255, 212, 92, .28)' } : undefined}
                                           >
                                             {ans}
                                           </button>
                                         );
                                       })}
                                     </div>
+                                    {myQuizAnswer === undefined && quizPendingIndex !== null && (
+                                      <div className="notice" style={{ marginTop: '12px' }}>
+                                        <strong>Gekozen antwoord:</strong> {t.answers[quizPendingIndex]}
+                                        <div className="btnrow one" style={{ marginTop: '10px' }}>
+                                          <button
+                                            className="btn primary"
+                                            onClick={() => handleAnswerQuiz(quizPendingIndex, t.correct, room.current_task_state.quizPoints || 1)}
+                                          >
+                                            Antwoord bevestigen
+                                          </button>
+                                          <button className="btn secondary" onClick={() => setQuizPendingIndex(null)}>
+                                            Andere keuze
+                                          </button>
+                                        </div>
+                                      </div>
+                                    )}
                                     {myQuizAnswer !== undefined && !quizLocked && (
                                       <div className="notice green" style={{ marginTop: '12px' }}>
                                         Antwoord opgeslagen. Wachten op de rest...
@@ -6813,92 +6905,56 @@ export default function App() {
                             {t.type === "diary" && (() => {
                               const activePart = room.current_task_state.part || 1;
                               const diaryAnswers = room.current_task_state.answers || {};
-                              
-                              if (isMyTurn) {
-                                // Voorlezer View
-                                const allSubmitted = players
-                                  .filter(p => p.id !== localPlayer.id)
-                                  .every(p => diaryAnswers[p.id]?.[`part${activePart}`]);
+                              const myAnswers = diaryAnswers[localPlayer.id] || {};
+                              const alreadySubmittedThisPart = !!myAnswers[`part${activePart}`];
+                              const allSubmitted = players.every(p => diaryAnswers[p.id]?.[`part${activePart}`]);
+                              const submittedCount = players.filter(p => diaryAnswers[p.id]?.[`part${activePart}`]).length;
+                              const fragment = activePart === 1 ? t.part1 : activePart === 2 ? t.part2 : t.part3;
 
-                                return (
-                                  <div>
-                                    <div className="notice" style={{ background: '#0a2042', borderColor: '#214d8f' }}>
-                                      <strong>Jij bent de voorlezer! 📖</strong> Lees het actieve deel hieronder luid en duidelijk voor aan de auto.
-                                    </div>
-                                    <div style={{ padding: '12px', background: '#091c38', borderRadius: '12px', marginBottom: '14px', border: '1px solid var(--line)' }}>
-                                      <strong style={{ color: 'var(--gold)', display: 'block', marginBottom: '5px' }}>Deel {activePart} (Voorlezer-scherm):</strong>
-                                      <p style={{ margin: 0, fontStyle: 'italic', fontSize: '15px', lineHeight: '1.4' }}>
-                                        {activePart === 1 ? t.part1 : activePart === 2 ? t.part2 : t.part3}
-                                      </p>
-                                    </div>
+                              return (
+                                <div>
+                                  <div className="notice" style={{ background: '#0a1c3c' }}>
+                                    <strong>Hint {activePart} van 3</strong> · iedereen ziet dezelfde hint en antwoordt op het eigen scherm.
+                                  </div>
+                                  <div style={{ padding: '14px', background: '#091c38', borderRadius: '12px', marginBottom: '14px', border: '1px solid var(--line)' }}>
+                                    <p style={{ margin: 0, fontStyle: 'italic', fontSize: '16px', lineHeight: '1.5' }}>{fragment}</p>
+                                  </div>
 
-                                    <div style={{ marginBottom: '14px' }}>
-                                      <strong style={{ fontSize: '13px', display: 'block', marginBottom: '6px' }}>Status antwoorden (Ronde {activePart}):</strong>
-                                      {players.filter(p => p.id !== localPlayer.id).map(p => {
-                                        const submitted = !!diaryAnswers[p.id]?.[`part${activePart}`];
-                                        const ansText = diaryAnswers[p.id]?.[`part${activePart}`];
-                                        return (
-                                          <div key={p.id} style={{ display: 'flex', justifyContent: 'space-between', padding: '6px 8px', background: '#07152d', borderRadius: '8px', marginBottom: '4px', fontSize: '13px' }}>
-                                            <span>{p.name}</span>
-                                            <span style={{ color: submitted ? 'var(--ok)' : 'var(--danger)' }}>
-                                              {submitted ? `Klaar (${ansText.char} · ${ansText.movie})` : 'Nadenken... ⏳'}
-                                            </span>
-                                          </div>
-                                        );
-                                      })}
+                                  {alreadySubmittedThisPart ? (
+                                    <div className="notice green">
+                                      Antwoord voor hint {activePart} opgeslagen. {submittedCount}/{players.length} spelers zijn klaar.
                                     </div>
-
-                                    <div className="notice" style={{ background: '#091c38', borderColor: 'var(--line)', fontSize: '13px' }}>
-                                      <strong>Oplossing:</strong> {t.character_nl} / {t.character_en} ({t.movie_nl} / {t.movie_en})
+                                  ) : (
+                                    <div>
+                                      <div className="field">
+                                        <label>Welk personage?</label>
+                                        <input placeholder="Vul het personage in" value={diaryChar} onChange={e => setDiaryChar(e.target.value)} />
+                                      </div>
+                                      <div className="field">
+                                        <label>Welke film?</label>
+                                        <input placeholder="Vul de film in" value={diaryMovie} onChange={e => setDiaryMovie(e.target.value)} />
+                                      </div>
+                                      <button className="btn primary full" disabled={!diaryChar.trim() || !diaryMovie.trim()} onClick={() => handleSubmitDiaryPart(activePart)}>
+                                        Antwoord bevestigen
+                                      </button>
                                     </div>
+                                  )}
 
-                                    <div className="btnrow stack" style={{ marginTop: '10px' }}>
+                                  {isHost && (
+                                    <div className="btnrow one" style={{ marginTop: '12px' }}>
                                       {activePart < 3 ? (
                                         <button className="btn primary" disabled={!allSubmitted} onClick={() => handleNextDiaryPart(activePart + 1)}>
-                                          Volgend deel voorlezen ➔
+                                          Toon hint {activePart + 1}
                                         </button>
                                       ) : (
                                         <button className="btn primary" disabled={!allSubmitted} onClick={() => handleResolveDiary(t)}>
-                                          Antwoorden evalueren & beëindigen
+                                          Toon uitslag
                                         </button>
                                       )}
-                                      <button className="btn secondary" onClick={() => handleSkipTask(false)}>Overslaan</button>
                                     </div>
-                                  </div>
-                                );
-                              } else {
-                                // Guesser View - Meeleesscherm text is completely REMOVED to avoid spoiling!
-                                const myAnswers = diaryAnswers[localPlayer.id] || {};
-                                const alreadySubmittedThisPart = !!myAnswers[`part${activePart}`];
-
-                                return (
-                                  <div>
-                                    <div className="notice" style={{ background: '#0a1c3c' }}>
-                                      <strong>Luister naar {activePlayer?.name}! 👂</strong> Hij/zij leest een geheim dagboekfragment voor. Raad welk karakter vertelt en uit welke film het komt!
-                                    </div>
-
-                                    {alreadySubmittedThisPart ? (
-                                      <div className="notice green">
-                                        Je hebt je antwoord voor deel {activePart} ingediend. Wacht tot de voorlezer doorgaat...
-                                      </div>
-                                    ) : (
-                                      <div>
-                                        <div className="field">
-                                          <label>Welk Karakter?</label>
-                                          <input placeholder="Bijv. Remy of Aladdin" value={diaryChar} onChange={e => setDiaryChar(e.target.value)} />
-                                        </div>
-                                        <div className="field">
-                                          <label>Welke Film?</label>
-                                          <input placeholder="Bijv. Ratatouille of Aladdin" value={diaryMovie} onChange={e => setDiaryMovie(e.target.value)} />
-                                        </div>
-                                        <button className="btn primary full" disabled={!diaryChar.trim() || !diaryMovie.trim()} onClick={() => handleSubmitDiaryPart(activePart)}>
-                                          Bevestig antwoord voor deel {activePart}
-                                        </button>
-                                      </div>
-                                    )}
-                                  </div>
-                                );
-                              }
+                                  )}
+                                </div>
+                              );
                             })()}
 
                             {/* 4. PICTIONARY */}
@@ -7225,6 +7281,10 @@ export default function App() {
 
                             {/* 8. WIE BEN IK (HINT QUEST) */}
                             {t.type === "whoami" && (() => {
+                              const hintLevel = room.current_task_state?.hintLevel || 1;
+                              const genericAnswers = room.current_task_state?.genericAnswers || {};
+                              const myAnswer = genericAnswers[localPlayer?.id];
+                              const allAnswered = players.length > 0 && players.every(p => genericAnswers[p.id] !== undefined);
                               return (
                                 <div>
                                   <div style={{ padding: '12px', background: '#091c38', borderRadius: '12px', marginBottom: '14px', border: '1px solid var(--line)' }}>
@@ -7232,13 +7292,13 @@ export default function App() {
                                       <strong style={{ color: 'var(--gold)', display: 'block', fontSize: '13px' }}>Hint 1 (Gratis):</strong>
                                       <span style={{ fontSize: '15px' }}>{t.hint1}</span>
                                     </div>
-                                    {whoamiRevealed >= 2 && (
+                                    {hintLevel >= 2 && (
                                       <div style={{ marginTop: '12px', borderTop: '1px solid var(--line)', paddingTop: '8px' }}>
                                         <strong style={{ color: 'var(--gold)', display: 'block', fontSize: '13px' }}>Hint 2 (Kosten: -1 punt):</strong>
                                         <span style={{ fontSize: '15px' }}>{t.hint2}</span>
                                       </div>
                                     )}
-                                    {whoamiRevealed >= 3 && (
+                                    {hintLevel >= 3 && (
                                       <div style={{ marginTop: '12px', borderTop: '1px solid var(--line)', paddingTop: '8px' }}>
                                         <strong style={{ color: 'var(--gold)', display: 'block', fontSize: '13px' }}>Hint 3 (Kosten: -2 punten):</strong>
                                         <span style={{ fontSize: '15px' }}>{t.hint3}</span>
@@ -7246,12 +7306,12 @@ export default function App() {
                                     )}
                                   </div>
 
-                                  {!whoamiLocked && canControlTurnTask && (
+                                  {!allAnswered && isHost && (
                                     <div className="btnrow" style={{ marginBottom: '14px' }}>
-                                      <button className="btn secondary mini" disabled={whoamiRevealed >= 2} onClick={() => setWhoamiRevealed(2)}>
+                                      <button className="btn secondary mini" disabled={hintLevel >= 2} onClick={() => handleRevealWhoamiHint(2)}>
                                         Onthul Hint 2
                                       </button>
-                                      <button className="btn secondary mini" disabled={whoamiRevealed < 2 || whoamiRevealed >= 3} onClick={() => setWhoamiRevealed(3)}>
+                                      <button className="btn secondary mini" disabled={hintLevel < 2 || hintLevel >= 3} onClick={() => handleRevealWhoamiHint(3)}>
                                         Onthul Hint 3
                                       </button>
                                     </div>
@@ -7260,23 +7320,37 @@ export default function App() {
                                   <div className="answers">
                                     {t.answers.map((ans, idx) => {
                                       let btnClass = "answer";
-                                      if (whoamiLocked) {
+                                      if (allAnswered) {
                                         if (idx === t.correct) btnClass += " correct";
-                                        else if (idx === whoamiSelected) btnClass += " wrong";
+                                        else if (idx === myAnswer) btnClass += " wrong";
                                       }
+                                      if (!allAnswered && idx === whoamiSelected) btnClass += " selected";
                                       return (
                                         <button 
                                           key={idx}
                                           className={btnClass}
-                                          disabled={whoamiLocked || !canControlTurnTask}
-                                          onClick={() => handleWhoamiAnswer(idx, t)}
+                                          disabled={allAnswered || myAnswer !== undefined}
+                                          aria-pressed={idx === whoamiSelected}
+                                          onClick={() => setWhoamiSelected(idx)}
+                                          style={!allAnswered && idx === whoamiSelected ? { borderColor: 'var(--gold)', boxShadow: '0 0 0 2px rgba(255, 212, 92, .28)' } : undefined}
                                         >
                                           {ans}
                                         </button>
                                       );
                                     })}
                                   </div>
-                                  {whoamiLocked && canControlTurnTask && (
+                                  {myAnswer === undefined && whoamiSelected !== null && !allAnswered && (
+                                    <div className="notice" style={{ marginTop: '12px' }}>
+                                      <strong>Gekozen antwoord:</strong> {t.answers[whoamiSelected]}
+                                      <button className="btn primary full" style={{ marginTop: '10px' }} onClick={() => handleWhoamiAnswer(whoamiSelected, t)}>
+                                        Antwoord bevestigen
+                                      </button>
+                                    </div>
+                                  )}
+                                  {myAnswer !== undefined && !allAnswered && (
+                                    <div className="notice green" style={{ marginTop: '12px' }}>Antwoord opgeslagen. Wachten op de rest…</div>
+                                  )}
+                                  {allAnswered && isHost && (
                                     <div style={{ marginTop: '12px' }}>
                                       <button className="btn primary full" onClick={handleFinishTask}>
                                         Volgende opdracht
@@ -7583,33 +7657,54 @@ export default function App() {
                             })()}
 
                             {/* 10. FEIT OF FABEL */}
-                            {t.type === "fact" && (
+                            {t.type === "fact" && (() => {
+                              const genericAnswers = room.current_task_state?.genericAnswers || {};
+                              const myAnswer = genericAnswers[localPlayer?.id];
+                              const allAnswered = players.length > 0 && players.every(p => genericAnswers[p.id] !== undefined);
+                              return (
                               <div>
-                                {factLocked ? (
-                                  <div className="notice" style={{ background: factSelected === t.correct ? '#174f43' : '#5b2437', borderColor: factSelected === t.correct ? '#58d4a4' : '#ff7b8b' }}>
+                                {allAnswered ? (
+                                  <div className="notice" style={{ background: myAnswer === t.correct ? '#174f43' : '#5b2437', borderColor: myAnswer === t.correct ? '#58d4a4' : '#ff7b8b' }}>
                                     <strong style={{ display: 'block', fontSize: '18px', marginBottom: '6px' }}>
-                                      {factSelected === t.correct ? 'Correct! 🎉 Feit.' : 'Helaas! 💔 Fabel.'}
+                                      {myAnswer === t.correct ? 'Correct! 🎉' : 'Helaas! 💔'} Het antwoord is {t.correct ? 'FEIT' : 'FABEL'}.
                                     </strong>
                                     <p style={{ margin: 0, fontSize: '15px', lineHeight: '1.4' }}>{t.explanation}</p>
                                     
-                                    {canControlTurnTask && (
+                                    {isHost && (
                                       <button className="btn primary full" style={{ marginTop: '14px' }} onClick={handleFinishTask}>
                                         Volgende opdracht
                                       </button>
                                     )}
                                   </div>
                                 ) : (
-                                  <div className="btnrow">
-                                    <button className="btn ok" disabled={!canControlTurnTask} onClick={() => handleFactAnswer(true, t)}>
-                                      🟩 FEIT (Echt waar)
-                                    </button>
-                                    <button className="btn danger" disabled={!canControlTurnTask} onClick={() => handleFactAnswer(false, t)}>
-                                      🟥 FABEL (Niet waar)
-                                    </button>
+                                  <div>
+                                    {myAnswer === undefined ? (
+                                      <>
+                                        <div className="btnrow">
+                                          <button className={`btn ${factSelected === true ? 'primary' : 'ok'}`} aria-pressed={factSelected === true} onClick={() => setFactSelected(true)}>
+                                            🟩 FEIT (Echt waar)
+                                          </button>
+                                          <button className={`btn ${factSelected === false ? 'primary' : 'danger'}`} aria-pressed={factSelected === false} onClick={() => setFactSelected(false)}>
+                                            🟥 FABEL (Niet waar)
+                                          </button>
+                                        </div>
+                                        {factSelected !== null && (
+                                          <div className="notice" style={{ marginTop: '12px' }}>
+                                            Je kiest <strong>{factSelected ? 'FEIT' : 'FABEL'}</strong>.
+                                            <button className="btn primary full" style={{ marginTop: '10px' }} onClick={() => handleFactAnswer(factSelected, t)}>
+                                              Keuze bevestigen
+                                            </button>
+                                          </div>
+                                        )}
+                                      </>
+                                    ) : (
+                                      <div className="notice green">Keuze opgeslagen. Wachten op de rest…</div>
+                                    )}
                                   </div>
                                 )}
                               </div>
-                            )}
+                              );
+                            })()}
 
                             {/* 11. SAMEN (COOP timer synced in real-time) */}
                             {t.type === "group" && (
@@ -7673,6 +7768,7 @@ export default function App() {
 
                   {/* Player's card hand tray */}
                   {(() => {
+                    if (!room.current_task_state?.roadRacePowerCardsEnabled) return null;
                     if (players.length <= 1) return null;
                     const myHand = room.current_task_state?.player_hands?.[localPlayer.id] || [];
                     if (!myHand.length) return null;
@@ -7741,7 +7837,7 @@ export default function App() {
               })()}
 
               <section className="card">
-                <h2 className="sectiontitle">Stand na {room?.round || 0} beurten</h2>
+                <h2 className="sectiontitle">Stand na {room?.round || 0} rondes</h2>
                 <div className="medals">
                   {[...players]
                     .sort((a, b) => b.score - a.score)
