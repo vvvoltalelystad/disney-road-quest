@@ -1298,6 +1298,7 @@ export default function App() {
 
   const [setupMode, setSetupMode] = useState('mix');
   const [roundsPerPlayer, setRoundsPerPlayer] = useState(10);
+  const [roadHostRole, setRoadHostRole] = useState('player');
   const [playerNames, setPlayerNames] = useState(['Speler 1', 'Speler 2', 'Speler 3', 'Speler 4']);
 
   // New Category setup choice checklist
@@ -1372,6 +1373,13 @@ export default function App() {
   const [arcadeLobbyCode, setArcadeLobbyCode] = useState('');
   const [arenaToolbar, setArenaToolbar] = useState(null);
   const [arenaSaves, setArenaSaves] = useState(() => readJsonStorage(ARENA_SAVES_KEY, {}));
+
+  const isRoomHost = () => {
+    const facilitatorId = room?.current_task_state?.facilitator?.id;
+    return facilitatorId ? facilitatorId === localPlayer?.id : players[0]?.id === localPlayer?.id;
+  };
+
+  const isFacilitatorHost = () => room?.current_task_state?.facilitator?.id === localPlayer?.id;
 
   useEffect(() => {
     if (room?.id !== 'solo' || !room?.game_mode?.startsWith('arcade-') || !activeProfileName) return undefined;
@@ -3044,7 +3052,7 @@ export default function App() {
     const attack = room?.current_task_state?.activeAttack;
     if (!attack || attack.timer <= 0) return;
 
-    const isHost = players[0]?.id === localPlayer?.id;
+    const isHost = isRoomHost();
     if (!isHost) return;
 
     const interval = setInterval(async () => {
@@ -3095,7 +3103,7 @@ export default function App() {
     const isAutoAdvanceType = ['quiz', 'whoami', 'fact', 'emoji'].includes(currentTask.type);
     if (!isAutoAdvanceType) return;
 
-    const isHost = players[0]?.id === localPlayer?.id;
+    const isHost = isRoomHost();
     if (!isHost) return;
 
     const timeout = setTimeout(async () => {
@@ -3382,12 +3390,23 @@ export default function App() {
       const mode = (selectedCats.length === 1 && selectedCats[0] === "Samen") ? "Samen" : "mix";
       const totalRounds = roundsPerPlayer;
       const { room: r, player: p } = await createRoom(mode, 1, roundsPerPlayer, profileName);
-      
-      await updateRoomState(r.id, { total_rounds: totalRounds });
+      const facilitator = roadHostRole === 'facilitator' ? { id: p.id, name: p.name } : null;
+      const initialTaskState = {
+        ...(r.current_task_state || {}),
+        facilitator,
+        hostRole: roadHostRole
+      };
+      await updateRoomState(r.id, { total_rounds: totalRounds, current_task_state: initialTaskState });
       r.total_rounds = totalRounds;
+      r.current_task_state = initialTaskState;
+
+      if (facilitator) {
+        const { error: removeHostError } = await supabase.from('players').delete().eq('id', p.id);
+        if (removeHostError) throw removeHostError;
+      }
 
       setRoom(r);
-      setPlayers([p]);
+      setPlayers(facilitator ? [] : [p]);
       setLocalPlayer(p);
       
       localStorage.setItem('disney_room_id', r.id);
@@ -3531,6 +3550,7 @@ export default function App() {
   );
 
   const handleDoubleWishChoice = async (choice) => {
+    if (isFacilitatorHost()) return;
     if (!localPlayer?.id || !room?.id) return;
     const { room: freshRoom } = await fetchRoomData(room.id);
     const freshState = freshRoom.current_task_state || {};
@@ -3550,7 +3570,7 @@ export default function App() {
   };
 
   const handleRevealRound = async () => {
-    if (!room?.id || players[0]?.id !== localPlayer?.id) return;
+    if (!room?.id || !isRoomHost()) return;
     await updateRoomState(room.id, {
       current_task_state: {
         ...room.current_task_state,
@@ -3560,6 +3580,7 @@ export default function App() {
   };
 
   const handleAnswerQuiz = async (answerIndex, correctAnswerIndex, points) => {
+    if (isFacilitatorHost()) return;
     if (room.current_task_state?.quizLocked) return;
     if (!localPlayer?.id) return;
 
@@ -3883,6 +3904,7 @@ export default function App() {
 
   // Dilemma
   const handleVoteDilemma = async (option) => {
+    if (isFacilitatorHost()) return;
     const votes = room.current_task_state.votes || {};
     votes[localPlayer.id] = option;
     await updateRoomState(room.id, {
@@ -3915,6 +3937,7 @@ export default function App() {
 
   // Inschattingsvragen
   const handleSendEstimate = async () => {
+    if (isFacilitatorHost()) return;
     const val = Math.round(Number(localEstimate));
     if (isNaN(val)) return;
     const { room: freshRoom } = await fetchRoomData(room.id);
@@ -3963,6 +3986,7 @@ export default function App() {
   };
 
   const handleSubmitPictionaryGuess = async (t) => {
+    if (isFacilitatorHost()) return;
     const typed = localEstimate.trim();
     if (!typed || !localPlayer?.id) return;
     const { room: freshRoom, players: freshPlayers } = await fetchRoomData(room.id);
@@ -4004,6 +4028,7 @@ export default function App() {
 
   // Disney Dagboek
   const handleSubmitDiaryPart = async (partNum) => {
+    if (isFacilitatorHost()) return;
     const answers = room.current_task_state.answers || {};
     const pAns = answers[localPlayer.id] || {};
     pAns[`part${partNum}`] = { char: diaryChar.trim(), movie: diaryMovie.trim() };
@@ -4080,6 +4105,7 @@ export default function App() {
 
   // Wie ben ik
   const handleWhoamiAnswer = async (idx, t) => {
+    if (isFacilitatorHost()) return;
     if (!localPlayer?.id) return;
     const { room: freshRoom, players: freshPlayers } = await fetchRoomData(room.id);
     const freshState = freshRoom.current_task_state || {};
@@ -4107,7 +4133,7 @@ export default function App() {
   };
 
   const handleRevealWhoamiHint = async (level) => {
-    if (players[0]?.id !== localPlayer?.id) return;
+    if (!isRoomHost()) return;
     await updateRoomState(room.id, {
       current_task_state: { ...room.current_task_state, hintLevel: level }
     });
@@ -4115,6 +4141,7 @@ export default function App() {
 
   // Feit of Fabel
   const handleFactAnswer = async (isTrue, t) => {
+    if (isFacilitatorHost()) return;
     if (!localPlayer?.id) return;
     const { room: freshRoom, players: freshPlayers } = await fetchRoomData(room.id);
     const freshState = freshRoom.current_task_state || {};
@@ -4141,6 +4168,7 @@ export default function App() {
 
   // Emoji Quiz text submission
   const handleEmojiTextAnswer = async (t) => {
+    if (isFacilitatorHost()) return;
     const typed = localEstimate.trim();
     if (!typed || !localPlayer?.id) return;
     const { room: freshRoom, players: freshPlayers } = await fetchRoomData(room.id);
@@ -4685,6 +4713,78 @@ export default function App() {
           <div className="road-car" style={{ left: `${pct}%` }}>
             🚗💨
           </div>
+        </div>
+      </div>
+    );
+  };
+
+  const renderFacilitatorDashboard = (task) => {
+    if (!isFacilitatorHost() || room?.current_task_state?.roundPhase !== 'playing') return null;
+    const state = room.current_task_state || {};
+    const diaryPart = state.part || 1;
+    const solution = task.type === 'quiz' ? task.answers?.[task.correct]
+      : task.type === 'whoami' ? task.answers?.[task.correct]
+      : task.type === 'fact' ? (task.correct ? 'FEIT' : 'FABEL')
+      : task.type === 'emoji' ? `${task.movie_nl} / ${task.movie_en}`
+      : task.type === 'diary' ? `${task.character_nl} · ${task.movie_nl}`
+      : task.type === 'estimate' ? `${task.correct_value} ${task.unit}`
+      : task.type === 'draw' ? task.text
+      : null;
+    const responseFor = (player) => {
+      if (task.type === 'quiz') {
+        const index = state.quizAnswers?.[player.id];
+        return index === undefined ? null : { text: task.answers?.[index], correct: index === task.correct };
+      }
+      if (task.type === 'whoami') {
+        const index = state.genericAnswers?.[player.id];
+        return index === undefined ? null : { text: task.answers?.[index], correct: index === task.correct };
+      }
+      if (task.type === 'fact') {
+        const answer = state.genericAnswers?.[player.id];
+        return answer === undefined ? null : { text: answer ? 'FEIT' : 'FABEL', correct: answer === task.correct };
+      }
+      if (task.type === 'emoji') {
+        const answer = state.genericAnswers?.[player.id];
+        return answer === undefined ? null : { text: answer, correct: match(answer, [task.movie_nl, task.movie_en, ...(task.movie_aliases || [])]) };
+      }
+      if (task.type === 'diary') {
+        const answer = state.answers?.[player.id]?.[`part${diaryPart}`];
+        if (!answer) return null;
+        return {
+          text: `${answer.char} · ${answer.movie}`,
+          correct: match(answer.char, [task.character_nl, task.character_en, ...(task.character_aliases || [])]) && match(answer.movie, [task.movie_nl, task.movie_en, ...(task.movie_aliases || [])])
+        };
+      }
+      if (task.type === 'estimate') {
+        const answer = state.estimates?.[player.id];
+        return answer === undefined ? null : { text: `${answer} ${task.unit}`, correct: null };
+      }
+      if (task.type === 'dilemma') {
+        const answer = state.votes?.[player.id];
+        return answer === undefined ? null : { text: answer === 'A' ? task.optionA : task.optionB, correct: null };
+      }
+      if (task.type === 'draw') {
+        if (player.id === players[room.current_player_index]?.id) return { text: 'Tekent momenteel', correct: null };
+        const answer = state.pictionaryGuesses?.[player.id];
+        return answer ? { text: answer.text, correct: answer.correct } : null;
+      }
+      return null;
+    };
+    return (
+      <div className="notice" style={{ marginTop: '14px', borderColor: 'var(--gold)', background: '#10213e' }}>
+        <strong style={{ display: 'block', color: 'var(--gold)', marginBottom: '8px' }}>👑 Spelleideroverzicht</strong>
+        {solution && <p style={{ margin: '0 0 10px' }}><strong>Juiste antwoord:</strong> {solution}</p>}
+        <div className="players">
+          {players.map(player => {
+            const response = responseFor(player);
+            const color = response?.correct === true ? 'var(--ok)' : response?.correct === false ? 'var(--danger)' : 'var(--muted)';
+            return (
+              <div key={player.id} className="playerline" style={{ marginBottom: '5px' }}>
+                <span>{player.name}</span>
+                <strong style={{ color }}>{response ? response.text : 'Nog aan het nadenken…'}</strong>
+              </div>
+            );
+          })}
         </div>
       </div>
     );
@@ -6338,7 +6438,32 @@ export default function App() {
               <section className="card">
                 <h2 className="sectiontitle">3. Spelers en lengte</h2>
                 <div className="field">
-                  <label htmlFor="hostName">Jouw Naam (Host)</label>
+                  <label>Rol van de organisator</label>
+                  <div className="answers">
+                    <button
+                      type="button"
+                      className={`answer ${roadHostRole === 'player' ? 'selected' : ''}`}
+                      aria-pressed={roadHostRole === 'player'}
+                      onClick={() => setRoadHostRole('player')}
+                      style={roadHostRole === 'player' ? { borderColor: 'var(--gold)' } : undefined}
+                    >
+                      <strong>Ik speel zelf mee</strong><br />
+                      <span className="small">Je bent organisator én gewone speler en kunt sterren en Coco Coins verdienen.</span>
+                    </button>
+                    <button
+                      type="button"
+                      className={`answer ${roadHostRole === 'facilitator' ? 'selected' : ''}`}
+                      aria-pressed={roadHostRole === 'facilitator'}
+                      onClick={() => setRoadHostRole('facilitator')}
+                      style={roadHostRole === 'facilitator' ? { borderColor: 'var(--gold)' } : undefined}
+                    >
+                      <strong>Ik ben alleen spelleider</strong><br />
+                      <span className="small">Je beheert vragen en uitslagen, maar telt niet mee als speler.</span>
+                    </button>
+                  </div>
+                </div>
+                <div className="field">
+                  <label htmlFor="hostName">Naam organisator</label>
                   <input 
                     id="hostName" 
                     placeholder="Bijv. Donald" 
@@ -6382,6 +6507,12 @@ export default function App() {
 
               <section className="card">
                 <h2 className="sectiontitle">Deelnemers ({players.length})</h2>
+                {room?.current_task_state?.facilitator && (
+                  <div className="notice" style={{ marginBottom: '12px' }}>
+                    <strong>👑 Spelleider: {room.current_task_state.facilitator.name}</strong><br />
+                    Deze organisator speelt niet mee en telt niet mee voor antwoorden, scores of beloningen.
+                  </div>
+                )}
                 {room?.game_mode?.startsWith('arcade-') && (
                   <p className="small" style={{ marginTop: '-4px' }}>
                     {getArenaGame(room.current_task_state?.arcadeGameId)?.name || 'Arena spel'}:
@@ -6391,16 +6522,16 @@ export default function App() {
                 <div className="players">
                   {players.map((p, idx) => (
                     <div key={p.id} className="playerline" style={{ padding: '10px', background: '#081a37', border: '1px solid var(--line)', borderRadius: '10px' }}>
-                      <strong>{p.name} {idx === 0 ? "👑" : ""}</strong>
+                      <strong>{p.name} {!room?.current_task_state?.facilitator && idx === 0 ? "👑" : ""}</strong>
                     </div>
                   ))}
                 </div>
 
-                {players.length > 0 && players[0].id === localPlayer?.id ? (
+                {isRoomHost() ? (
                   <div className="btnrow one" style={{ marginTop: '20px' }}>
                     <button
                       className="btn primary"
-                      disabled={room?.game_mode?.startsWith('arcade-') && room.current_task_state?.arcadeMaxPlayers && players.length > room.current_task_state.arcadeMaxPlayers}
+                      disabled={players.length < 1 || (room?.game_mode?.startsWith('arcade-') && room.current_task_state?.arcadeMaxPlayers && players.length > room.current_task_state.arcadeMaxPlayers)}
                       onClick={handleStartGame}
                     >
                       Spel Starten ({players.length} spelers)
@@ -6428,7 +6559,7 @@ export default function App() {
                     <h1 style={{ fontSize: '32px', margin: '10px 0' }}>Etappe Pauze</h1>
                     <p>Even rust. Tijd voor snacks of een plaspauze! Klik hieronder als iedereen er weer klaar voor is.</p>
                     
-                    {players[0]?.id === localPlayer?.id ? (
+                    {isRoomHost() ? (
                       <div className="btnrow one">
                         <button className="btn primary" onClick={handleContinueStage}>Volgende Etappe</button>
                       </div>
@@ -6469,7 +6600,7 @@ export default function App() {
                       const t = getCurrentTask();
                       const activePlayer = players[room.current_player_index];
                       const isMyTurn = activePlayer?.id === localPlayer?.id;
-                      const isHost = players[0]?.id === localPlayer?.id;
+                      const isHost = isRoomHost();
                       const canControlTurnTask = isMyTurn || isHost;
                       const difficultyLabel = t.difficulty ? { easy: "Makkelijk", medium: "Medium", hard: "Moeilijk" }[t.difficulty] : "";
                       const isSoloAiGame = t.type === 'arcade-game' && t.mode === 'solo' && hasArenaAi(t.gameId);
@@ -6530,13 +6661,16 @@ export default function App() {
                             const myWishChoice = wishChoices[localPlayer?.id];
                             const allPlayersChose = players.length > 0 && players.every(player => wishChoices[player.id]);
                             const canUseWish = !wishUsed[localPlayer?.id];
+                            const facilitatorView = isFacilitatorHost();
                             return (
                               <div className="round-announcement">
                                 <div className="bigicon" aria-hidden="true">✨</div>
                                 <div className="badge">Volgende ronde</div>
                                 <h2>{t.cat || t.title}</h2>
-                                <p>Iedereen krijgt dezelfde opdracht. Kies nu of je jouw eenmalige verdubbelaar inzet.</p>
-                                {!myWishChoice ? (
+                                <p>{facilitatorView ? 'De spelers kiezen nu of zij hun eenmalige verdubbelaar inzetten.' : 'Iedereen krijgt dezelfde opdracht. Kies nu of je jouw eenmalige verdubbelaar inzet.'}</p>
+                                {facilitatorView ? (
+                                  <div className="notice" style={{ marginTop: '14px' }}>Spelleiderweergave · je telt niet mee als speler.</div>
+                                ) : !myWishChoice ? (
                                   <div className="btnrow one" style={{ marginTop: '16px' }}>
                                     {canUseWish && (
                                       <button className="btn primary" onClick={() => handleDoubleWishChoice('double')}>
@@ -6566,6 +6700,7 @@ export default function App() {
 
                           <h2 style={isRoundAnnouncement ? { display: 'none' } : undefined}>{t.title}</h2>
                           <div className="prompt" style={isRoundAnnouncement ? { display: 'none' } : undefined}>{t.text}</div>
+                          {!isRoundAnnouncement && renderFacilitatorDashboard(t)}
 
                            <div className={t.type === 'arcade-game' && t.gameId === 'qwixx' ? 'task-game-content task-game-content-qwixx' : 'task-game-content'} style={{ marginTop: '20px', ...(isRoundAnnouncement ? { display: 'none' } : {}) }}>
                             {/* -1. DISNEY DUEL ARENA */}
@@ -6929,7 +7064,7 @@ export default function App() {
                                         Antwoord opgeslagen. Wachten op de rest...
                                       </div>
                                     )}
-                                    {quizLocked && players[0]?.id === localPlayer?.id && (
+                                    {quizLocked && isRoomHost() && (
                                       <div style={{ marginTop: '12px' }}>
                                         <button className="btn primary full" onClick={handleFinishTask}>
                                           Volgende opdracht
@@ -7728,18 +7863,18 @@ export default function App() {
                                 {t.seconds && (
                                   <div id="timerArea" style={{ textAlign: 'center', marginBottom: '12px' }}>
                                     <div className={`timer ${secondsLeft <= 10 ? 'low' : ''}`}>{secondsLeft || t.seconds}</div>
-                                    {players[0]?.id === localPlayer?.id && !timerRunning && (
+                                    {isRoomHost() && !timerRunning && (
                                       <button className="btn secondary" onClick={() => handleStartGroupTimer(t.seconds)}>
                                         {room.current_task_state?.timerStartedAt ? 'Start timer opnieuw' : 'Start timer'}
                                       </button>
                                     )}
-                                    {players[0]?.id !== localPlayer?.id && !timerRunning && (
+                                    {!isRoomHost() && !timerRunning && (
                                       <p className="small">De host kan de timer starten.</p>
                                     )}
                                   </div>
                                 )}
                                 
-                                {players[0]?.id === localPlayer?.id && (
+                                {isRoomHost() && (
                                   <div className="btnrow" style={{ marginTop: '12px' }}>
                                     <button className="btn ok" onClick={() => handleGroupScoreAward(t.points || 1)}>
                                       Missie geslaagd (+{t.points || 1} ★ elk)
@@ -7774,7 +7909,7 @@ export default function App() {
                   ) : (
                     <section className="card center">
                       <p>Klaarmaken van de volgende opdracht...</p>
-                      {players[0]?.id === localPlayer?.id && (
+                      {isRoomHost() && (
                         <button className="btn primary" onClick={() => selectNextTask(room, players)}>
                           Opdracht Laden
                         </button>
