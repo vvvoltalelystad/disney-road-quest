@@ -5539,14 +5539,12 @@ export default function App() {
                   return Number(item.score) > 0 ? 'win' : 'loss';
                 };
                 const gameResults = games.map(item => ({ ...item, result: classifyResult(item) }));
-                const groupedGames = Object.values(gameResults.reduce((groups, item) => {
-                  const gameName = item.gameType || 'Onbekend spel';
-                  const current = groups[gameName] || { name: gameName, played: 0, win: 0, draw: 0, loss: 0 };
-                  current.played += 1;
-                  current[item.result] += 1;
-                  groups[gameName] = current;
-                  return groups;
-                }, {}));
+                const sortedGames = [...gameResults].sort((a, b) => new Date(b.date || 0) - new Date(a.date || 0));
+                const resultLabels = {
+                  win: 'Gewonnen',
+                  draw: 'Gelijk',
+                  loss: 'Verloren'
+                };
                 const totalWins = gameResults.filter(item => item.result === 'win').length;
                 const totalDraws = gameResults.filter(item => item.result === 'draw').length;
                 const totalLosses = gameResults.filter(item => item.result === 'loss').length;
@@ -5569,8 +5567,12 @@ export default function App() {
                       <div><strong>{totalLosses}</strong><span>verloren</span></div>
                     </div>
                     <h3>Gespeelde spellen</h3>
-                    {groupedGames.length ? <div className="dashboard-games">{groupedGames.map(game => (
-                      <div key={game.name}><strong>{game.name}</strong><span>{game.played}× gespeeld</span><small>{game.win} gewonnen · {game.draw} gelijk · {game.loss} verloren</small></div>
+                    {sortedGames.length ? <div className="dashboard-games" aria-label="Gespeelde spellen, nieuwste eerst">{sortedGames.map((game, index) => (
+                      <div key={`${game.date || 'game'}-${game.gameType || 'onbekend'}-${index}`}>
+                        <strong>{game.gameType || 'Onbekend spel'}</strong>
+                        <span className={`dashboard-game-result ${game.result}`}>{resultLabels[game.result]}</span>
+                        <small>{game.date ? new Date(game.date).toLocaleString('nl-NL') : 'Datum onbekend'}</small>
+                      </div>
                     ))}</div> : <p className="small">Nog geen spellen geregistreerd voor dit profiel.</p>}
                     <h3>Coco Coins</h3>
                     <section className={`dashboard-ledger ${openLedgerSection === 'earned' ? 'is-open' : ''}`}>
