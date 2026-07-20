@@ -6630,14 +6630,6 @@ export const DEFAULT_TASKS = [
     "text": "Noem samen binnen 45 seconden acht films die na het jaar 2010 zijn uitgebracht.",
     "seconds": 45,
     "points": 1
-  },
-  {
-    "id": "mastermind-01",
-    "cat": "Disney Mastermind",
-    "type": "mastermind",
-    "title": "Code Breaker",
-    "text": "Kraak de geheime code van Disney-figuren in zo min mogelijk beurten!",
-    "points": 3
   }
 ];
 

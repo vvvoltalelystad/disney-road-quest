@@ -3257,6 +3257,7 @@ export default function App() {
 
     const activeTasks = DEFAULT_TASKS.filter(t => 
       t.active !== false && 
+      t.type !== 'mastermind' &&
       (currentRoom.game_mode === 'mix' || t.cat === currentRoom.game_mode) &&
       enabledCats.includes(t.cat)
     );
@@ -3348,7 +3349,9 @@ export default function App() {
         part: selected.type === 'diary' ? 1 : undefined,
         answers: selected.type === 'diary' ? {} : undefined,
         lines: selected.type === 'draw' ? [] : undefined,
+        pictionaryGuesses: selected.type === 'draw' ? {} : undefined,
         estimate: undefined,
+        estimates: {},
         votes: (selected.type === 'dilemma' || selected.type === 'estimate') ? {} : undefined,
         tinkActive: false,
         hyperdriveActive: false,
@@ -3914,13 +3917,18 @@ export default function App() {
   const handleSendEstimate = async () => {
     const val = Math.round(Number(localEstimate));
     if (isNaN(val)) return;
+    const { room: freshRoom } = await fetchRoomData(room.id);
+    const freshState = freshRoom.current_task_state || {};
+    const estimates = { ...(freshState.estimates || {}) };
+    if (estimates[localPlayer.id] !== undefined) return;
+    estimates[localPlayer.id] = val;
     await updateRoomState(room.id, {
       current_task_state: {
-        ...room.current_task_state,
-        estimate: val,
-        votes: {}
+        ...freshState,
+        estimates
       }
     });
+    setLocalEstimate('');
   };
 
   const handleVoteEstimate = async (direction) => {
@@ -3936,31 +3944,61 @@ export default function App() {
 
   const handleResolveEstimate = async (t) => {
     const correct = t.correct_value;
-    const estimate = room.current_task_state.estimate;
-    const votes = room.current_task_state.votes || {};
-    const activePlayer = players[room.current_player_index];
+    const estimates = room.current_task_state.estimates || {};
+    const distances = players
+      .filter(p => estimates[p.id] !== undefined)
+      .map(p => ({ player: p, distance: Math.abs(Number(estimates[p.id]) - correct) }));
+    const bestDistance = distances.length ? Math.min(...distances.map(item => item.distance)) : null;
+    await Promise.all(distances
+      .filter(item => item.distance === bestDistance)
+      .map(({ player }) => addPlayerScore(
+        room.id,
+        player,
+        2 * getRoundMultiplier(player.id),
+        `Inschattingsvraag: dichtst bij ${correct} ${t.unit}`,
+        'knowledge'
+      )));
 
-    const isHigher = correct > estimate;
-    const otherPlayers = players.filter(p => p.id !== activePlayer?.id);
-    const wrongVotes = otherPlayers.filter(p => {
-      const vote = votes[p.id];
-      const voteCorrect = (vote === 'higher' && isHigher) || (vote === 'lower' && !isHigher);
-      return vote && !voteCorrect;
-    });
+    await handleFinishTask();
+  };
 
-    if (activePlayer && wrongVotes.length > 0) {
-      const bonus = wrongVotes.length === otherPlayers.length ? 1 : 0;
-      const basePts = wrongVotes.length + bonus;
-      const pts = basePts * getRoundMultiplier(activePlayer.id);
+  const handleSubmitPictionaryGuess = async (t) => {
+    const typed = localEstimate.trim();
+    if (!typed || !localPlayer?.id) return;
+    const { room: freshRoom, players: freshPlayers } = await fetchRoomData(room.id);
+    const freshState = freshRoom.current_task_state || {};
+    const guesses = { ...(freshState.pictionaryGuesses || {}) };
+    if (guesses[localPlayer.id]) return;
+    const correct = match(typed, [t.text]);
+    guesses[localPlayer.id] = { text: typed, correct };
+    if (correct) {
       await addPlayerScore(
         room.id,
-        activePlayer,
-        pts,
-        `Inschatting: ${wrongVotes.length} speler(s) verkeerd gestuurd${bonus ? ' + bonus' : ''} (${correct})`,
-        'knowledge'
+        freshPlayers.find(p => p.id === localPlayer.id) || localPlayer,
+        2 * getRoundMultiplier(localPlayer.id, freshState),
+        'Pictionary: tekening correct geraden',
+        'creative'
       );
     }
+    await updateRoomState(room.id, {
+      current_task_state: { ...freshState, pictionaryGuesses: guesses }
+    });
+    setLocalEstimate('');
+  };
 
+  const handleResolvePictionary = async () => {
+    const drawer = players[room.current_player_index];
+    const guesses = room.current_task_state?.pictionaryGuesses || {};
+    const hasCorrectGuess = Object.values(guesses).some(guess => guess?.correct);
+    if (drawer && hasCorrectGuess) {
+      await addPlayerScore(
+        room.id,
+        drawer,
+        2 * getRoundMultiplier(drawer.id),
+        'Pictionary: tekening succesvol geraden',
+        'creative'
+      );
+    }
     await handleFinishTask();
   };
 
@@ -6961,6 +6999,10 @@ export default function App() {
 
                             {/* 4. PICTIONARY */}
                             {t.type === "draw" && (() => {
+                              const guesses = room.current_task_state?.pictionaryGuesses || {};
+                              const guessers = players.filter(p => p.id !== activePlayer?.id);
+                              const allGuessed = guessers.length === 0 || guessers.every(p => guesses[p.id]);
+                              const myGuess = guesses[localPlayer?.id];
                               return (
                                 <div>
                                   {isMyTurn ? (
@@ -7009,26 +7051,25 @@ export default function App() {
                                       </div>
 
                                       <div style={{ marginTop: '18px' }}>
-                                        <label>Wie heeft het geraden?</label>
-                                        <div className="answers">
-                                          {players.map((p, idx) => (
-                                            p.id !== localPlayer.id && (
-                                              <button key={p.id} className="answer" onClick={() => handlePictionaryGuessed(idx)}>
-                                                ⭐ {p.name}
-                                              </button>
-                                            )
-                                          ))}
-                                          <button className="btn danger full" onClick={handleFinishTask} style={{ marginTop: '8px' }}>
-                                            Niemand heeft het geraden
-                                          </button>
-                                        </div>
+                                        <label>Antwoorden ({Object.keys(guesses).length}/{guessers.length})</label>
+                                        {guessers.map(p => (
+                                          <div key={p.id} className="playerline" style={{ marginBottom: '5px' }}>
+                                            <span>{p.name}</span>
+                                            <strong style={{ color: guesses[p.id] ? (guesses[p.id].correct ? 'var(--ok)' : 'var(--danger)') : 'var(--muted)' }}>
+                                              {guesses[p.id] ? `${guesses[p.id].text} ${guesses[p.id].correct ? '✓' : '✕'}` : 'Tekening bekijken…'}
+                                            </strong>
+                                          </div>
+                                        ))}
+                                        <button className="btn primary full" disabled={!allGuessed} onClick={handleResolvePictionary} style={{ marginTop: '10px' }}>
+                                          Uitslag tonen en doorgaan
+                                        </button>
                                       </div>
                                     </div>
                                   ) : (
                                     // Guesser UI
                                     <div>
                                       <div className="notice" style={{ background: '#0a1c3c' }}>
-                                        <strong>Raad wat {activePlayer?.name} tekent! 🎨</strong> Roep het antwoord in de auto zodra je het weet!
+                                        <strong>Raad wat {activePlayer?.name} tekent! 🎨</strong> Vul je antwoord op je eigen scherm in.
                                       </div>
 
                                       <svg 
@@ -7048,9 +7089,21 @@ export default function App() {
                                           />
                                         ))}
                                       </svg>
-                                      <div className="center" style={{ marginTop: '12px', color: 'var(--muted)' }}>
-                                        Tekening synchroniseert live... ⏳
-                                      </div>
+                                      {myGuess ? (
+                                        <div className="notice green" style={{ marginTop: '12px' }}>
+                                          Antwoord opgeslagen. Wachten op de andere spelers…
+                                        </div>
+                                      ) : (
+                                        <div style={{ marginTop: '12px' }}>
+                                          <div className="field">
+                                            <label>Wat wordt er getekend?</label>
+                                            <input value={localEstimate} onChange={e => setLocalEstimate(e.target.value)} placeholder="Vul je antwoord in" />
+                                          </div>
+                                          <button className="btn primary full" disabled={!localEstimate.trim()} onClick={() => handleSubmitPictionaryGuess(t)}>
+                                            Antwoord bevestigen
+                                          </button>
+                                        </div>
+                                      )}
                                     </div>
                                   )}
                                 </div>
@@ -7059,95 +7112,51 @@ export default function App() {
 
                             {/* 5. INSCHATTINGSVRAGEN */}
                             {t.type === "estimate" && (() => {
-                              const estimate = room.current_task_state.estimate;
-                              const votes = room.current_task_state.votes || {};
-                              
-                              if (isMyTurn) {
-                                const hasEstimated = estimate !== undefined;
-                                const allVoted = players
-                                  .filter(p => p.id !== localPlayer.id)
-                                  .every(p => votes[p.id]);
-
-                                return (
-                                  <div>
-                                    {!hasEstimated ? (
-                                      <div>
-                                        <div className="field">
-                                          <label>Jouw Schatting ({t.unit}):</label>
-                                          <input type="number" placeholder={`Bijv. 1500`} value={localEstimate} onChange={e => setLocalEstimate(e.target.value)} />
-                                        </div>
-                                        <button className="btn primary full" disabled={!localEstimate} onClick={handleSendEstimate}>
-                                          Schatting verzenden
-                                        </button>
-                                      </div>
-                                    ) : (
-                                      <div>
-                                        <div className="notice green">
-                                          Jouw schatting: <strong>{estimate} {t.unit}</strong>.
-                                        </div>
-                                        <div className="notice" style={{ background: '#0a2042' }}>
-                                          Jij krijgt 1 ster voor elke medespeler die hoger/lager verkeerd kiest.
-                                          Kiest iedereen verkeerd, dan krijg je 1 bonusster.
-                                        </div>
-                                        
-                                        <div style={{ marginBottom: '14px' }}>
-                                          <label>Hoger of Lager stemmen:</label>
-                                          {players.filter(p => p.id !== localPlayer.id).map(p => {
-                                            const v = votes[p.id];
-                                            return (
-                                              <div key={p.id} style={{ display: 'flex', justifyContent: 'space-between', padding: '6px 8px', background: '#07152d', borderRadius: '8px', marginBottom: '4px', fontSize: '13px' }}>
-                                                <span>{p.name}</span>
-                                                <span style={{ color: v ? 'var(--ok)' : 'var(--danger)' }}>
-                                                  {v ? (v === 'higher' ? 'Hoger ⬆️' : 'Lager ⬇️') : 'Stemmen... ⏳'}
-                                                </span>
-                                              </div>
-                                            );
-                                          })}
-                                        </div>
-
-                                        <div className="notice" style={{ background: '#0c2145' }}>
-                                          Het juiste antwoord is: <strong>{t.correct_value} {t.unit}</strong>
-                                        </div>
-
-                                        <button className="btn primary full" disabled={!allVoted} onClick={() => handleResolveEstimate(t)}>
-                                          Puntentelling valideren & doorgaan
-                                        </button>
-                                      </div>
-                                    )}
+                              const estimates = room.current_task_state.estimates || {};
+                              const myEstimate = estimates[localPlayer.id];
+                              const allEstimated = players.length > 0 && players.every(p => estimates[p.id] !== undefined);
+                              const submittedCount = players.filter(p => estimates[p.id] !== undefined).length;
+                              return (
+                                <div>
+                                  <div className="notice" style={{ background: '#0a2042' }}>
+                                    Iedereen maakt tegelijk een eigen schatting. Wie het dichtst bij het juiste antwoord zit, verdient 2 sterren. Gedeelde eerste plaats betekent gedeelde winst.
                                   </div>
-                                );
-                              } else {
-                                const hasEstimated = estimate !== undefined;
-                                const myVote = votes[localPlayer.id];
-
-                                return (
-                                  <div>
-                                    {!hasEstimated ? (
-                                      <div className="center">Wachten tot {activePlayer?.name} zijn/haar schatting indient...</div>
-                                    ) : (
-                                      <div>
-                                        <div className="notice">
-                                          {activePlayer?.name} schat: <strong style={{ fontSize: '22px', display: 'block', margin: '4px 0' }}>{estimate} {t.unit}</strong>
-                                        </div>
-                                        
-                                        {myVote ? (
-                                          <div className="notice green">
-                                            Je hebt gestemd: <strong>{myVote === 'higher' ? 'Hoger ⬆️' : 'Lager ⬇️'}</strong>. Wachten tot iedereen gestemd heeft...
-                                          </div>
-                                        ) : (
-                                          <div>
-                                            <p className="center">Is het werkelijke antwoord hoger of lager?</p>
-                                            <div className="btnrow" style={{ marginTop: '12px' }}>
-                                              <button className="btn primary" onClick={() => handleVoteEstimate('higher')}>Hoger ⬆️</button>
-                                              <button className="btn secondary" onClick={() => handleVoteEstimate('lower')}>Lager ⬇️</button>
-                                            </div>
-                                          </div>
-                                        )}
+                                  {myEstimate === undefined ? (
+                                    <div>
+                                      <div className="field">
+                                        <label>Jouw schatting ({t.unit})</label>
+                                        <input type="number" inputMode="numeric" placeholder="Vul een getal in" value={localEstimate} onChange={e => setLocalEstimate(e.target.value)} />
                                       </div>
-                                    )}
-                                  </div>
-                                );
-                              }
+                                      <button className="btn primary full" disabled={!localEstimate} onClick={handleSendEstimate}>
+                                        Schatting bevestigen
+                                      </button>
+                                    </div>
+                                  ) : (
+                                    <div className="notice green">
+                                      Jouw schatting: <strong>{myEstimate} {t.unit}</strong>. {submittedCount}/{players.length} spelers zijn klaar.
+                                    </div>
+                                  )}
+                                  {allEstimated && (
+                                    <div style={{ marginTop: '14px' }}>
+                                      <div className="notice" style={{ background: '#0c2145' }}>
+                                        Juiste antwoord: <strong>{t.correct_value} {t.unit}</strong>
+                                      </div>
+                                      <div className="players" style={{ marginBottom: '12px' }}>
+                                        {players.map(p => (
+                                          <div key={p.id} className="playerline">
+                                            <span>{p.name}</span><strong>{estimates[p.id]} {t.unit}</strong>
+                                          </div>
+                                        ))}
+                                      </div>
+                                      {isHost && (
+                                        <button className="btn primary full" onClick={() => handleResolveEstimate(t)}>
+                                          Winnaar bepalen en doorgaan
+                                        </button>
+                                      )}
+                                    </div>
+                                  )}
+                                </div>
+                              );
                             })()}
 
                             {/* 6. DILEMMA */}
