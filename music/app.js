@@ -1,6 +1,6 @@
 // Build trigger: 2026-07-04 23:22
 "use strict";
-const DMQ_VERSION='77';
+const DMQ_VERSION='78';
 const cfg=window.DMQ_CONFIG||{};
 const COLORS=[['blue','Blauw','#00e5ff'],['green','Groen','#2eff7d'],['yellow','Geel','#ffd615'],['pink','Roze','#ff2a85'],['purple','Paars','#bd53ed'],['orange','Oranje','#ff6b00']];
 const AVATARS=[['linguini','Alfredo Linguini','avatars/linguini.webp'],['bruno','Bruno','avatars/bruno.png'],['buzz','Buzz Lightyear','avatars/buzz.png'],['heihei','Heihei','avatars/heihei.png'],['hen-wen','Hen Wen','avatars/hen-wen.png'],['jack','Jack Sparrow','avatars/jack.png'],['kuzco','Kuzco','avatars/kuzco.png'],['medusa','Madame Medusa','avatars/medusa.png'],['maximus','Maximus','avatars/maximus.png'],['miguel','Miguel','avatars/miguel.png'],['mufasa','Mufasa','avatars/mufasa.png'],['mushu','Mushu','avatars/mushu.png'],['olaf','Olaf','avatars/olaf.png'],['pascal','Pascal','avatars/pascal.png'],['percy','Percy','avatars/percy.png'],['peter','Peter Pan','avatars/peter.png'],['redpanda','Red Panda','avatars/redpanda.png'],['remy','Remy','avatars/remy.png'],['stitch','Stitch','avatars/stitch.png'],['taran','Taran','avatars/taran.png']];
@@ -14,6 +14,13 @@ function configured(){return cfg.SUPABASE_URL&&cfg.SUPABASE_ANON_KEY&&!cfg.SUPAB
 function esc(v){return String(v??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#039;'}[c]))}
 function setupScreen(){app().innerHTML=`<section class="card hero"><div class="logo">♫</div><h1>Mickey's Music Match</h1><p>Origineel: Disney Music Quiz. Voer eerst supabase_setup.sql en supabase_setup_v2.sql uit en vul config.js in.</p></section>`}
 function app(){return document.getElementById('app')}
+function profileStorageKey(name){return String(name||'speler').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'').replace(/[^a-z0-9]/g,'')||'speler'}
+function portalUrl(action=''){const url=new URL('../',location.href);url.searchParams.set('portal','1');if(action)url.searchParams.set(action,'1');return url.toString()}
+function readMusicProfile(){const name=activeProfileName();if(!name)return null;const key=profileStorageKey(name);let preference={};let bank={};try{preference=JSON.parse(localStorage.getItem('disney_profile_preferences')||'{}')[key]||{}}catch(e){}try{bank=JSON.parse(localStorage.getItem('disney_coco_coin_bank')||'{}')}catch(e){}return{name,key,balance:Number(bank[key]||0),preference}}
+function musicTheme(){const profile=readMusicProfile();return profile?.preference?.theme||localStorage.getItem('disney_theme_mode')||'day'}
+function applyMusicTheme(){document.body.classList.toggle('music-night',musicTheme()==='night')}
+function toggleMusicTheme(){const profile=readMusicProfile();const next=musicTheme()==='night'?'day':'night';localStorage.setItem('disney_theme_mode',next);if(profile){try{const preferences=JSON.parse(localStorage.getItem('disney_profile_preferences')||'{}');preferences[profile.key]={...(preferences[profile.key]||{}),name:profile.name,theme:next};localStorage.setItem('disney_profile_preferences',JSON.stringify(preferences))}catch(e){}}applyMusicTheme();renderGlobalMusicHeader()}
+function renderGlobalMusicHeader(){const header=document.getElementById('globalMusicHeader');if(!header)return;const profile=readMusicProfile();if(!profile){header.hidden=true;return}const avatarId=profile.preference?.avatar||'';const avatarFile=avatarId?`avatars/${avatarId}.${avatarId==='linguini'?'webp':'png'}`:'';const color=C(profile.preference?.color).hex;header.hidden=false;header.innerHTML=`<div class="global-profile-pill"><a class="global-profile-segment global-profile-name-segment" href="${portalUrl('profile')}" aria-label="Wijzig profiel">${avatarFile?`<img class="global-profile-avatar" src="${avatarFile}" alt="" style="border-color:${color}">`:``}<span>${esc(profile.name)}</span></a><span class="global-profile-divider">·</span><a class="global-profile-segment global-profile-balance-segment" href="${portalUrl('coin')}" aria-label="Bekijk Coco Coin. Saldo: ${profile.balance}"><span>${profile.balance}</span><img src="../collectables/coco-coin-front.png" alt="Coco Coin"></a><span class="global-profile-divider">·</span><a class="global-profile-segment global-log-anchor" href="${portalUrl('log')}" aria-label="Open Captain's Log">⚓</a></div><button class="global-header-icon" type="button" onclick="toggleMusicTheme()" aria-label="Wissel dag- en nachtstand">${musicTheme()==='night'?'☀️':'🌙'}</button><button class="global-header-icon" type="button" onclick="returnToPortal()" aria-label="Terug">←</button>`;applyMusicTheme()}
 function toast(m){const e=document.getElementById('toast');e.textContent=m;e.classList.add('show');clearTimeout(e._t);e._t=setTimeout(()=>e.classList.remove('show'),2600)}
 function loading(m='Even laden…'){app().innerHTML=`<section class="card hero"><div class="spinner"></div><p>${esc(m)}</p></section>`}
 function fatal(m,e){console.error(e);app().innerHTML=`<section class="card"><h2>Er ging iets mis</h2><p>${esc(m)}</p><div class="notice red">${esc(e?.message||e)}</div><button class="btn primary full" onclick="location.reload()">Opnieuw</button></section>`}
@@ -25,7 +32,7 @@ function online(p){return Object.values(state.presence||{}).flat().some(x=>x.use
 function host(){return state.room?.host_user_id===state.user?.id}
 function playingHost(){return host()&&!!state.me}
 function facilitatorOnly(){return host()&&!state.me}
-function settings(){return{...DEFAULT_SETTINGS,...(state.room?.settings||{})}}
+function settings(){return{...DEFAULT_SETTINGS,...(state.room?.settings||{}),powers:false}}
 function hostLeaderId(){return state.room?.host_user_id||state.user?.id||null}
 function leaderId(){const s=settings();if(s.leader_mode==='fixed')return s.fixed_leader_player_id||hostLeaderId()||state.players[0]?.id||null;if(!state.players.length)return null;return state.players[(Math.max(1,state.room.current_round_no||1)-1)%state.players.length]?.id}
 function leader(){return state.me?.id===leaderId()||(host()&&settings().leader_mode==='fixed'&&leaderId()===hostLeaderId())}
@@ -121,6 +128,7 @@ async function refreshAll(){if(state.refreshing)return;if(!state.room){const nex
 function subscribe(){cleanup();state.channel=state.sb.channel('dmq2-'+state.room.id,{config:{presence:{key:state.user.id}}}).on('presence',{event:'sync'},()=>{state.presence=state.channel.presenceState();render()}).on('postgres_changes',{event:'*',schema:'public',table:'dmq_rooms',filter:`id=eq.${state.room.id}`},schedule).on('postgres_changes',{event:'*',schema:'public',table:'dmq_players',filter:`room_id=eq.${state.room.id}`},schedule).on('postgres_changes',{event:'*',schema:'public',table:'dmq_rounds',filter:`room_id=eq.${state.room.id}`},schedule).on('postgres_changes',{event:'*',schema:'public',table:'dmq_answers',filter:`room_id=eq.${state.room.id}`},schedule).subscribe(async s=>{if(s==='SUBSCRIBED')await state.channel.track({user_id:state.user.id,name:state.me?.name||'organisator'})});state.poll=setInterval(refreshAll,4500)}
 function cleanup(){if(state.poll)clearInterval(state.poll);state.poll=null;if(state.channel&&state.sb)state.sb.removeChannel(state.channel).catch(()=>{});state.channel=null}
 function render(){
+  renderGlobalMusicHeader();
   const activeId=document.activeElement?.id;
   const selStart=document.activeElement?.selectionStart;
   const selEnd=document.activeElement?.selectionEnd;
@@ -186,7 +194,7 @@ function openSongAdminFromLobby(){
 }
 
 function returnToPortal(){window.location.href='../?portal=1'}
-function renderHome(){app().innerHTML=`<section class="card hero music-home-hero"><button class="music-hero-mark" type="button" onclick="returnToPortal()" aria-label="Terug naar Portal"><img src="../portal/mickey_singing.png" alt="Mickey's Music Match"></button><div class="badge">Origineel: Disney Music Quiz</div><h1><span>Mickey's</span> <span class="music-accent">Music Match</span></h1><p>Start een kamer en laat medespelers met hun gekozen Disney-profiel aansluiten.</p></section><section class="card hostcard"><h2>Spel organiseren</h2><p>Jij telt niet automatisch mee als speler.</p><button class="btn primary full" onclick="createRoom()">Nieuwe game maken</button></section><section class="card"><h2>Meedoen of hervatten</h2><div class="field"><label>Kamercode</label><input id="homeCode" maxlength="6" autocapitalize="characters" value="${esc(state.joinCode)}"></div><button class="btn secondary full" onclick="goJoin()">Deelnemen als nieuwe speler</button><button class="btn ghost full" style="margin-top:10px" onclick="resumePlayer()">Hervat als speler</button><button class="btn ghost full" style="margin-top:10px" onclick="resumeHost()">Hervat als organisator</button><p class="small muted" style="margin:12px 0 0">Hervatten opent de bestaande kamer precies bij de huidige ronde en score.</p></section><section class="card"><button class="btn ghost full" onclick="state.view='admin';render()">⚙️ Songbeheer · 150 songs</button></section>`}
+function renderHome(){app().innerHTML=`<section class="card hero music-home-hero"><button class="music-hero-mark" type="button" onclick="returnToPortal()" aria-label="Terug naar Portal"><img src="../portal/mickey_singing.png" alt="Mickey's Music Match"></button><div class="badge">Origineel: Disney Music Quiz</div><h1><span>Mickey's</span> <span class="music-accent">Music Match</span></h1><p>Start een kamer en laat medespelers met hun gekozen Disney-profiel aansluiten.</p></section><section class="card hostcard"><h2>Spel organiseren</h2><p>Jij telt niet automatisch mee als speler.</p><button class="btn primary full" onclick="createRoom()">Nieuwe game maken</button></section><section class="card"><h2>Meedoen of hervatten</h2><div class="field"><label>Kamercode</label><input id="homeCode" maxlength="6" autocapitalize="characters" value="${esc(state.joinCode)}"></div><button class="btn secondary full" onclick="goJoin()">Deelnemen als nieuwe speler</button><button class="btn ghost full" style="margin-top:10px" onclick="resumePlayer()">Hervat als speler</button><button class="btn ghost full" style="margin-top:10px" onclick="resumeHost()">Hervat als organisator</button><p class="small muted" style="margin:12px 0 0">Hervatten opent de bestaande kamer precies bij de huidige ronde en score.</p></section><section class="card"><button class="btn ghost full" onclick="state.view='admin';render()">⚙️ Songbeheer · 300 songs</button></section>`}
 function homeCode(){return (document.getElementById('homeCode')?.value||'').trim().toUpperCase()}
 async function goJoin(){state.joinCode=homeCode();state.view='join';loading('Vrije kleuren en avatars laden…');await loadJoinChoices(state.joinCode);render()}
 async function resumeHost(){const code=homeCode();if(!code){toast('Vul de kamercode in.');return}loading('Organisatorrol herstellen…');const r=await state.sb.rpc('dmq_resume_host',{p_code:code});if(r.error){fatal('Hervatten als organisator mislukt.',r.error);return}const row=Array.isArray(r.data)?r.data[0]:r.data;history.replaceState(null,'',`${location.pathname}?host=${code}&v=${DMQ_VERSION}`);await loadRoom(row.room_id||row,false)}
@@ -239,7 +247,7 @@ function organizerPanel(){
         <button class="btn secondary" onclick="regenerateRoomCode()">Nieuwe kamercode</button>
         <button class="btn danger" onclick="resetRoomToLobby()">Spel herstellen</button>
       </div>
-      <button class="btn ghost full" style="margin-top:9px" onclick="openSongAdminFromLobby()">⚙️ Songbeheer · 150 songs openen</button>
+      <button class="btn ghost full" style="margin-top:9px" onclick="openSongAdminFromLobby()">⚙️ Songbeheer · 300 songs openen</button>
       <hr><h3>Spelers beheren</h3>
       ${state.players.length?state.players.map(p=>`
         <div class="adminsong">
@@ -309,20 +317,11 @@ function renderLobby(){
       </div>
     </div>
     <div class="notice blue">Music Match wordt zonder antwoordtimer gespeeld. Iedereen kan rustig invullen en bevestigen.</div>
-    <div class="grid2" style="margin-top:10px">
-      ${state.lobbySettings.answerTimeLimit==='none'?`<div class="field"><label>Krachten per speler</label><div class="notice blue" style="margin:0">2 kaarten: 1 individuele kracht + 1 andere kracht.</div></div>`:`<div class="field"><label>Krachten per speler</label>
-        <select id="cardsPerPlayer" onchange="state.lobbySettings.cards_per_player = Number(this.value); validateCardsCount(); renderLobby();">
-          <option value="1" ${state.lobbySettings.cards_per_player === 1?'selected':''}>1 kaart</option>
-          <option value="2" ${state.lobbySettings.cards_per_player === 2?'selected':''}>2 kaarten</option>
-          <option value="3" ${(state.lobbySettings.cards_per_player === 3 || !state.lobbySettings.cards_per_player)?'selected':''}${state.players.length>=5?' disabled':''}>3 kaarten (max 4 spl)</option>
-        </select>
-      </div>`}
-      <div class="field"><label>Spelleider</label>
+    <div class="field" style="margin-top:10px"><label>Spelleider</label>
         <select id="leaderMode" onchange="state.lobbySettings.leaderMode = this.value; renderLobby();">
           <option value="rotating" ${state.lobbySettings.leaderMode === 'rotating'?'selected':''}>Roulerend</option>
           <option value="fixed" ${state.lobbySettings.leaderMode === 'fixed'?'selected':''}>Vast</option>
         </select>
-      </div>
     </div>
     <div class="field" id="fixedLeaderWrap" style="display: ${state.lobbySettings.leaderMode === 'fixed' ? 'block' : 'none'}">
       <label>Vaste spelleider</label>
@@ -333,12 +332,11 @@ function renderLobby(){
     </div>
     <h3>Extra spelregels</h3>
     ${toggle('streaks','Muzikale streaks',state.lobbySettings.streaks,'streaks')}
-    ${toggle('powers','Attractiekrachten',state.lobbySettings.powers,'powers')}
     ${toggle('jackpot','Soundtrack Jackpot',state.lobbySettings.jackpot,'jackpot')}
     ${toggle('stats','Extra statistiektitels',state.lobbySettings.stat_titles,'stat_titles')}
     ${toggle('bet','Geheime inzet finale',state.lobbySettings.final_bet,'final_bet')}
     ${toggle('anim','Feestelijke animaties',state.lobbySettings.animations,'animations')}
-    ${state.lobbySettings.answerTimeLimit==='none'?'<div class="notice blue">Zonder tijdsdruk krijgt iedereen precies 2 kaarten: altijd 1 individuele kracht en maximaal 1 gezamenlijke kracht. Tweede Val, Lichtsnelheid en Turbo Boost vallen weg.</div>':''}
+    <div class="notice blue">Attractiekrachten zijn uitgeschakeld. Music Match draait volledig om de muziekkennis en de geheime finale-inzet.</div>
     <div class="notice ${activeCount>=state.lobbySettings.roundCount?'green':'red'}"><strong>${activeCount} actieve songs beschikbaar.</strong> Voor ${state.lobbySettings.roundCount} rondes zijn minimaal ${state.lobbySettings.roundCount} actieve songs met titel, film, jaar en Spotify-link/scancode nodig.</div>
     ${state.startError?`<div class="notice red"><strong>Starten lukt niet:</strong> ${esc(state.startError)}</div>`:''}
     <div class="notice blue">Na starten kun jij naar Hitster wisselen.</div>
@@ -347,6 +345,7 @@ function renderLobby(){
   ${organizerPanel()}`;
 }
 function getSongPopularity(s){
+  if(s.question_profile)return s.question_profile==='iconic'?'high':s.question_profile==='deep'||s.question_profile==='score'?'low':'medium';
   const n=Number(s.song_number);
   const high=[1,2,3,4,5,6,9,10,11,12,15,16,17,20,21,22,25,26,30,31,40,43,47,48,96,97,100,
                101,102,103,104,107,108,110,113,115,119,122,126,127,130,132,134,135,143,144,147,148,149,150];
@@ -357,17 +356,18 @@ function getSongPopularity(s){
   return 'medium';
 }
 function qtype(mode,s){
-  if(mode!=='mix')return mode;
+  const allowed=Array.isArray(s.allowed_questions)&&s.allowed_questions.length?s.allowed_questions:['film','title','year','artist'];
+  if(mode!=='mix')return allowed.includes(mode)?mode:allowed[Math.floor(Math.random()*allowed.length)];
   const pop=getSongPopularity(s);
   if(pop==='low'){
-    const opts=['year','title','film'];
+    const opts=['year','title','film'].filter(type=>allowed.includes(type));
     return opts[Math.floor(Math.random()*opts.length)];
   }
   if(pop==='medium'){
-    const opts=['year_film','year_title','film_title'];
+    const opts=['year_film','year_title','film_title'].filter(type=>type.split('_').every(part=>allowed.includes(part)));
     return opts[Math.floor(Math.random()*opts.length)];
   }
-  const opts=['year_film_artist','year_title_artist','film_title_artist','full'];
+  const opts=['year_film_artist','year_title_artist','film_title_artist','full'].filter(type=>(type==='full'?['film','title','year']:type.split('_')).every(part=>allowed.includes(part)));
   return opts[Math.floor(Math.random()*opts.length)];
 }
 async function startGame(){
@@ -378,14 +378,14 @@ async function startGame(){
     const songs=shuffle(activeSongs()).slice(0,total);
     if(state.players.length<2)throw new Error('Er zijn minimaal twee spelers nodig.');
     if(!state.players.every(online))throw new Error('Niet alle spelers worden als online gezien. Laat iedereen de wachtruimte openhouden en druk op ↻.');
-    if(songs.length<total)throw new Error(`Er zijn ${songs.length} actieve songs, maar je hebt ${total} rondes gekozen. Activeer meer songs in Songbeheer · 150 songs.`);
+    if(songs.length<total)throw new Error(`Er zijn ${songs.length} actieve songs, maar je hebt ${total} rondes gekozen. Activeer meer songs in Songbeheer · 300 songs.`);
     const lm=state.lobbySettings.leaderMode||'rotating';
     const answerTimeLimit='none';
     const fixedLeaderId=state.lobbySettings.fixedLeader||hostLeaderId()||state.players[0]?.id||null;
     const fixedLeaderName=fixedLeaderId===hostLeaderId()?(activeProfileName()||'Organisator'):state.players.find(player=>player.id===fixedLeaderId)?.name||null;
     const set={
       streaks:state.lobbySettings.streaks,
-      powers:state.lobbySettings.powers,
+      powers:false,
       quick_guess:answerTimeLimit!=='none',
       answer_time_limit:answerTimeLimit,
       jackpot:state.lobbySettings.jackpot,
@@ -819,7 +819,7 @@ function renderFinal(){
 function awardFinalMusicReward(){if(!state.me||!state.room)return;const key=`dmq-final-reward-${state.room.id}-${state.me.id}`;if(localStorage.getItem(key))return;const reward=finalCoinReward(state.me);awardDisneyStars(state.me.name,reward);localStorage.setItem(key,String(reward));syncFinalMusicReward(state.me.name,reward,key).catch(console.error);recordMusicResult(state.me)}
 async function syncFinalMusicReward(name,reward,receipt){if(!state.sb||reward<=0)return;const atomic=await state.sb.rpc('dmq_award_coco_reward',{p_receipt:receipt,p_profile_key:disneyStarKey(name),p_amount:reward});if(!atomic.error)return;console.warn('Atomaire beloning nog niet beschikbaar.',atomic.error)}
 function recordMusicResult(player){const key=`dmq-history-${state.room.id}-${player.id}`;if(localStorage.getItem(key))return;const rank=competitionRank(player);const history=JSON.parse(localStorage.getItem('disney_solo_history')||'[]');history.unshift({profileName:player.name,profileKey:disneyStarKey(player.name),category:'music-match',gameType:"Mickey's Music Match",date:new Date().toISOString(),score:player.score,details:rank===1?'Gewonnen':`Geëindigd op plaats ${rank}`});localStorage.setItem('disney_solo_history',JSON.stringify(history));localStorage.setItem(key,'1')}
-function renderAdmin(){let s=state.songs.find(x=>+x.song_number===+state.adminSelectedSong)||{};app().innerHTML=`${topbar('Songbeheer · 150 songs',"state.view='home';render()")}
+function renderAdmin(){let s=state.songs.find(x=>+x.song_number===+state.adminSelectedSong)||{};app().innerHTML=`${topbar('Songbeheer · 300 songs',"state.view='home';render()")}
 <section class="card"><div class="field"><label>Beheer-PIN</label><input id="adminPin" type="password" value="${esc(state.adminPin)}"></div><div class="field"><label>Song</label><select id="songSelect" onchange="selectAdminSong(this.value)">${state.songs.map(x=>`<option value="${x.song_number}" ${+x.song_number===+state.adminSelectedSong?'selected':''}>${esc(x.label)} · ${esc(x.title||'leeg')}</option>`).join('')}</select></div></section>
 <section class="card"><div class="field"><label>Titel</label><input id="songTitle" value="${esc(s.title||'')}"></div><div class="field"><label>Film</label><input id="songFilm" value="${esc(s.film||'')}"></div><div class="grid2"><div class="field"><label>Jaar</label><input id="songYear" type="number" value="${esc(s.year||'')}"></div><div class="field"><label>Uitvoerder</label><input id="songArtist" value="${esc(s.artist||'')}"></div></div><div class="field"><label>Spotify-link</label><input id="songSpotify" value="${esc(s.spotify_url||'')}"></div><div class="field"><label>Codeafbeelding-URL</label><input id="songCode" value="${esc(s.code_image_url||'')}"></div><div class="field"><label>Film-aliases</label><input id="filmAliases" value="${esc((s.film_aliases||[]).join(', '))}"></div><div class="field"><label>Titel-aliases</label><input id="titleAliases" value="${esc((s.title_aliases||[]).join(', '))}"></div><div class="field"><label>Uitvoerder-aliases</label><input id="artistAliases" value="${esc((s.artist_aliases||[]).join(', '))}"></div><label class="toggleline">Song actief<input id="songEnabled" type="checkbox" ${s.enabled?'checked':''}></label><button class="btn primary full" onclick="saveSong()">Opslaan</button></section>`}
 function list(v){return String(v||'').split(',').map(x=>x.trim()).filter(Boolean)}
