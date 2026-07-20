@@ -7,6 +7,11 @@ const csvPath = path.join(root, 'public/music/song_library_100_spotify.csv');
 const [headerLine, ...lines] = fs.readFileSync(csvPath, 'utf8').trim().split(/\r?\n/);
 const headers = headerLine.split(';');
 const songs = lines.map((line) => Object.fromEntries(headers.map((header, index) => [header, line.split(';')[index]])));
+const expansion = fs.readFileSync(path.join(root, 'public/music/supabase_songs_150_expansion.sql'), 'utf8');
+for (const match of expansion.matchAll(/^\((\d+),\s*'[^']*',\s*'((?:''|[^'])*)'.*?'(https:\/\/open\.spotify\.com\/track\/[A-Za-z0-9]+)',\s*true\)[,;]?$/gm)) {
+  songs.push({ song_number: match[1], title: match[2].replaceAll("''", "'"), spotify_url: match[3] });
+}
+if (songs.length !== 150) throw new Error(`Expected 150 songs, found ${songs.length}`);
 const normalize = (value) => value.toLowerCase()
   .normalize('NFD').replace(/[\u0300-\u036f]/g, '')
   .replace(/&[^;]+;/g, ' ')

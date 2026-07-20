@@ -120,10 +120,70 @@ set
 from exact_songs
 where target.song_number = exact_songs.song_number;
 
+
+-- Exacte links voor uitbreidingslijst 101-150.
+with exact_expansion (song_number, spotify_url) as (
+  values
+  (101, 'https://open.spotify.com/track/52xJxFP6TqMuO4Yt0eOkMz'),
+  (102, 'https://open.spotify.com/track/760jhRscwGbIIe1m1IIQpU'),
+  (103, 'https://open.spotify.com/track/4b1yxSdlumA8N4fEk4UOZp'),
+  (104, 'https://open.spotify.com/track/5DJgVGikMm9NKyJO2wvDF6'),
+  (105, 'https://open.spotify.com/track/7I1QMEyw5T3nddOBbvoT9u'),
+  (106, 'https://open.spotify.com/track/1XHc1VYAdV3iwLDpMbLNEy'),
+  (107, 'https://open.spotify.com/track/0inaxid9CcJYsu9CdF0s4m'),
+  (108, 'https://open.spotify.com/track/6gF8tPWPRoPt2j4SZWOUXC'),
+  (109, 'https://open.spotify.com/track/4xUzgBNEzJCVerZZLwRRSH'),
+  (110, 'https://open.spotify.com/track/1N3dZ7TTWO6VcD4Y3hHYLZ'),
+  (111, 'https://open.spotify.com/track/3c1ItvzDDDpmDgLH9SIUp4'),
+  (112, 'https://open.spotify.com/track/5yyqx4brn6Bm9U1Rj9ENnz'),
+  (113, 'https://open.spotify.com/track/03xWMkKEbeO4SnylA53ipj'),
+  (114, 'https://open.spotify.com/track/0TCt7OFRdD8PQ6vTRQxNgQ'),
+  (115, 'https://open.spotify.com/track/2GLyruWagsv8o7aGNXboH1'),
+  (116, 'https://open.spotify.com/track/14mNTV7rsvzkVfBmRepX1X'),
+  (117, 'https://open.spotify.com/track/7kh64k3P9Fk4EsA6vOdwmj'),
+  (118, 'https://open.spotify.com/track/40oaXWRJALmKVIryVTSgyI'),
+  (119, 'https://open.spotify.com/track/5cAr657iTXwdYnyT4alvsX'),
+  (120, 'https://open.spotify.com/track/3xGDZyWQ8bICKb1NlN5fd2'),
+  (121, 'https://open.spotify.com/track/73nQWdQVd6hLrW8MPTQpP7'),
+  (122, 'https://open.spotify.com/track/6pO5svQbrKKLZS08tIiEUA'),
+  (123, 'https://open.spotify.com/track/45cku3eLTd5hObrNM8q8PA'),
+  (124, 'https://open.spotify.com/track/6Uj1B88LmhTcYSvAVdAYum'),
+  (125, 'https://open.spotify.com/track/3VNVHB1pa63RIokenb7EKt'),
+  (126, 'https://open.spotify.com/track/3T74kgnbHw8JqkYGJKD4Tl'),
+  (127, 'https://open.spotify.com/track/1LhFadk0aWYczltTjIbFlI'),
+  (128, 'https://open.spotify.com/track/3icOFPIciIN8FQSyVlpYSF'),
+  (129, 'https://open.spotify.com/track/2AILbz83cBnrAMAG06rZts'),
+  (130, 'https://open.spotify.com/track/40lNlmrek40tfBOiQzf6qK'),
+  (131, 'https://open.spotify.com/track/3wjgPeXocinhLyPL37p70e'),
+  (132, 'https://open.spotify.com/track/0D1OY0M5A0qD5HGBvFmFid'),
+  (133, 'https://open.spotify.com/track/4zDfgax6Ihb0UWdour1ZEs'),
+  (134, 'https://open.spotify.com/track/0PKmDncVOiNQLO6D1P6PXi'),
+  (135, 'https://open.spotify.com/track/1O841LULHXexH8W7fqtctA'),
+  (136, 'https://open.spotify.com/track/3SZXvtZabmTK2oRmdSjfBO'),
+  (137, 'https://open.spotify.com/track/5KLCfUQh7sgWek4C0lbmvs'),
+  (138, 'https://open.spotify.com/track/67KymXb4OUQtUlO31EFOjS'),
+  (139, 'https://open.spotify.com/track/7cX2nwvVfWW3bfScg2f15K'),
+  (140, 'https://open.spotify.com/track/4rp9YObc6Q5xc6X1S8c7m9'),
+  (141, 'https://open.spotify.com/track/7rRT1F75dJjTIu4fZp3eXx'),
+  (142, 'https://open.spotify.com/track/0yURuYmnz9tl4K04e5Y6aQ'),
+  (143, 'https://open.spotify.com/track/2xS0Aybg4e8cQ8xiv3DeoH'),
+  (144, 'https://open.spotify.com/track/4FrfQdZaZnudSHPwgliazB'),
+  (145, 'https://open.spotify.com/track/64lQ4g5QiFNDC7gTUCe3DY'),
+  (146, 'https://open.spotify.com/track/4VF8YWqMsY3Y1UcKJBg5XO'),
+  (147, 'https://open.spotify.com/track/0fzcz7acLp523Dyrd43Sm3'),
+  (148, 'https://open.spotify.com/track/517vxmOFgKFJvuucKuUdar'),
+  (149, 'https://open.spotify.com/track/5J554vlWIKAZMlAnsrBpRQ'),
+  (150, 'https://open.spotify.com/track/7fImDWw5bcUhRbZ0w1ny4J')
+)
+update public.dmq_songs as target
+set spotify_url = exact_expansion.spotify_url, code_image_url = null, enabled = true, updated_at = now()
+from exact_expansion
+where target.song_number = exact_expansion.song_number;
+
 commit;
 
 select
   count(*) filter (where spotify_url like 'https://open.spotify.com/track/%') as exacte_tracks,
   count(*) filter (where spotify_url like 'https://open.spotify.com/search/%') as zoeklinks
 from public.dmq_songs
-where song_number between 1 and 100;
+where song_number between 1 and 150;
