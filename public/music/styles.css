@@ -30,13 +30,17 @@ body.music-night{--bg:#010714;--panel:rgba(5,20,45,.86);--panel2:rgba(8,29,59,.8
 *{box-sizing:border-box}
 html{background:var(--bg);min-height:100%}
 body{
-  margin:0;min-height:100%;color:var(--text);
+  margin:0;min-height:100%;color:var(--text);position:relative;
   font-family:'Plus Jakarta Sans',Inter,ui-rounded,system-ui,-apple-system,sans-serif;
   background:
     radial-gradient(circle at 85% 5%,rgba(38,63,123,0.3) 0,transparent 35%),
     radial-gradient(circle at 15% 90%,rgba(85,29,109,0.25) 0,transparent 35%),
     linear-gradient(180deg,#06132b,#030816);
 }
+body::before{content:'';position:fixed;right:7%;top:3%;z-index:0;width:clamp(76px,19vw,132px);aspect-ratio:1;border-radius:50%;pointer-events:none;background:radial-gradient(circle,#fffbd1 0 23%,#ffe47a 42%,rgba(255,204,69,.18) 68%,transparent 72%);filter:drop-shadow(0 0 34px rgba(255,224,105,.42))}
+body.music-night::before{right:8%;top:4%;width:clamp(70px,17vw,118px);background:radial-gradient(circle at 35% 32%,#fffef0 0 18%,#dbe5ff 58%,#a3b2dc 100%);box-shadow:0 0 26px rgba(220,231,255,.55),0 0 75px rgba(129,151,232,.25);filter:none;opacity:.88}
+body.music-night::after{content:'';position:fixed;right:calc(8% + clamp(12px,3vw,22px));top:calc(4% - clamp(8px,2vw,14px));z-index:0;width:clamp(62px,15vw,104px);aspect-ratio:1;border-radius:50%;pointer-events:none;background:#111b42;box-shadow:inset -6px -6px 12px rgba(104,127,199,.12)}
+.global-music-header,#app{position:relative;z-index:1}
 button,input,select,textarea{font:inherit}
 button{cursor:pointer}
 button:disabled{cursor:not-allowed;opacity:.5}
