@@ -283,7 +283,7 @@ function renderLobby(){
     state.lobbySettings.fixedLeader=leaderOptions[0]?.id||null;
   }
   app().innerHTML=`${topbar('Wachtruimte','leaveRoom()')}
-  <section class="card hero"><div class="badge">Kamercode</div><div class="roomcode">${esc(state.room.code)}</div><p>Laat spelers in Mickey's Music Match hun kamercode invullen en daarna hun kleur en Disney-karakter kiezen.</p></section>
+  <section class="card hero"><div class="badge">Kamercode</div><div class="roomcode">${esc(state.room.code)}</div><p>Laat spelers deze kamercode invullen. Hun profielavatar en spelerskleur worden automatisch gebruikt.</p></section>
   <section class="card"><h2>Spelers · ${state.players.length}/6</h2>${playerList()}
     ${!ready.enoughPlayers?`<div class="notice blue">Minimaal twee spelers nodig.</div>`:''}
     ${ready.enoughPlayers&&!ready.allOnline?`<div class="notice red">Niet alle spelers worden als online gezien. Laat iedereen de wachtruimte openhouden en druk op ↻.</div>`:''}
