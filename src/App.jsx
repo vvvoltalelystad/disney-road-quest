@@ -6701,7 +6701,7 @@ export default function App() {
                         : isSoloAiGame
                           ? `LEVEL ${aiLevelNumber}`
                           : `${t.points || 1} ster${(t.points || 1) > 1 ? "ren" : ""}`;
-                      const badgeText = `${t.cat}${difficultyLabel ? " · " + difficultyLabel : ""} · ${pointsText}`;
+                      const badgeText = `${t.cat}${difficultyLabel ? " · " + difficultyLabel : ""} · ${pointsText}${room.current_task_state?.bonusRound ? ' · BONUS ×2' : ''}`;
 
                       return (
                         <section className={`card task${t.type === 'arcade-game' && t.gameId === 'qwixx' ? ' task-qwixx' : ''}`}>
@@ -6793,6 +6793,9 @@ export default function App() {
 
                           <h2 style={isRoundAnnouncement ? { display: 'none' } : undefined}>{t.title}</h2>
                           <div className="prompt" style={isRoundAnnouncement ? { display: 'none' } : undefined}>{t.text}</div>
+                          {!isRoundAnnouncement && room.current_task_state?.bonusRound && (
+                            <div className="notice green" style={{ marginTop: '12px', textAlign: 'center' }}>🎆 Disney Parade Bonus actief · alle verdiende punten ×2</div>
+                          )}
                           {!isRoundAnnouncement && renderFacilitatorDashboard(t)}
 
                            <div className={t.type === 'arcade-game' && t.gameId === 'qwixx' ? 'task-game-content task-game-content-qwixx' : 'task-game-content'} style={{ marginTop: '20px', ...(isRoundAnnouncement ? { display: 'none' } : {}) }}>
