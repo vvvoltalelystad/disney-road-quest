@@ -15,14 +15,24 @@ $destination = [System.IO.Path]::GetFullPath($DestinationDirectory)
 [System.IO.Directory]::CreateDirectory($destination) | Out-Null
 
 $candidates = foreach ($file in Get-ChildItem -LiteralPath $SourceDirectory -File) {
-  if ($file.Name -match '^(?<park>disneyland|adventure)[ -](?<rarity>common|uncommon|rare|epic|legendary)-(?<number>\d+)(?:_(?<version>\d+))?\.png') {
+  if ($file.Name -match '^(?<park>disneyland|adventure)[ -](?<rarity>common|uncommon|rare|epic|legendary)-?(?<number>\d+)') {
+    $park = $Matches.park.ToLowerInvariant()
+    $rarity = $Matches.rarity.ToLowerInvariant()
+    $number = [int]$Matches.number
+    $version = 1
+    # Een versienummer mag direct achter het slotnummer staan, of achter de lange badgenaam.
+    # Voorbeelden: common-1_3.png en common-1.png — Badge Name_3.png.
+    if ($file.BaseName -match '_(?<assetVersion>\d+)$') {
+      $version = [int]$Matches.assetVersion
+    }
+
     [PSCustomObject]@{
       File = $file
-      Park = $Matches.park.ToLowerInvariant()
-      Rarity = $Matches.rarity.ToLowerInvariant()
-      Number = [int]$Matches.number
-      Version = if ($Matches.version) { [int]$Matches.version } else { 1 }
-      Key = "$($Matches.park.ToLowerInvariant())-$($Matches.rarity.ToLowerInvariant())-$([int]$Matches.number)"
+      Park = $park
+      Rarity = $rarity
+      Number = $number
+      Version = $version
+      Key = "$park-$rarity-$number"
     }
   }
 }
