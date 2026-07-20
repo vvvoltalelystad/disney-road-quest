@@ -6679,6 +6679,62 @@ const ADULT_WHOAMI_HINTS = {
   'whoami-40': ['Ik combineer gezinsverantwoordelijkheid met een professionele identiteit die ik lange tijd verborgen moet houden.', 'Mijn vermogen maakt infiltratie en redding mogelijk, maar in mijn gezin is flexibiliteit vooral figuurlijk nodig.']
 };
 
+const EMOJI_QUIZ_TASKS = [
+  ['emoji-01', '🍎 🪞 ⛏️ 7️⃣', 'Sneeuwwitje en de zeven dwergen', 'Snow White and the Seven Dwarfs', ['Sneeuwwitje', 'Snow White']],
+  ['emoji-02', '🪵 🤥 🐋 ⭐', 'Pinokkio', 'Pinocchio', []],
+  ['emoji-03', '🧙‍♂️ 🧹 🌊 🎼', 'Fantasia', 'Fantasia', []],
+  ['emoji-04', '🐘 👂 🎪 🪶', 'Dombo', 'Dumbo', []],
+  ['emoji-05', '🦌 🌲 🔥 ❄️', 'Bambi', 'Bambi', []],
+  ['emoji-06', '🥿 🎃 🕛 🐭', 'Assepoester', 'Cinderella', []],
+  ['emoji-07', '🐇 ⌚ 🍄 ♥️', 'Alice in Wonderland', 'Alice in Wonderland', ['Alice in Wonderland']],
+  ['emoji-08', '🧚 🌙 🏴‍☠️ 🐊', 'Peter Pan', 'Peter Pan', []],
+  ['emoji-09', '🐶 🍝 🌙 🐾', 'Lady en de Vagebond', 'Lady and the Tramp', ['Lady and the Tramp']],
+  ['emoji-10', '🪡 💤 🐉 🌹', 'Doornroosje', 'Sleeping Beauty', []],
+  ['emoji-11', '1️⃣0️⃣1️⃣ 🐶 ⚫⚪ 🧥', '101 Dalmatiërs', 'One Hundred and One Dalmatians', ['101 Dalmatians', '101 Dalmatiërs']],
+  ['emoji-12', '🐻 🐍 🐅 🌴', 'Jungle Boek', 'The Jungle Book', ['Jungle Book']],
+  ['emoji-13', '🐈 🎹 🥛 🇫🇷', 'De Aristokatten', 'The Aristocats', ['Aristocats']],
+  ['emoji-14', '🦊 🏹 👑 💰', 'Robin Hood', 'Robin Hood', []],
+  ['emoji-15', '🧜‍♀️ 🐚 🎤 ⚓', 'De Kleine Zeemeermin', 'The Little Mermaid', ['Kleine Zeemeermin']],
+  ['emoji-16', '🌹 🏰 📚 🫖', 'Belle en het Beest', 'Beauty and the Beast', ['Beauty & the Beast']],
+  ['emoji-17', '🪔 🐒 🧞‍♂️ 🕌', 'Aladdin', 'Aladdin', []],
+  ['emoji-18', '🦁 👑 🌅 🐗', 'De Leeuwenkoning', 'The Lion King', ['Lion King']],
+  ['emoji-19', '🍃 🛶 🧭 🌳', 'Pocahontas', 'Pocahontas', []],
+  ['emoji-20', '🔔 ⛪ 🎭 🔥', 'De Klokkenluider van de Notre Dame', 'The Hunchback of Notre Dame', ['Klokkenluider van de Notre Dame']],
+  ['emoji-21', '⚡ 💪 🏛️ 🐎', 'Hercules', 'Hercules', []],
+  ['emoji-22', '🐉 ⚔️ 🏔️ 🪭', 'Mulan', 'Mulan', []],
+  ['emoji-23', '🦍 🌿 🚢 ❤️', 'Tarzan', 'Tarzan', []],
+  ['emoji-24', '👑 🦙 🧪 🐿️', 'Keizer Kuzco', "The Emperor's New Groove", ['The Emperors New Groove', 'Kuzco']],
+  ['emoji-25', '🌺 👽 🏄‍♀️ 👨‍👩‍👧', 'Lilo & Stitch', 'Lilo & Stitch', ['Lilo en Stitch']],
+  ['emoji-26', '🐸 👑 🍲 🎺', 'De Prinses en de Kikker', 'The Princess and the Frog', ['Prinses en de Kikker']],
+  ['emoji-27', '🦎 🏮 💇‍♀️ 🗼', 'Rapunzel', 'Tangled', ['Tangled']],
+  ['emoji-28', '❄️ 👭 ⛄ 🦌', 'Frozen', 'Frozen', []],
+  ['emoji-29', '🌊 🛶 🐓 🌀', 'Vaiana', 'Moana', ['Moana']],
+  ['emoji-30', '🏠 🕯️ 🦋 🌸', 'Encanto', 'Encanto', []],
+  ['emoji-31', '🤠 🚀 🧸 🧒', 'Toy Story', 'Toy Story', []],
+  ['emoji-32', '🚪 👁️ 😱 🧦', 'Monsters en Co.', 'Monsters, Inc.', ['Monsters Inc', 'Monsters en Co']],
+  ['emoji-33', '🐠 🔎 🌊 🐢', 'Finding Nemo', 'Finding Nemo', ['Op zoek naar Nemo']],
+  ['emoji-34', '🦸‍♂️ 👨‍👩‍👧‍👦 🏝️ 🤖', 'The Incredibles', 'The Incredibles', ['De Ongelooflijke Familie', 'Incredibles']],
+  ['emoji-35', '🏎️ ⚡ 🛣️ 🏁', 'Cars', 'Cars', []],
+  ['emoji-36', '🐀 👨‍🍳 🥘 🇫🇷', 'Ratatouille', 'Ratatouille', []],
+  ['emoji-37', '🤖 🌱 🚀 🗑️', 'WALL-E', 'WALL-E', ['Walle', 'Wall E']],
+  ['emoji-38', '🎈 🏠 🦜 👴', 'Up', 'Up', []],
+  ['emoji-39', '🧠 😊 😡 😢', 'Binnenstebuiten', 'Inside Out', ['Inside Out']],
+  ['emoji-40', '💀 🎸 🌉 🌼', 'Coco', 'Coco', []]
+].map(([id, text, movie_nl, movie_en, movie_aliases]) => ({
+  id,
+  cat: 'Emoji Quiz',
+  type: 'emoji',
+  title: 'Emoji Filmcode',
+  text,
+  movie_nl,
+  movie_en,
+  movie_aliases,
+  points: 2,
+  active: true
+}));
+
+DEFAULT_TASKS.push(...EMOJI_QUIZ_TASKS);
+
 DEFAULT_TASKS.forEach(task => {
   const adultHints = ADULT_WHOAMI_HINTS[task.id];
   if (!adultHints) return;
