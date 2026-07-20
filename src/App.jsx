@@ -4741,6 +4741,22 @@ export default function App() {
     setCoinPopupOpen(true);
   };
 
+  useEffect(() => {
+    if (!activeProfileName) return;
+    const params = new URLSearchParams(window.location.search);
+    const requestedAction = ['profile', 'coin', 'log'].find(action => params.get(action) === '1');
+    if (!requestedAction) return;
+    if (requestedAction === 'profile') openProfileAppearance(activeProfileName);
+    if (requestedAction === 'coin') openCoinViewer();
+    if (requestedAction === 'log') {
+      setLogProfileName(activeProfileName);
+      setLogPopupOpen(true);
+    }
+    params.delete(requestedAction);
+    const query = params.toString();
+    window.history.replaceState(null, '', `${window.location.pathname}${query ? `?${query}` : ''}${window.location.hash}`);
+  }, [activeProfileName]);
+
   const renderAppHeader = () => {
     const key = getCollectorKey(activeProfileName);
     const balance = starBank[key] || 0;
@@ -5774,8 +5790,8 @@ export default function App() {
                     e.stopPropagation();
                     if (selectedPortalGame === 'music_match') {
                       window.location.href = room?.code
-                        ? `./music/index.html?room=${room.code}&v=77`
-                        : './music/index.html?v=77';
+                        ? `./music/index.html?room=${room.code}&v=78`
+                        : './music/index.html?v=78';
                     } else {
                       setSelectedPortalGame('music_match');
                     }
@@ -5794,7 +5810,7 @@ export default function App() {
                   <div className="portal-card-body">
                     <h3>Mickey's Music Match</h3>
                     <p style={{ color: 'var(--gold)', fontSize: '12px', marginTop: '-4px' }}>Origineel: Disney Music Quiz</p>
-                    <p>Dé interactieve muziekquiz met 150 betoverende Disney en Pixar songs. Scan scancodes met Spotify, raad de film, het jaartal of de uitvoerder en verover de troon!</p>
+                    <p>Dé interactieve muziekquiz met 300 betoverende Disney en Pixar songs. Open de originele soundtracktrack in Spotify, raad de film, titel, het jaartal of de uitvoerder en verover de troon!</p>
                   </div>
                   <div className="portal-card-footer">
                     <span className="btn-play music">
