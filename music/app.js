@@ -5,9 +5,9 @@ const cfg=window.DMQ_CONFIG||{};
 const COLORS=[['blue','Blauw','#00e5ff'],['green','Groen','#2eff7d'],['yellow','Geel','#ffd615'],['pink','Roze','#ff2a85'],['purple','Paars','#bd53ed'],['orange','Oranje','#ff6b00']];
 const AVATARS=[['linguini','Alfredo Linguini','avatars/linguini.webp'],['bruno','Bruno','avatars/bruno.png'],['buzz','Buzz Lightyear','avatars/buzz.png'],['heihei','Heihei','avatars/heihei.png'],['hen-wen','Hen Wen','avatars/hen-wen.png'],['jack','Jack Sparrow','avatars/jack.png'],['kuzco','Kuzco','avatars/kuzco.png'],['medusa','Madame Medusa','avatars/medusa.png'],['maximus','Maximus','avatars/maximus.png'],['miguel','Miguel','avatars/miguel.png'],['mufasa','Mufasa','avatars/mufasa.png'],['mushu','Mushu','avatars/mushu.png'],['olaf','Olaf','avatars/olaf.png'],['pascal','Pascal','avatars/pascal.png'],['percy','Percy','avatars/percy.png'],['peter','Peter Pan','avatars/peter.png'],['redpanda','Red Panda','avatars/redpanda.png'],['remy','Remy','avatars/remy.png'],['stitch','Stitch','avatars/stitch.png'],['taran','Taran','avatars/taran.png']];
 const POWERS_EXPLAIN=[{id:'hyperdrive',name:'Hyperdrive (Hyperspace Mountain)',icon:'attractions/hyperspace.png',desc:'Verdubbel al jouw behaalde punten in de huidige ronde!'},{id:'wild_ride',name:'Wild Ride (Big Thunder Mountain)',icon:'attractions/big_thunder.png',desc:'Bij jaartal-vragen krijg je ook punten bij een afwijking van max. 4 jaar.'},{id:'ghost_whisper',name:'Geestenfluistering (Phantom Manor)',icon:'attractions/phantom.png',desc:'Kies anoniem uit de ingevoerde jaartallen van alle spelers.'},{id:'hidden_treasure',name:'Verborgen Schat (Pirates of the Caribbean)',icon:'attractions/pirates.png',desc:'Krijg +1 bonuspunt als je ten minste één onderdeel correct beantwoordt.'},{id:'second_drop',name:'Tweede Val (Tower of Terror)',icon:'attractions/tower.png',desc:'Iedereen mag gedurende 30 seconden zijn foutieve (rode) antwoorden herzien.'},{id:'lightspeed',name:'Lichtsnelheid (Star Tours)',icon:'attractions/star_tours.png',desc:'Beantwoord de vraag correct binnen 10 seconden voor +1 snelheidsbonus.'},{id:'small_world',name:'Kleine Wereld Harmonie ("it\'s a small world")',icon:'attractions/small_world.png',desc:'Spelers die minder scoren dan jij, schenken jou +1 bonuspunt (max. +2).'},{id:'ingredient_theft',name:'Remy\'s Keukendiefstal (Ratatouille)',icon:'attractions/ratatouille.png',desc:'Kopiëer het antwoord van een tegenstander als je het zelf niet weet.'},{id:'laser_block',name:'Laser Blaster (Buzz Lightyear)',icon:'attractions/buzz.png',desc:'Schiet de actieve kracht van een tegenstander uit de lucht om deze te neutraliseren.'},{id:'temple_run',name:'Temple of Peril (Indiana Jones)',icon:'attractions/indiana.png',desc:'Verdrievoudig je score bij een goed antwoord, maar krijg -1 punt bij een fout antwoord.'},{id:'spider_bot',name:'Spider-Bot (WEB Adventure)',icon:'attractions/web.png',desc:'Kopieer de score van de hoogst scorende speler in deze ronde (indien jouw score lager is).'},{id:'turbo_boost',name:'Turbo Boost (Autopia)',icon:'attractions/autopia.png',desc:'Krijg +1 bonuspunt als je antwoord correct is en je de allersnelste correcte speler was.'}];
-const DEFAULT_SETTINGS={streaks:true,powers:true,quick_guess:false,answer_time_limit:'auto',jackpot:false,stat_titles:true,final_bet:false,animations:true,leader_mode:'rotating',fixed_leader_player_id:null,fixed_leader_name:null};
+const DEFAULT_SETTINGS={streaks:true,powers:false,quick_guess:false,answer_time_limit:'none',jackpot:false,stat_titles:true,final_bet:false,animations:true,leader_mode:'rotating',fixed_leader_player_id:null,fixed_leader_name:null};
 const TIME_POWER_IDS=new Set(['second_drop','lightspeed','turbo_boost']);
-const state={sb:null,user:null,room:null,players:[],me:null,round:null,answers:[],songs:[],presence:{},channel:null,poll:null,view:'home',joinCode:'',joinName:localStorage.getItem('disney_active_profile')||localStorage.getItem('disney_player_name')||'',joinColor:null,joinAvatar:null,adminPin:'',adminSelectedSong:1,refreshing:false,timer:null,startError:'',manageOpen:false,lobbySettings:{roundCount:10,gameMode:'mix',leaderMode:'rotating',fixedLeader:null,streaks:true,powers:true,answerTimeLimit:'auto',jackpot:false,stat_titles:true,final_bet:false,animations:true},currentAnswer:{film:'',title:'',year:'',text:'',artist:''},timerSeconds:0,timerRoundId:null,timerPhase:null,lastShownPower:null,answerPhaseStartedAt:null,reviewFinalPoints:null,reviewCorrectionNote:null,celebrationShown:false};
+const state={sb:null,user:null,room:null,players:[],me:null,round:null,answers:[],songs:[],presence:{},channel:null,poll:null,view:'home',joinCode:'',joinName:localStorage.getItem('disney_active_profile')||localStorage.getItem('disney_player_name')||'',joinColor:null,joinAvatar:null,adminPin:'',adminSelectedSong:1,refreshing:false,timer:null,startError:'',manageOpen:false,lobbySettings:{roundCount:10,gameMode:'mix',leaderMode:'rotating',fixedLeader:null,streaks:true,powers:false,answerTimeLimit:'none',jackpot:false,stat_titles:true,final_bet:false,animations:true},currentAnswer:{film:'',title:'',year:'',text:'',artist:'',year_period:null},timerSeconds:0,timerRoundId:null,timerPhase:null,lastShownPower:null,answerPhaseStartedAt:null,reviewFinalPoints:null,reviewCorrectionNote:null,celebrationShown:false};
 document.addEventListener('DOMContentLoaded',init);window.addEventListener('beforeunload',cleanup);
 async function init(){document.addEventListener('focusout',e=>{if(['INPUT','TEXTAREA','SELECT'].includes(e.target.tagName))window.scrollTo(0,window.scrollY)});if('serviceWorker'in navigator){navigator.serviceWorker.getRegistrations().then(rs=>rs.forEach(r=>r.unregister())).catch(()=>{});if('caches'in window)caches.keys().then(ks=>ks.forEach(k=>caches.delete(k))).catch(()=>{})}if(!configured()){setupScreen();return}try{state.sb=window.supabase.createClient(cfg.SUPABASE_URL,cfg.SUPABASE_ANON_KEY,{auth:{persistSession:true,autoRefreshToken:true}});let{data:{session}}=await state.sb.auth.getSession();if(!session){let r=await state.sb.auth.signInAnonymously();if(r.error)throw r.error;session=r.data.session}state.user=session.user;await fetchSongs();const params=new URLSearchParams(location.search);if(params.get('admin')==='1'){state.room=null;state.players=[];state.me=null;state.view='admin';render();return}const join=(params.get('join')||'').toUpperCase();const hostCode=(params.get('host')||'').toUpperCase();const legacy=(params.get('room')||'').toUpperCase();if(join){localStorage.removeItem('dmq-v2-room');state.room=null;state.me=null;state.joinCode=join;state.view='join';await loadJoinChoices(join);render();return}const q=hostCode||legacy;if(q){let roomResult=await state.sb.from('dmq_rooms').select('id,code,host_user_id,status').eq('code',q).maybeSingle();if(roomResult.data){let isHost=roomResult.data.host_user_id===state.user.id;let membership=await state.sb.from('dmq_players').select('id').eq('room_id',roomResult.data.id).eq('user_id',state.user.id).maybeSingle();if(isHost||membership.data){if(await loadRoom(roomResult.data.id,false))return}}state.joinCode=q;state.view='join';await loadJoinChoices(q);render();return}const saved=localStorage.getItem('dmq-v2-room');if(saved&&await loadRoom(saved,false))return;render()}catch(e){fatal('Verbinden mislukt.',e)}}
 function configured(){return cfg.SUPABASE_URL&&cfg.SUPABASE_ANON_KEY&&!cfg.SUPABASE_URL.includes('VUL_HIER')&&!cfg.SUPABASE_ANON_KEY.includes('VUL_HIER')}
@@ -30,10 +30,14 @@ function leader(){return state.me?.id===leaderId()||(host()&&settings().leader_m
 function leaderName(){const id=leaderId();return state.players.find(p=>p.id===id)?.name||settings().fixed_leader_name||'De spelleider'}
 function uniqueTopScorerId(){if(!state.players.length)return null;const top=Math.max(...state.players.map(player=>Number(player.score)||0));const leaders=state.players.filter(player=>(Number(player.score)||0)===top);return leaders.length===1?leaders[0].id:null}
 function crownFor(playerId){return uniqueTopScorerId()===playerId?'<span class="score-crown" aria-label="Unieke topscore">👑</span>':''}
+function competitionRank(player,players=state.players){const score=Number(player?.score)||0;return 1+new Set(players.filter(other=>(Number(other.score)||0)>score).map(other=>Number(other.score)||0)).size}
+function rankMedal(rank){return rank===1?'🥇':rank===2?'🥈':rank===3?'🥉':'🎵'}
+function finalCoinReward(player){return ({1:10,2:6,3:4}[competitionRank(player)]||2)}
 function currentSong(){return state.songs.find(s=>+s.song_number===+state.round?.song_number)}
 function own(){return state.answers.find(a=>a.user_id===state.user.id)}
 function activeProfileName(){return String(localStorage.getItem('disney_active_profile')||localStorage.getItem('disney_player_name')||'').trim()}
 function syncJoinProfile(){state.joinName=activeProfileName();return state.joinName}
+function activeProfilePreference(){try{const all=JSON.parse(localStorage.getItem('disney_profile_preferences')||'{}');return all[disneyStarKey(activeProfileName())]||null}catch(e){return null}}
 function questionFieldCount(type){if(type==='full')return 3;return ['film','title','year','artist'].filter(key=>type===key||type.includes(key)).length||1}
 function answerTimeLimit(type){const choice=settings().answer_time_limit||'auto';if(choice==='none')return 0;if(choice!=='auto')return Number(choice)||0;const fields=questionFieldCount(type);return fields<=2?30:fields===3?45:60}
 function maxPowerCardsPerPlayer(){const total=state.lobbySettings.answerTimeLimit==='none'?9:12;return Math.max(1,Math.floor(total/Math.max(state.players.length,1)))}
@@ -109,7 +113,7 @@ function scorebar(){const count=state.players.length;return `<div class="scoreba
 function progress(){if(!state.room?.total_rounds)return'';let n=state.room.current_round_no||0,t=state.room.total_rounds;return `<div class="progress"><i style="width:${Math.min(100,n/t*100)}%"></i></div><p class="small" style="text-align:center;margin:6px 0 12px">Ronde ${n} van ${t}</p>`}
 async function fetchSongs(){let r=await state.sb.from('dmq_songs').select('*').order('song_number');if(r.error)throw r.error;state.songs=r.data||[]}
 async function loadRoom(id,show=true){try{if(show)loading('Kamer openen…');let r=await state.sb.from('dmq_rooms').select('*').eq('id',id).single();if(r.error)return false;let p=await state.sb.from('dmq_players').select('*').eq('room_id',id).order('joined_at');if(p.error)throw p.error;const players=p.data||[];const me=players.find(x=>x.user_id===state.user.id)||null;const isHost=r.data.host_user_id===state.user.id;if(!isHost&&!me){localStorage.removeItem('dmq-v2-room');return false}state.room=r.data;state.players=players;state.me=me;localStorage.setItem('dmq-v2-room',id);await fetchRound();subscribe();render();return true}catch(e){console.error(e);return false}}
-async function fetchRound(){if(!state.room?.current_round_no)return;let r=await state.sb.from('dmq_rounds').select('*').eq('room_id',state.room.id).eq('round_no',state.room.current_round_no).maybeSingle();if(r.error)throw r.error;if(r.data && (!state.round || state.round.id !== r.data.id)){state.currentAnswer={film:'',title:'',year:'',text:'',artist:''};state.answerPhaseStartedAt=null;state.reviewFinalPoints=null;state.reviewCorrectionNote=null}state.round=r.data;if(r.data){let a=await state.sb.from('dmq_answers').select('*').eq('round_id',r.data.id);if(a.error)throw a.error;state.answers=(a.data||[]).map(answer=>({...answer,note:answer.correction_note||''}));let allRResult=await state.sb.from('dmq_rounds').select('*').eq('room_id',state.room.id).order('round_no',{ascending:true});state.allRounds=allRResult.data||[];let allAResult=await state.sb.from('dmq_answers').select('*').eq('room_id',state.room.id);state.allAnswers=allAResult.data||[]}}
+async function fetchRound(){if(!state.room?.current_round_no)return;let r=await state.sb.from('dmq_rounds').select('*').eq('room_id',state.room.id).eq('round_no',state.room.current_round_no).maybeSingle();if(r.error)throw r.error;if(r.data && (!state.round || state.round.id !== r.data.id)){state.currentAnswer={film:'',title:'',year:'',text:'',artist:'',year_period:null};state.answerPhaseStartedAt=null;state.reviewFinalPoints=null;state.reviewCorrectionNote=null}state.round=r.data;if(r.data){let a=await state.sb.from('dmq_answers').select('*').eq('round_id',r.data.id);if(a.error)throw a.error;state.answers=(a.data||[]).map(answer=>({...answer,note:answer.correction_note||''}));let allRResult=await state.sb.from('dmq_rounds').select('*').eq('room_id',state.room.id).order('round_no',{ascending:true});state.allRounds=allRResult.data||[];let allAResult=await state.sb.from('dmq_answers').select('*').eq('room_id',state.room.id);state.allAnswers=allAResult.data||[]}}
 let rt=null;function schedule(){clearTimeout(rt);rt=setTimeout(refreshAll,130)}
 async function refreshAll(){if(state.refreshing)return;if(!state.room){const nextUrl=new URL(location.href);nextUrl.searchParams.set('v',DMQ_VERSION);nextUrl.searchParams.set('refresh',Date.now().toString());location.replace(nextUrl.toString());return}state.refreshing=true;try{let r=await state.sb.from('dmq_rooms').select('*').eq('id',state.room.id).single();let p=await state.sb.from('dmq_players').select('*').eq('room_id',state.room.id).order('joined_at');if(r.data)state.room=r.data;if(p.data){state.players=p.data;state.me=p.data.find(x=>x.user_id===state.user.id)||state.me}await fetchRound();if(state.round?.active_power && state.lastShownPower !== state.round.active_power){const activator=state.players.find(pl=>pl.id===state.round.power_used_by_player_id)?.name||'Iemand';playPowerTakeover(state.round.active_power,activator);state.lastShownPower=state.round.active_power}else if(!state.round?.active_power){state.lastShownPower=null}render()}finally{state.refreshing=false}}
 function subscribe(){cleanup();state.channel=state.sb.channel('dmq2-'+state.room.id,{config:{presence:{key:state.user.id}}}).on('presence',{event:'sync'},()=>{state.presence=state.channel.presenceState();render()}).on('postgres_changes',{event:'*',schema:'public',table:'dmq_rooms',filter:`id=eq.${state.room.id}`},schedule).on('postgres_changes',{event:'*',schema:'public',table:'dmq_players',filter:`room_id=eq.${state.room.id}`},schedule).on('postgres_changes',{event:'*',schema:'public',table:'dmq_rounds',filter:`room_id=eq.${state.room.id}`},schedule).on('postgres_changes',{event:'*',schema:'public',table:'dmq_answers',filter:`room_id=eq.${state.room.id}`},schedule).subscribe(async s=>{if(s==='SUBSCRIBED')await state.channel.track({user_id:state.user.id,name:state.me?.name||'organisator'})});state.poll=setInterval(refreshAll,4500)}
@@ -130,6 +134,7 @@ function render(){
   } else if(!state.round){
     loading('Ronde laden…');
   } else {
+    if(state.round.phase==='review')prepareReviewState();
     ({claim:renderClaim,answer:renderAnswer,power_phantom:renderPhantom,power_tower:renderTower,review:renderReview,standings:renderStandings}[state.round.phase]||renderAnswer)();
   }
 
@@ -195,6 +200,14 @@ function renderJoin(){
 if(state.joinColor&&state.players.some(p=>p.color_id===state.joinColor))state.joinColor=null;
 if(state.joinAvatar&&state.players.some(p=>p.avatar_id===state.joinAvatar))state.joinAvatar=null;
 const profileName=syncJoinProfile();
+const preference=activeProfilePreference();
+if(preference?.color)state.joinColor=preference.color;
+if(preference?.avatar)state.joinAvatar=preference.avatar;
+const profileColor=C(state.joinColor||'blue'),profileAvatar=A(state.joinAvatar||'miguel');
+app().innerHTML=`${topbar('Deelnemen',"state.view='home';render()")}
+<section class="card"><div class="field"><label>Kamercode</label><input id="joinCode" maxlength="6" autocapitalize="characters" value="${esc(state.joinCode)}"></div><div class="notice blue">Je speelt als <strong>${esc(profileName||'kies eerst een profiel in de portal')}</strong>.</div><div class="player energy" style="--player-color:${profileColor.hex}"><div class="playerleft"><span class="avatarbadge">${profileAvatar.icon}</span><div><strong>${esc(profileName||'Geen profiel')}</strong><small>${esc(profileAvatar.name)} · ${esc(profileColor.name)}</small></div></div></div><p class="small muted">Avatar en kleur wijzig je via je profiel in de portal.</p></section>
+<section class="card"><button class="btn primary full" onclick="joinRoom()">Deelnemen</button></section>`;
+return;
 app().innerHTML=`${topbar('Deelnemen',"state.view='home';render()")}
 <section class="card"><div class="field"><label>Kamercode</label><input id="joinCode" maxlength="6" autocapitalize="characters" value="${esc(state.joinCode)}"></div><div class="notice blue">Je speelt als <strong>${esc(profileName||'kies eerst een profiel in de portal')}</strong>.</div></section>
 <section class="card"><h2>Kies een kleur</h2><div class="choicegrid">${COLORS.map(x=>{let taken=state.players.some(p=>p.color_id===x[0]);return `<button class="colorchoice ${state.joinColor===x[0]?'selected':''} ${taken?'taken':''}" style="--choice:${x[2]}" ${taken?'disabled':''} onclick="chooseJoinColor('${x[0]}')"><span class="colororb"></span>${x[1]}</button>`}).join('')}</div></section>
@@ -257,6 +270,7 @@ function validateCardsCount(){
     state.lobbySettings.cards_per_player=Math.min(3,maxAllowed);
   }
 }
+function prepareReviewState(){if(state.reviewFinalPoints!==null||host())return;const mine=own();if(!mine)return;let proposed=Number(mine.final_points)||0;const bet=Number(mine.answer?.final_bet)||0;const isFinal=state.room?.current_round_no===state.room?.total_rounds;if(isFinal&&state.room?.settings?.final_bet&&bet>0&&proposed===0)proposed=-bet;state.reviewFinalPoints=proposed}
 
 function adjustRoundCount(delta){state.lobbySettings.roundCount=Math.max(1,Math.min(100,(Number(state.lobbySettings.roundCount)||1)+delta));renderLobby()}
 
@@ -290,16 +304,7 @@ function renderLobby(){
         </select>
       </div>
     </div>
-    <div class="field" style="margin-top:10px"><label>Antwoordtijd</label>
-      <select id="answerTimeLimit" onchange="state.lobbySettings.answerTimeLimit=this.value;validateCardsCount();renderLobby();">
-        <option value="auto" ${state.lobbySettings.answerTimeLimit==='auto'?'selected':''}>Automatisch: 30 / 45 / 60 sec.</option>
-        <option value="30" ${state.lobbySettings.answerTimeLimit==='30'?'selected':''}>30 seconden per ronde</option>
-        <option value="45" ${state.lobbySettings.answerTimeLimit==='45'?'selected':''}>45 seconden per ronde</option>
-        <option value="60" ${state.lobbySettings.answerTimeLimit==='60'?'selected':''}>60 seconden per ronde</option>
-        <option value="none" ${state.lobbySettings.answerTimeLimit==='none'?'selected':''}>Geen tijdsdruk</option>
-      </select>
-      <small class="muted">Automatisch: 1-2 antwoorden 30 sec., 3 antwoorden 45 sec. en 4 antwoorden 60 sec.</small>
-    </div>
+    <div class="notice blue">Music Match wordt zonder antwoordtimer gespeeld. Iedereen kan rustig invullen en bevestigen.</div>
     <div class="grid2" style="margin-top:10px">
       ${state.lobbySettings.answerTimeLimit==='none'?`<div class="field"><label>Krachten per speler</label><div class="notice blue" style="margin:0">2 kaarten: 1 individuele kracht + 1 andere kracht.</div></div>`:`<div class="field"><label>Krachten per speler</label>
         <select id="cardsPerPlayer" onchange="state.lobbySettings.cards_per_player = Number(this.value); validateCardsCount(); renderLobby();">
@@ -371,7 +376,7 @@ async function startGame(){
     if(!state.players.every(online))throw new Error('Niet alle spelers worden als online gezien. Laat iedereen de wachtruimte openhouden en druk op ↻.');
     if(songs.length<total)throw new Error(`Er zijn ${songs.length} actieve songs, maar je hebt ${total} rondes gekozen. Activeer meer songs in Songbeheer · 150 songs.`);
     const lm=state.lobbySettings.leaderMode||'rotating';
-    const answerTimeLimit=state.lobbySettings.answerTimeLimit||'auto';
+    const answerTimeLimit='none';
     const fixedLeaderId=state.lobbySettings.fixedLeader||hostLeaderId()||state.players[0]?.id||null;
     const fixedLeaderName=fixedLeaderId===hostLeaderId()?(activeProfileName()||'Organisator'):state.players.find(player=>player.id===fixedLeaderId)?.name||null;
     const set={
@@ -436,7 +441,7 @@ async function updateManagedPlayer(playerId){
   }catch(e){console.error(e);toast(`Wijzigen mislukt: ${e.message||e}`)}
 }
 
-function rules(type,p=null){let x=type==='full'?['Juiste film: +1','Juiste titel: +1','Exact filmjaar: +1','Maximum: 3']:type==='year_film'?['Juiste film: +1','Exact filmjaar: +2','1 jaar verschil: +1','Maximum: 3']:type==='year_film_artist'?['Juiste film: +1','Exact filmjaar: +1','Juiste uitvoerder/personage: +1','Maximum: 3']:type==='film'?['Juiste film: +2']:type==='title'?['Juiste titel: +2']:type==='artist'?['Juiste uitvoerder/personage: +2']:['Exact: +3','1 jaar verschil: +2','2 jaar verschil: +1','Verder: 0'];if(p==='hyperdrive')x.push('Hyperdrive: alle punten dubbel');if(p==='wild_ride'&&type==='year')x=['Exact: +3','Maximaal 2 jaar verschil: +2','Maximaal 4 jaar verschil: +1'];if(p==='wild_ride'&&type==='year_film')x=['Juiste film: +1','Exact of max. 2 jaar verschil: +2','Maximaal 4 jaar verschil: +1','Maximum: 3'];if(p==='wild_ride'&&type==='year_film_artist')x=['Juiste film: +1','Max. 2 jaar verschil: +1','Juiste uitvoerder/personage: +1','Maximum: 3'];if(p==='hidden_treasure')x.push('Verborgen schat: minimaal 1 goed = +1 bonus');if(p==='ghost_whisper')x.push('Geestenfluistering: kies 10 seconden uit alle jaartallen');if(p==='second_drop')x.push('Tweede val: rode antwoorden 30 seconden aanpassen');if(p==='lightspeed')x.push('Lichtsnelheid: beantwoord binnen 10s = +1 bonus');if(p==='small_world')x.push('Kleine wereld harmonie: minder scorende spelers schenken +1 bonus');if(p==='ingredient_theft')x.push('Remy\'s Keukendiefstal: gekopieerd antwoord');if(p==='laser_block')x.push('Laser Blaster: neutraliseer de geactiveerde kracht van een tegenstander!');if(p==='laser_blocked')x.push('Laser Blaster: alle krachten zijn deze ronde geannuleerd! 💥');if(p==='temple_run')x.push('Temple of Peril: verdrievoudig bij juist, -1 bij fout!');if(p==='spider_bot')x.push('Spider-Bot: kopieer de topscore van deze ronde!');if(p==='turbo_boost')x.push('Turbo Boost: +1 bonus voor de allersnelste correcte speler!');const jv=getJackpotValue();if(state.room?.settings?.jackpot&&jv>0)x.push(`Soundtrack Jackpot: +${jv} bonus voor perfect antwoord!`);return `<div class="rulebox"><h3>Punten deze ronde</h3>${x.map(v=>`<div>• ${v}</div>`).join('')}</div>`}
+function rules(type,p=null){const x=[];if(type==='film')x.push('Juiste film: +2');else if(type==='title')x.push('Juiste titel: +2');else if(type==='artist')x.push('Juiste uitvoerder: +2');else{if(type==='full'||type.includes('film'))x.push('Juiste film: +1');if(type==='full'||type.includes('title'))x.push('Juiste titel: +1');if(type.includes('artist'))x.push('Juiste uitvoerder: +1');if(type==='full'||type.includes('year')||type==='year'){x.push('Juiste periode van vijf jaar: +1');x.push('Exact filmjaar: +1 extra')}}if(p)x.push('Een geactiveerde Attractiekracht kan de score aanpassen.');return `<div class="rulebox"><h3>Punten deze ronde</h3>${x.map(value=>`<div>• ${value}</div>`).join('')}<div><strong>Maximum: ${maxPoints(type,p,state.me?.id)}</strong></div></div>`}
 function myAccentColor(){if(host())return'#ffd45c';return state.me?.color||'#ffd45c'}
 function power(){return state.round?.active_power||null}
 function powerButton(){
@@ -490,7 +495,7 @@ function powerButton(){
 async function activatePower(p){let r=await state.sb.rpc('dmq_activate_power',{p_round_id:state.round.id,p_power:p});if(r.error)toast(r.error.message);else schedule()}
 function renderClaim(){let s=currentSong(),claimed=state.round.claimed_by_user_id,mine=claimed===state.user.id,cp=state.players.find(p=>p.user_id===claimed);app().innerHTML=`${topbar('Song starten')}${scorebar()}${progress()}<section class="card question" style="--accent:${myAccentColor()}"><div class="badge">${esc(state.round.question_type)}</div><div class="songnumber">${esc(s?.label||'Song')}</div><p>Scan de code met de Hitster-telefoon.</p><div class="qrwrap" id="qrArea"></div>${rules(state.round.question_type,power())}${powerButton()}${!claimed?'<button class="btn primary full" onclick="claimSong()">▶ Ik laat deze song afspelen</button>':mine?'<div class="notice green">Jij bedient de muziek.</div><button class="btn primary full" onclick="confirmPlaying()">🔊 De song wordt afgespeeld</button><button class="btn ghost full" style="margin-top:8px" onclick="releaseSong()">Afspeelbeurt vrijgeven</button>':`<div class="notice blue">${esc(cp?.name||'Een speler')} laat de song afspelen.</div>${leader()?'<button class="btn ghost full" onclick="releaseSong()">Claim vrijgeven</button>':''}`}</section>`;setTimeout(()=>showCode(s),0)}
 function showCode(s){let e=document.getElementById('qrArea');if(!e)return;e.innerHTML='';if(s?.code_image_url)e.innerHTML=`<img src="${esc(s.code_image_url)}">`;else if(s?.spotify_url&&window.QRCode)new window.QRCode(e,{text:s.spotify_url,width:200,height:200,colorDark:'#07152e',colorLight:'#fff'});else e.innerHTML='<div class="qrplaceholder">Nog geen scancode ingesteld.</div>'}
-async function claimSong(){let r=await state.sb.rpc('dmq_claim_song',{p_round_id:state.round.id});if(r.error)toast(r.error.message);else if(!r.data)toast('Iemand anders was sneller.');else schedule()}
+async function claimSong(){let r=await state.sb.rpc('dmq_claim_song',{p_round_id:state.round.id});if(r.error){toast(r.error.message);return}if(!r.data){toast('Iemand anders was sneller.');return}let playing=await state.sb.rpc('dmq_confirm_playing',{p_round_id:state.round.id});if(playing.error)toast(playing.error.message);else schedule()}
 async function releaseSong(){let r=await state.sb.rpc('dmq_release_song',{p_round_id:state.round.id});if(r.error)toast(r.error.message);else schedule()}
 async function confirmPlaying(){let r=await state.sb.rpc('dmq_confirm_playing',{p_round_id:state.round.id});if(r.error)toast(r.error.message);else schedule()}
 function prompt(t){
@@ -508,6 +513,8 @@ function prompt(t){
     film_title_artist:'Welke film, welke titel en wie zingt of voert dit uit?'
   }[t] || 'Beantwoord de vragen:';
 }
+function yearPeriodOptions(song=currentSong()){const year=Number(song?.year)||2000;const correctStart=Math.floor((year-1)/5)*5+1;const correctSlot=((Number(song?.song_number)||0)+(Number(state.room?.current_round_no)||0))%3;const firstStart=correctStart-(correctSlot*5);return Array.from({length:3},(_,index)=>{const start=firstStart+(index*5);return{id:`${start}-${start+4}`,label:`${start}–${start+4}`}})}
+function yearFields(a={}){const selected=state.currentAnswer.year_period!==undefined?state.currentAnswer.year_period:(a.year_period||'');const yearValue=state.currentAnswer.year!==undefined?state.currentAnswer.year:(a.year||'');return `<div class="field"><label>Kies eerst de periode van vijf jaar</label><div class="yearchoices">${yearPeriodOptions().map(period=>`<button type="button" class="yearbtn ${selected===period.id?'selected':''}" onclick="state.currentAnswer.year_period='${period.id}';render()">${period.label}</button>`).join('')}</div></div><div class="field"><label>Exact filmjaar (optioneel, +1 extra)</label><input id="ansYear" type="number" inputmode="numeric" value="${esc(yearValue)}" oninput="state.currentAnswer.year=this.value"></div>`}
 function form(t,a={}){
   const fVal=state.currentAnswer.film!==undefined?state.currentAnswer.film:(a.film||'');
   const tVal=state.currentAnswer.title!==undefined?state.currentAnswer.title:(a.title||'');
@@ -525,14 +532,14 @@ function form(t,a={}){
   if (isSingle) {
     if (t === 'film') return `<div class="field"><label>Film</label><input id="ansFilm" value="${esc(fVal)}" oninput="state.currentAnswer.film=this.value"></div>`;
     if (t === 'title') return `<div class="field"><label>Titel</label><input id="ansTitle" value="${esc(tVal)}" oninput="state.currentAnswer.title=this.value"></div>`;
-    if (t === 'year') return `<div class="field"><label>Jaar</label><input id="ansYear" type="number" value="${esc(yVal)}" oninput="state.currentAnswer.year=this.value"></div>`;
+    if (t === 'year') return yearFields(a);
     if (t === 'artist') return `<div class="field"><label>Uitvoerder</label><input id="ansArtist" value="${esc(artVal)}" oninput="state.currentAnswer.artist=this.value"></div>`;
     return `<div class="field"><label>Antwoord</label><input id="ansText" value="${esc(txVal)}" oninput="state.currentAnswer.text=this.value"></div>`;
   }
   
   if (reqFilm) html += `<div class="field"><label>Film</label><input id="ansFilm" value="${esc(fVal)}" oninput="state.currentAnswer.film=this.value"></div>`;
   if (reqTitle) html += `<div class="field"><label>Titel</label><input id="ansTitle" value="${esc(tVal)}" oninput="state.currentAnswer.title=this.value"></div>`;
-  if (reqYear) html += `<div class="field"><label>Jaar</label><input id="ansYear" type="number" value="${esc(yVal)}" oninput="state.currentAnswer.year=this.value"></div>`;
+  if (reqYear) html += yearFields(a);
   if (reqArtist) html += `<div class="field"><label>Uitvoerder</label><input id="ansArtist" value="${esc(artVal)}" oninput="state.currentAnswer.artist=this.value"></div>`;
   return html;
 }
@@ -546,7 +553,7 @@ function collect(t){
   const fieldValue = id => document.getElementById(id)?.value?.trim() || '';
   if (reqFilm) res.film = fieldValue('ansFilm');
   if (reqTitle) res.title = fieldValue('ansTitle');
-  if (reqYear) res.year = +fieldValue('ansYear') || null;
+  if (reqYear) {res.year=+fieldValue('ansYear')||null;res.year_period=state.currentAnswer.year_period||null}
   if (reqArtist) res.artist = fieldValue('ansArtist');
   
   if (!reqFilm && !reqTitle && !reqYear && !reqArtist) {
@@ -565,7 +572,7 @@ function filled(t,a){
   
   if (reqFilm && !a.film) return false;
   if (reqTitle && !a.title) return false;
-  if (reqYear && !a.year) return false;
+  if (reqYear && !a.year_period) return false;
   if (reqArtist && !a.artist) return false;
   if (!reqFilm && !reqTitle && !reqYear && !reqArtist) {
     return !!a[t];
@@ -578,7 +585,9 @@ function renderAnswer(){
   const isFinalRound = state.room.current_round_no === state.room.total_rounds;
   const needFinalBet = state.room.settings?.final_bet && isFinalRound && !host() && !mine && state.currentAnswer.final_bet === undefined;
   if(needFinalBet){
-    app().innerHTML=`${topbar('Finale inzet')}${scorebar()}${progress()}<section class="card question" style="--accent:${myAccentColor()}"><div class="badge">🔥 De Grote Finale</div><h2>Geheime Finale Inzet</h2><p>Zet een deel van je huidige punten in. Antwoord je dadelijk goed? Dan win je de inzet erbij. Antwoord je fout? Dan verlies je de inzet.</p><div class="field"><label>Mijn inzet (huidige score: ${state.me?.score||0})</label><input id="betAmount" type="range" min="0" max="${state.me?.score||0}" value="${Math.floor((state.me?.score||0)/2)}" oninput="betVal.textContent=this.value"><div style="text-align:center;font-size:28px;font-weight:900;margin-top:8px" id="betVal">${Math.floor((state.me?.score||0)/2)}</div></div><button class="btn primary full" onclick="confirmFinalBet()">Inzet vastleggen</button></section>`;
+    const pending=state.currentAnswer.pending_final_bet;
+    const currentScore=Number(state.me?.score)||0;
+    app().innerHTML=`${topbar('Finale inzet')}${scorebar()}${progress()}<section class="card question" style="--accent:${myAccentColor()}"><div class="badge">🔥 De Grote Finale</div><h2>Geheime finale-inzet</h2><p>Vul zelf in hoeveel punten je wilt inzetten. Je krijgt eerst een overzicht voordat de inzet definitief wordt.</p>${pending===undefined?`<div class="field"><label>Mijn inzet (huidige score: ${currentScore})</label><input id="betAmount" type="number" inputmode="numeric" min="0" max="${currentScore}" value="0"></div><button class="btn primary full" onclick="previewFinalBet()">Bekijk mijn inzet</button>`:`<div class="answerline"><small>Inzet</small><strong>${pending} punten</strong></div><div class="notice green">Bij een goed antwoord komt de inzet boven op je rondepunten. Bij een volledig fout antwoord daalt je totaalscore naar ${Math.max(0,currentScore-pending)}.</div><div class="btnrow"><button class="btn ghost" onclick="editFinalBet()">Wijzigen</button><button class="btn primary" onclick="confirmFinalBet()">Inzet bevestigen</button></div>`}</section>`;
     return;
   }
   const configuredSeconds=answerTimeLimit(state.round.question_type);
@@ -624,11 +633,9 @@ function renderAnswer(){
     });
   }
 }
-function confirmFinalBet(){
-  const val = +document.getElementById('betAmount').value;
-  state.currentAnswer.final_bet = val;
-  render();
-}
+function previewFinalBet(){const max=Number(state.me?.score)||0;const val=Math.max(0,Math.min(max,Number(document.getElementById('betAmount')?.value)||0));state.currentAnswer.pending_final_bet=val;render()}
+function editFinalBet(){delete state.currentAnswer.pending_final_bet;render()}
+function confirmFinalBet(){state.currentAnswer.final_bet=Number(state.currentAnswer.pending_final_bet)||0;delete state.currentAnswer.pending_final_bet;render()}
 async function submitAnswer(){if(host())return;let a=collect(state.round.question_type);if(!filled(state.round.question_type,a)){toast('Vul je antwoord in.');return}const elapsed=(Date.now()-(state.answerPhaseStartedAt||Date.now()))/1000;if(answerTimeLimit(state.round.question_type)>0&&elapsed<=10)a.speed_bonus=true;clearInterval(state.timer);state.timer=null;let r=await state.sb.from('dmq_answers').insert({room_id:state.room.id,round_id:state.round.id,player_id:state.me.id,user_id:state.user.id,answer:a});if(r.error)toast(r.error.message);else schedule()}
 function norm(v){return String(v||'').normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLowerCase().replace(/&/g,' and ').replace(/\b(the|a|an|de|het|een|la|le|les|un|une|der|die|das)\b/g,' ').replace(/[^a-z0-9]+/g,' ').trim().replace(/\s+/g,' ')}
 function lev(a,b){if(a===b)return 0;if(!a.length)return b.length;if(!b.length)return a.length;let r=Array.from({length:b.length+1},(_,i)=>i);for(let i=1;i<=a.length;i++){let p=r[0];r[0]=i;for(let j=1;j<=b.length;j++){let t=r[j];r[j]=Math.min(r[j]+1,r[j-1]+1,p+(a[i-1]===b[j-1]?0:1));p=t}}return r[b.length]}
@@ -647,28 +654,11 @@ function points(a,s,t,activePower,playerId){
   const reqYear = t === 'full' || t.includes('year') || t === 'year';
   const reqArtist = t.includes('artist') || t === 'artist';
   
-  if (reqFilm && match(a.film, film)) q++;
-  if (reqTitle && match(a.title, title)) q++;
-  if (reqArtist && match(a.artist, artist)) q++;
+  if (reqFilm && match(a.film, film)) q+=t==='film'?2:1;
+  if (reqTitle && match(a.title, title)) q+=t==='title'?2:1;
+  if (reqArtist && match(a.artist, artist)) q+=t==='artist'?2:1;
   
-  if (reqYear && a.year) {
-    let diff = Math.abs(+a.year - +s.year);
-    let allowed = p === 'wild_ride' ? 4 : 0;
-    
-    if (t === 'year') {
-      if (diff === 0) q += 3;
-      else if (diff === 1) q += 2;
-      else if (diff === 2) q += 1;
-      else if (p === 'wild_ride' && diff <= allowed) q += 1;
-    } else if (t === 'year_film' || t === 'year_title') {
-      if (diff === 0) q += 2;
-      else if (diff === 1) q += 1;
-      else if (p === 'wild_ride' && diff <= allowed) q += 1;
-    } else {
-      if (diff === 0) q += 1;
-      else if (p === 'wild_ride' && diff <= allowed) q += 1;
-    }
-  }
+  if(reqYear){const correctStart=Math.floor((Number(s.year)-1)/5)*5+1;const correctPeriod=`${correctStart}-${correctStart+4}`;if(a.year_period===correctPeriod)q+=1;if(a.year&&Number(a.year)===Number(s.year))q+=1}
   
   if(p==='hidden_treasure'){
     let correctParts = 0;
@@ -769,18 +759,15 @@ function answerText(a,t){
   const parts=[];
   if((t==='full'||t.includes('film')||t==='film')&&a.film)parts.push(`Film: ${a.film}`);
   if((t==='full'||t.includes('title')||t==='title')&&a.title)parts.push(`Titel: ${a.title}`);
-  if((t==='full'||t.includes('year')||t==='year')&&a.year)parts.push(`Jaar: ${a.year}`);
+  if((t==='full'||t.includes('year')||t==='year')&&a.year_period)parts.push(`Periode: ${a.year_period}`);
+  if((t==='full'||t.includes('year')||t==='year')&&a.year)parts.push(`Exact jaar: ${a.year}`);
   if((t.includes('artist')||t==='artist')&&a.artist)parts.push(`Uitvoerder: ${a.artist}`);
   if(parts.length===0&&!t.includes('_')&&t!=='full')return String(a[t]||'—');
   return parts.length>0?parts.join(' · '):'—';
 }
 function maxPoints(t,p,playerId){
-  let m=2;
-  if(t==='full'||t==='year'||t==='year_film'||t==='year_film_artist'||t==='year_title'||t==='year_title_artist'||t==='film_title_artist'){
-    m=3;
-  }else{
-    m=2;
-  }
+  const hasYear=t==='full'||t.includes('year')||t==='year';
+  let m=(t==='film'||t==='title'||t==='artist')?2:questionFieldCount(t)+(hasYear?1:0);
   const activeP=isMyPower(playerId)?p:null;
   if(activeP==='hidden_treasure'||activeP==='lightspeed')m++;
   if(activeP==='small_world')m+=2;
@@ -795,20 +782,27 @@ function maxPoints(t,p,playerId){
   }
   return m;
 }
-function renderReview(){let s=currentSong(),mine=own();if(!s||(!mine&&!host())){loading('Laden…');return}let a=mine?.revised_answer||mine?.answer||{},p=power();if(mine){if(state.reviewFinalPoints===null)state.reviewFinalPoints=mine.final_points;if(state.reviewCorrectionNote===null)state.reviewCorrectionNote=mine.note||''}const fpVal=(mine&&state.reviewFinalPoints!==null)?state.reviewFinalPoints:(mine?.final_points||0);const noteVal=(mine&&state.reviewCorrectionNote!==null)?state.reviewCorrectionNote:(mine?.note||'');const minP=p==='temple_run'&&isMyPower(state.me?.id)?-1:0;app().innerHTML=`${topbar('Punten controleren')}${scorebar()}${progress()}<section class="card question" style="--accent:${myAccentColor()}"><div class="correctbox"><strong>Het juiste antwoord</strong><p style="margin:7px 0 0">${esc(s.title)} · ${esc(s.film)} · ${esc(s.year)}${s.artist?` · ${esc(s.artist)}`:''}</p></div>${rules(state.round.question_type,p)}${host()?'':`<div class="answerline"><small>Jouw definitieve antwoord</small><strong>${esc(answerText(a,state.round.question_type))}</strong></div>`}${host()?'<div class="notice blue">Jij bent de organisator. Wacht tot de spelers hun punten bevestigen.</div>':!mine.points_confirmed?`<div class="field"><label>Mijn definitieve punten</label><select id="finalPoints" onchange="state.reviewFinalPoints=+this.value">${Array.from({length:maxPoints(state.round.question_type,p,state.me?.id)-minP+1},(_,i)=>{const val=minP+i;return`<option value="${val}" ${+fpVal===val?'selected':''}>${val}</option>`}).join('')}</select></div><div class="field"><label>Toelichting bij correctie</label><input id="correctionNote" value="${esc(noteVal)}" oninput="state.reviewCorrectionNote=this.value"></div><button class="btn primary full" onclick="confirmPoints()">Punten bevestigen</button>`:`<div class="notice green">Je hebt +${mine.final_points} bevestigd.</div>${!mine.round_completed?'<button class="btn primary full" onclick="completeRound()">Ik ben klaar met deze ronde</button>':'<button class="btn ghost full" disabled>Ronde afgerond ✓</button>'}`}</section><section class="card"><h2>Puntenstatus</h2>${playerList(pl=>{let x=state.answers.find(a=>a.player_id===pl.id);if(!x?.points_confirmed)return['Controleert nog','wait'];return x.round_completed?[`+${x.final_points} · klaar`,'ok']:[`+${x.final_points} · afronden`,'wait']})}</section>`}
-async function confirmPoints(){let r=await state.sb.rpc('dmq_confirm_points',{p_answer_id:own().id,p_final_points:state.reviewFinalPoints,p_note:state.reviewCorrectionNote||''});if(r.error)toast(r.error.message);else{awardDisneyStars(state.me?.name,state.reviewFinalPoints);schedule()}}
+function renderReview(){let s=currentSong(),mine=own();if(host())return renderReviewLegacy();if(!s||!mine){loading('Laden…');return}let a=mine?.revised_answer||mine?.answer||{};if(state.reviewFinalPoints===null)state.reviewFinalPoints=Number(mine.final_points)||0;if(state.reviewCorrectionNote===null)state.reviewCorrectionNote=mine.note||'';const pointsValue=Number(state.reviewFinalPoints)||0;const noteValue=state.reviewCorrectionNote||'';const statusHtml=playerList(pl=>{let x=state.answers.find(answer=>answer.player_id===pl.id);if(!x?.points_confirmed)return['Controleert nog','wait'];return x.round_completed?[`${x.final_points>=0?'+':''}${x.final_points} · klaar`,'ok']:[`${x.final_points>=0?'+':''}${x.final_points} · afronden`,'wait']});app().innerHTML=`${topbar('Punten controleren')}${scorebar()}${progress()}<section class="card question" style="--accent:${myAccentColor()}"><div class="correctbox"><strong>Het juiste antwoord</strong><p style="margin:7px 0 0">${esc(s.title)} · ${esc(s.film)} · ${esc(s.year)}${s.artist?` · ${esc(s.artist)}`:''}</p></div>${rules(state.round.question_type,power())}<div class="answerline"><small>Jouw definitieve antwoord</small><strong>${esc(answerText(a,state.round.question_type))}</strong></div>${!mine.points_confirmed?`<div class="field"><label>Mijn definitieve punten</label><input id="finalPoints" type="number" inputmode="numeric" min="-${Number(state.me?.score)||0}" max="50" value="${pointsValue}" oninput="state.reviewFinalPoints=Number(this.value)||0"></div><div class="field"><label>Toelichting bij correctie</label><input id="correctionNote" value="${esc(noteValue)}" oninput="state.reviewCorrectionNote=this.value"></div><div class="notice blue">Controleer de punten eerst. Je kunt het getal nog wijzigen voordat je bevestigt.</div><button class="btn primary full" onclick="confirmPoints()">Punten bevestigen</button>`:`<div class="notice green">Je hebt ${mine.final_points>=0?'+':''}${mine.final_points} bevestigd.</div>${!mine.round_completed?'<button class="btn primary full" onclick="completeRound()">Ik ben klaar met deze ronde</button>':'<button class="btn ghost full" disabled>Ronde afgerond ✓</button>'}`}</section><section class="card"><h2>Puntenstatus</h2>${statusHtml}</section>`}
+function renderReviewLegacy(){let s=currentSong(),mine=own();if(!s||(!mine&&!host())){loading('Laden…');return}let a=mine?.revised_answer||mine?.answer||{},p=power();if(mine){if(state.reviewFinalPoints===null)state.reviewFinalPoints=mine.final_points;if(state.reviewCorrectionNote===null)state.reviewCorrectionNote=mine.note||''}const fpVal=(mine&&state.reviewFinalPoints!==null)?state.reviewFinalPoints:(mine?.final_points||0);const noteVal=(mine&&state.reviewCorrectionNote!==null)?state.reviewCorrectionNote:(mine?.note||'');const minP=p==='temple_run'&&isMyPower(state.me?.id)?-1:0;app().innerHTML=`${topbar('Punten controleren')}${scorebar()}${progress()}<section class="card question" style="--accent:${myAccentColor()}"><div class="correctbox"><strong>Het juiste antwoord</strong><p style="margin:7px 0 0">${esc(s.title)} · ${esc(s.film)} · ${esc(s.year)}${s.artist?` · ${esc(s.artist)}`:''}</p></div>${rules(state.round.question_type,p)}${host()?'':`<div class="answerline"><small>Jouw definitieve antwoord</small><strong>${esc(answerText(a,state.round.question_type))}</strong></div>`}${host()?'<div class="notice blue">Jij bent de organisator. Wacht tot de spelers hun punten bevestigen.</div>':!mine.points_confirmed?`<div class="field"><label>Mijn definitieve punten</label><select id="finalPoints" onchange="state.reviewFinalPoints=+this.value">${Array.from({length:maxPoints(state.round.question_type,p,state.me?.id)-minP+1},(_,i)=>{const val=minP+i;return`<option value="${val}" ${+fpVal===val?'selected':''}>${val}</option>`}).join('')}</select></div><div class="field"><label>Toelichting bij correctie</label><input id="correctionNote" value="${esc(noteVal)}" oninput="state.reviewCorrectionNote=this.value"></div><button class="btn primary full" onclick="confirmPoints()">Punten bevestigen</button>`:`<div class="notice green">Je hebt +${mine.final_points} bevestigd.</div>${!mine.round_completed?'<button class="btn primary full" onclick="completeRound()">Ik ben klaar met deze ronde</button>':'<button class="btn ghost full" disabled>Ronde afgerond ✓</button>'}`}</section><section class="card"><h2>Puntenstatus</h2>${playerList(pl=>{let x=state.answers.find(a=>a.player_id===pl.id);if(!x?.points_confirmed)return['Controleert nog','wait'];return x.round_completed?[`+${x.final_points} · klaar`,'ok']:[`+${x.final_points} · afronden`,'wait']})}</section>`}
+async function confirmPoints(){let r=await state.sb.rpc('dmq_confirm_points',{p_answer_id:own().id,p_final_points:state.reviewFinalPoints,p_note:state.reviewCorrectionNote||''});if(r.error)toast(r.error.message);else schedule()}
 async function completeRound(){let r=await state.sb.rpc('dmq_complete_round',{p_answer_id:own().id});if(r.error)toast(r.error.message);else schedule()}
-function renderStandings(){let sorted=[...state.players].sort((a,b)=>b.score-a.score);app().innerHTML=`${topbar('Tussenstand')}${rules(state.round.question_type,power())}<section class="card"><div class="standings">${sorted.map((p,i)=>`<div class="rank" style="border-color:${p.color}"><div class="rankicon">${['🥇','🥈','🥉','🎵','🎶'][i]}</div><div><strong>${A(p.avatar_id).icon} ${esc(p.name)}</strong><small class="muted">${esc(A(p.avatar_id).name)}</small></div><div class="rankscore">${p.score} ★</div></div>`).join('')}</div>${leader()?`<button class="btn primary full" style="margin-top:14px" onclick="nextRound()">${state.room.current_round_no>=state.room.total_rounds?'Einduitslag':'Volgende song'}</button>`:`<div class="notice blue">${esc(leaderName())} start de volgende ronde.</div>`}</section>`}
+function renderStandings(){let sorted=[...state.players].sort((a,b)=>b.score-a.score);app().innerHTML=`${topbar('Tussenstand')}${rules(state.round.question_type,power())}<section class="card"><div class="standings">${sorted.map(p=>{const rank=competitionRank(p,sorted);return`<div class="rank" style="border-color:${p.color}"><div class="rankicon">${rankMedal(rank)}</div><div><strong>${A(p.avatar_id).icon} ${esc(p.name)}</strong><small class="muted">${esc(A(p.avatar_id).name)} · verwachte beloning ${finalCoinReward(p)} Coco Coins</small></div><div class="rankscore">${p.score} ★</div></div>`}).join('')}</div>${leader()?`<button class="btn primary full" style="margin-top:14px" onclick="nextRound()">${state.room.current_round_no>=state.room.total_rounds?'Einduitslag':'Volgende song'}</button>`:`<div class="notice blue">${esc(leaderName())} start de volgende ronde.</div>`}</section>`}
 async function nextRound(){state.reviewFinalPoints=null;state.reviewCorrectionNote=null;let r=await state.sb.rpc('dmq_next_round_v2',{p_room_id:state.room.id});if(r.error)toast(r.error.message);else schedule()}
 const TITLES=[['De Maestro van Main Street','De Gouden Groove van het Kasteel','De Onbetwiste Oorwurmkoning','De Headliner van de Magische Hitlijst','De Dirigent van de Disney-deuntjes'],['De Eeuwige Encore','De Zilveren Soundtrackheld','De Bijna-Banger van Big Thunder','De Ster van het Voorprogramma','De Remix die nét niet won'],['De Phantom van het Vergeten Refrein','De Shuffleknop in Mensenvorm','De FastPass naar het Foute Jaartal','De Piraat met de Verkeerde Playlist','De Toonzoeker van de Tower']];
 function renderFinal(){
   let s=[...state.players].sort((a,b)=>b.score-a.score);
-  app().innerHTML=`${topbar('Einduitslag','leaveRoom()')}<section class="card hero"><div class="logo">♫</div><h1>${esc(s[0]?.name)} wint!</h1></section><section class="card"><div class="standings">${s.map((p,i)=>`<div class="rank" style="border-color:${p.color}"><div class="rankicon">${['🥇','🥈','🥉','🎵','🎶'][Math.min(i,4)]}</div><div><strong>${A(p.avatar_id).icon} ${esc(p.name)}</strong><small class="gold">${esc(getPlayerTitle(p,s,state.allAnswers))}</small></div><div class="rankscore">${p.score} ★</div></div>`).join('')}</div><button class="btn ghost full" style="margin-top:14px" onclick="leaveRoom()">Terug</button></section>`;
+  awardFinalMusicReward();
+  const winners=s.filter(player=>(Number(player.score)||0)===(Number(s[0]?.score)||0));
+  const winnerTitle=winners.length>1?`${winners.map(player=>player.name).join(' & ')} winnen samen!`:`${s[0]?.name||'De winnaar'} wint!`;
+  app().innerHTML=`${topbar('Einduitslag','leaveRoom()')}<section class="card hero"><div class="logo">♫</div><h1>${esc(winnerTitle)}</h1></section><section class="card"><div class="standings">${s.map(p=>{const rank=competitionRank(p,s);return`<div class="rank" style="border-color:${p.color}"><div class="rankicon">${rankMedal(rank)}</div><div><strong>${A(p.avatar_id).icon} ${esc(p.name)}</strong><small class="gold">${esc(getPlayerTitle(p,s,state.allAnswers))}</small><small class="muted">${finalCoinReward(p)} Coco Coins</small></div><div class="rankscore">${p.score} ★</div></div>`}).join('')}</div><button class="btn ghost full" style="margin-top:14px" onclick="leaveRoom()">Terug</button></section>`;
   if(state.lobbySettings.animations&&s.length>0&&!state.celebrationShown){
     state.celebrationShown=true;
     setTimeout(()=>playWinnerCelebration(s[0],s.slice(1)),150);
   }
 }
+function awardFinalMusicReward(){if(!state.me||!state.room)return;const key=`dmq-final-reward-${state.room.id}-${state.me.id}`;if(localStorage.getItem(key))return;const reward=finalCoinReward(state.me);awardDisneyStars(state.me.name,reward);localStorage.setItem(key,String(reward));syncFinalMusicReward(state.me.name,reward,key).catch(console.error);recordMusicResult(state.me)}
+async function syncFinalMusicReward(name,reward,receipt){if(!state.sb||reward<=0)return;const atomic=await state.sb.rpc('dmq_award_coco_reward',{p_receipt:receipt,p_profile_key:disneyStarKey(name),p_amount:reward});if(!atomic.error)return;console.warn('Atomaire beloning nog niet beschikbaar.',atomic.error)}
+function recordMusicResult(player){const key=`dmq-history-${state.room.id}-${player.id}`;if(localStorage.getItem(key))return;const rank=competitionRank(player);const history=JSON.parse(localStorage.getItem('disney_solo_history')||'[]');history.unshift({profileName:player.name,profileKey:disneyStarKey(player.name),category:'music-match',gameType:"Mickey's Music Match",date:new Date().toISOString(),score:player.score,details:rank===1?'Gewonnen':`Geëindigd op plaats ${rank}`});localStorage.setItem('disney_solo_history',JSON.stringify(history));localStorage.setItem(key,'1')}
 function renderAdmin(){let s=state.songs.find(x=>+x.song_number===+state.adminSelectedSong)||{};app().innerHTML=`${topbar('Songbeheer · 150 songs',"state.view='home';render()")}
 <section class="card"><div class="field"><label>Beheer-PIN</label><input id="adminPin" type="password" value="${esc(state.adminPin)}"></div><div class="field"><label>Song</label><select id="songSelect" onchange="selectAdminSong(this.value)">${state.songs.map(x=>`<option value="${x.song_number}" ${+x.song_number===+state.adminSelectedSong?'selected':''}>${esc(x.label)} · ${esc(x.title||'leeg')}</option>`).join('')}</select></div></section>
 <section class="card"><div class="field"><label>Titel</label><input id="songTitle" value="${esc(s.title||'')}"></div><div class="field"><label>Film</label><input id="songFilm" value="${esc(s.film||'')}"></div><div class="grid2"><div class="field"><label>Jaar</label><input id="songYear" type="number" value="${esc(s.year||'')}"></div><div class="field"><label>Uitvoerder</label><input id="songArtist" value="${esc(s.artist||'')}"></div></div><div class="field"><label>Spotify-link</label><input id="songSpotify" value="${esc(s.spotify_url||'')}"></div><div class="field"><label>Codeafbeelding-URL</label><input id="songCode" value="${esc(s.code_image_url||'')}"></div><div class="field"><label>Film-aliases</label><input id="filmAliases" value="${esc((s.film_aliases||[]).join(', '))}"></div><div class="field"><label>Titel-aliases</label><input id="titleAliases" value="${esc((s.title_aliases||[]).join(', '))}"></div><div class="field"><label>Uitvoerder-aliases</label><input id="artistAliases" value="${esc((s.artist_aliases||[]).join(', '))}"></div><label class="toggleline">Song actief<input id="songEnabled" type="checkbox" ${s.enabled?'checked':''}></label><button class="btn primary full" onclick="saveSong()">Opslaan</button></section>`}
@@ -1205,6 +1199,7 @@ Object.assign(window,{
   removeManagedPlayer,updateManagedPlayer,startGame,refreshAll,shareRoom,adjustRoundCount,
   createRoom,goJoin,resumeHost,resumePlayer,chooseJoinColor,chooseJoinAvatar,joinRoom,render,
   renderLobby,saveSong,selectAdminSong,nextRound,confirmPoints,completeRound,
+  previewFinalBet,editFinalBet,confirmFinalBet,
   showPowersInfo,closePowersInfo,openStealDialog,closeStealDialog,stealFromPlayer,
   closeCelebration,removeBg,P
 });

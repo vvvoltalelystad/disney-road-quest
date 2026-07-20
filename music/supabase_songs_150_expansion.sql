@@ -36,7 +36,7 @@ values
 (127, 'Song 127', 'Son of Man', 'Tarzan', 1999, 'Phil Collins', 'https://open.spotify.com/search/Son%20of%20Man%20Phil%20Collins%20Tarzan%20Disney', true),
 (128, 'Song 128', 'Two Worlds', 'Tarzan', 1999, 'Phil Collins', 'https://open.spotify.com/search/Two%20Worlds%20Phil%20Collins%20Tarzan%20Disney', true),
 (129, 'Song 129', 'Reflection', 'Mulan', 1998, 'Lea Salonga', 'https://open.spotify.com/search/Reflection%20Lea%20Salonga%20Mulan%20Disney', true),
-(130, 'Song 130', 'I''ll Make a Man Out of You', 'Mulan', 1998, 'Donny Osmond', 'https://open.spotify.com/search/I%27ll%20Make%20a%20Man%20Out%20of%20You%20Donny%20Osmond%20Mulan%20Disney', true),
+(130, 'Song 130', 'I''ll Make a Man Out of You', 'Mulan', 1998, 'Donny Osmond & Chorus - Mulan', 'https://open.spotify.com/track/40lNlmrek40tfBOiQzf6qK', true),
 (131, 'Song 131', 'A Girl Worth Fighting For', 'Mulan', 1998, 'Mulan Cast', 'https://open.spotify.com/search/A%20Girl%20Worth%20Fighting%20For%20Mulan%20Cast%20Mulan%20Disney', true),
 (132, 'Song 132', 'Go the Distance', 'Hercules', 1997, 'Roger Bart', 'https://open.spotify.com/search/Go%20the%20Distance%20Roger%20Bart%20Hercules%20Disney', true),
 (133, 'Song 133', 'Zero to Hero', 'Hercules', 1997, 'Tawatha Agee, Lillias White, LaChanze', 'https://open.spotify.com/search/Zero%20to%20Hero%20Hercules%20Disney', true),
