@@ -4103,29 +4103,31 @@ export default function App() {
 
   // Emoji Quiz text submission
   const handleEmojiTextAnswer = async (t) => {
-    if (quizLocked) return;
-    const isHost = players[0]?.id === localPlayer?.id;
-    const isMyTurn = players[room.current_player_index]?.id === localPlayer?.id;
-    if (!isMyTurn && !isHost) return;
-
-    setQuizLocked(true);
     const typed = localEstimate.trim();
+    if (!typed || !localPlayer?.id) return;
+    const { room: freshRoom, players: freshPlayers } = await fetchRoomData(room.id);
+    const freshState = freshRoom.current_task_state || {};
+    const genericAnswers = { ...(freshState.genericAnswers || {}) };
+    if (genericAnswers[localPlayer.id] !== undefined) return;
+    genericAnswers[localPlayer.id] = typed;
     setQuizSelectedAnswer(typed);
-
     const isCorrect = match(typed, [t.movie_nl, t.movie_en, ...(t.movie_aliases || [])]);
-    if (isCorrect) {
-      const pts = 2 * getRoundMultiplier((players[room.current_player_index] || localPlayer)?.id);
-      const activePlayer = players[room.current_player_index] || localPlayer;
-      await addPlayerScore(room.id, activePlayer, pts, `Emoji Quiz: correct geraden`, 'knowledge');
+    const genericAwarded = { ...(freshState.genericAwarded || {}) };
+    if (isCorrect && !genericAwarded[localPlayer.id]) {
+      const pts = 2 * getRoundMultiplier(localPlayer.id, freshState);
+      await addPlayerScore(room.id, freshPlayers.find(p => p.id === localPlayer.id) || localPlayer, pts, `Emoji Quiz: correct geraden`, 'knowledge');
+      genericAwarded[localPlayer.id] = true;
     }
-
+    const allAnswered = freshPlayers.every(p => genericAnswers[p.id] !== undefined);
     await updateRoomState(room.id, {
       current_task_state: {
-        ...room.current_task_state,
-        quizLocked: true,
-        selectedAnswer: typed
+        ...freshState,
+        genericAnswers,
+        genericAwarded,
+        quizLocked: allAnswered
       }
     });
+    setLocalEstimate('');
   };
 
   // --- POWER CARDS PLAY LOGIC ---
@@ -7231,21 +7233,25 @@ export default function App() {
                             })()}
 
                             {/* 7. EMOJI QUIZ (Converted from MC to typing input for adult difficulty) */}
-                            {t.type === "emoji" && (
+                            {t.type === "emoji" && (() => {
+                              const genericAnswers = room.current_task_state?.genericAnswers || {};
+                              const myAnswer = genericAnswers[localPlayer?.id];
+                              const allAnswered = players.length > 0 && players.every(p => genericAnswers[p.id] !== undefined);
+                              return (
                               <div>
                                 <div className="center" style={{ fontSize: '48px', margin: '20px 0', letterSpacing: '4px', filter: 'drop-shadow(0 4px 10px rgba(0,0,0,0.3))' }}>
                                   {t.text}
                                 </div>
                                 
-                                {quizLocked ? (
-                                  <div className="notice" style={{ background: match(quizSelectedAnswer, [t.movie_nl, t.movie_en, ...(t.movie_aliases || [])]) ? '#123d2b' : '#3d121c' }}>
+                                {allAnswered ? (
+                                  <div className="notice" style={{ background: match(myAnswer, [t.movie_nl, t.movie_en, ...(t.movie_aliases || [])]) ? '#123d2b' : '#3d121c' }}>
                                     <strong>
-                                      {match(quizSelectedAnswer, [t.movie_nl, t.movie_en, ...(t.movie_aliases || [])]) ? 'Correct! 🎉' : 'Helaas! 💔'}
+                                      {match(myAnswer, [t.movie_nl, t.movie_en, ...(t.movie_aliases || [])]) ? 'Correct! 🎉' : 'Helaas! 💔'}
                                     </strong>
-                                    <p>Jouw antwoord: <em>{quizSelectedAnswer || "Geen"}</em></p>
+                                    <p>Jouw antwoord: <em>{myAnswer || "Geen"}</em></p>
                                     <p style={{ marginTop: '10px' }}><strong>Oplossing:</strong> {t.movie_nl} / {t.movie_en}</p>
                                     
-                                    {canControlTurnTask && (
+                                    {isHost && (
                                       <button className="btn primary full" style={{ marginTop: '14px' }} onClick={handleFinishTask}>
                                         Volgende opdracht
                                       </button>
@@ -7253,7 +7259,7 @@ export default function App() {
                                   </div>
                                 ) : (
                                   <div>
-                                    {canControlTurnTask ? (
+                                    {myAnswer === undefined ? (
                                       <div>
                                         <div className="field">
                                           <label>Welke Disney film wordt hier uitgebeeld?</label>
@@ -7272,12 +7278,13 @@ export default function App() {
                                         </button>
                                       </div>
                                     ) : (
-                                      <div className="center">Wachten tot {activePlayer?.name} de emojis raadt... ⏳</div>
+                                      <div className="notice green">Antwoord opgeslagen. Wachten op de rest…</div>
                                     )}
                                   </div>
                                 )}
                               </div>
-                            )}
+                              );
+                            })()}
 
                             {/* 8. WIE BEN IK (HINT QUEST) */}
                             {t.type === "whoami" && (() => {
