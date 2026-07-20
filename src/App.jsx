@@ -5453,17 +5453,76 @@ export default function App() {
 
             <div className="captains-log-content">
               {(() => {
-                const entries = getOrGenerateCaptainsLog(logProfileName);
+                const rawEntries = getOrGenerateCaptainsLog(logProfileName);
                 const profileKey = getCollectorKey(logProfileName);
-                const games = soloHistory.filter(item => {
+                const currentBalance = Number(starBank[profileKey]) || 0;
+                const signedMutationAmount = entry => (
+                  entry.type === 'spend' || Number(entry.amount) < 0
+                    ? -Math.abs(Number(entry.amount) || 0)
+                    : Math.abs(Number(entry.amount) || 0)
+                );
+                const recordedBalance = rawEntries.reduce((sum, entry) => sum + signedMutationAmount(entry), 0);
+                const missingMutation = currentBalance - recordedBalance;
+                const entries = Math.abs(missingMutation) > 0.0001 ? [...rawEntries, {
+                  timestamp: new Date().toISOString(),
+                  amount: missingMutation,
+                  type: missingMutation < 0 ? 'spend' : 'earn',
+                  description: missingMutation < 0
+                    ? 'Historische uitgave (saldo-synchronisatie)'
+                    : 'Historische opbrengst (saldo-synchronisatie)',
+                  balanceAfter: currentBalance,
+                  synthetic: true
+                }] : rawEntries;
+                const storedGames = soloHistory.filter(item => {
                   if (item.profileKey) return item.profileKey === profileKey;
                   if (item.profileName) return getCollectorKey(item.profileName) === profileKey;
                   return false;
                 });
+                const inferCompletedGame = entry => {
+                  const description = String(entry.description || '');
+                  let gameName = '';
+                  let details = description;
+                  if (/^McQueen's Road Race afgerond/i.test(description)) gameName = "McQueen's Road Race";
+                  else if (/^Mickey's Music Match afgerond/i.test(description)) gameName = "Mickey's Music Match";
+                  else {
+                    const aliases = [
+                      [/Othello/i, 'Othello'],
+                      [/Rapunzel|Kamertje verhuren/i, "Rapunzel's Torenkamers"],
+                      [/Inside Out Kleurenchaos|Color Lines/i, 'Inside Out Kleurenchaos'],
+                      [/Ricochet Shot/i, 'Ricochet Shot'],
+                      [/Curling Duel/i, 'Curling Duel'],
+                      [/Louisa's Power Push|Marble Push|Abalone/i, "Louisa's Power Push"],
+                      [/Black Pearl's Plank/i, "Black Pearl's Plank"],
+                      [/Goofy's Geluksworp/i, "Goofy's Geluksworp"],
+                      [/Mike's Wazowski-Board|Qwixx/i, "Mike's Wazowski-Board"],
+                      [/Yzma's Poison Struggle/i, "Yzma's Poison Struggle"],
+                      [/Tic Tac Tinker Bell/i, 'Tic Tac Tinker Bell'],
+                      [/Zazu's Sudoku/i, "Zazu's Sudoku"]
+                    ];
+                    gameName = aliases.find(([pattern]) => pattern.test(description))?.[1] || '';
+                    if (!gameName || !/gewonnen|verloren|gelijkspel|opgelost|gemist|gezonken|verzameld|afgerond/i.test(description)) return null;
+                  }
+                  details = description.replace(/^[^:]+:\s*/, '') || description;
+                  return {
+                    profileName: logProfileName,
+                    profileKey,
+                    category: gameName.includes('Road Race') ? 'road-race' : gameName.includes('Music Match') ? 'music-match' : 'arena',
+                    gameType: gameName,
+                    date: entry.timestamp,
+                    score: Math.max(0, Number(entry.amount) || 0),
+                    details,
+                    inferred: true
+                  };
+                };
+                const inferredGames = rawEntries.map(inferCompletedGame).filter(Boolean).filter(inferred => !storedGames.some(stored => (
+                  stored.gameType === inferred.gameType
+                  && (stored.details === inferred.details || Math.abs(new Date(stored.date || 0) - new Date(inferred.date || 0)) < 120000)
+                )));
+                const games = [...storedGames, ...inferredGames];
                 const classifyResult = item => {
                   const text = `${item.details || ''}`.toLowerCase();
                   if (/gelijk|draw/.test(text)) return 'draw';
-                  if (/verloren|verlies|niet gekraakt|niet opgelost|overgeslagen|plaats\s+[2-9]/.test(text)) return 'loss';
+                  if (/verloren|verlies|niet gekraakt|niet opgelost|gemist|gezonken|overgeslagen|plaats\s+[2-9]/.test(text)) return 'loss';
                   if (/gewonnen|winst|wint|opgelost|gekraakt|plaats\s+1/.test(text)) return 'win';
                   return Number(item.score) > 0 ? 'win' : 'loss';
                 };
@@ -5481,9 +5540,11 @@ export default function App() {
                 const totalLosses = gameResults.filter(item => item.result === 'loss').length;
                 const earned = entries.filter(entry => entry.type === 'earn' && Number(entry.amount) > 0);
                 const spent = entries.filter(entry => entry.type === 'spend' || Number(entry.amount) < 0);
+                const earnedTotal = earned.reduce((sum, entry) => sum + Math.abs(Number(entry.amount) || 0), 0);
+                const spentTotal = spent.reduce((sum, entry) => sum + Math.abs(Number(entry.amount) || 0), 0);
                 const renderMutations = list => list.length ? [...list].reverse().map((entry, idx) => (
                   <div key={`${entry.timestamp}-${idx}`} className="dashboard-mutation">
-                    <span><strong>{entry.description}</strong><small>{new Date(entry.timestamp).toLocaleString('nl-NL')}</small></span>
+                    <span><strong>{entry.description}</strong><small>{entry.synthetic ? 'Automatisch afgestemd op het huidige saldo' : new Date(entry.timestamp).toLocaleString('nl-NL')}</small></span>
                     <b className={Number(entry.amount) >= 0 ? 'earn' : 'spend'}>{Number(entry.amount) >= 0 ? '+' : '−'}{Math.abs(Number(entry.amount) || 0)}</b>
                   </div>
                 )) : <p className="small">Nog geen mutaties.</p>;
@@ -5500,9 +5561,9 @@ export default function App() {
                       <div key={game.name}><strong>{game.name}</strong><span>{game.played}× gespeeld</span><small>{game.win} gewonnen · {game.draw} gelijk · {game.loss} verloren</small></div>
                     ))}</div> : <p className="small">Nog geen spellen geregistreerd voor dit profiel.</p>}
                     <h3>Coco Coins</h3>
-                    <details className="dashboard-ledger"><summary><span>Verdiende coins</span><strong>+{earned.reduce((sum, entry) => sum + Math.abs(Number(entry.amount) || 0), 0)}</strong></summary>{renderMutations(earned)}</details>
-                    <details className="dashboard-ledger"><summary><span>Uitgegeven coins</span><strong>−{spent.reduce((sum, entry) => sum + Math.abs(Number(entry.amount) || 0), 0)}</strong></summary>{renderMutations(spent)}</details>
-                    <div className="dashboard-balance"><span>Huidig saldo</span><strong>{starBank[profileKey] || 0} <CocoCoinIcon size={22} /></strong></div>
+                    <details className="dashboard-ledger"><summary><span>Verdiende coins</span><strong>+{earnedTotal}</strong></summary><div className="dashboard-ledger-list">{renderMutations(earned)}</div></details>
+                    <details className="dashboard-ledger"><summary><span>Uitgegeven coins</span><strong>−{spentTotal}</strong></summary><div className="dashboard-ledger-list">{renderMutations(spent)}</div></details>
+                    <div className="dashboard-balance"><span>Huidig saldo<small>{earnedTotal} − {spentTotal} = {currentBalance}</small></span><strong>{currentBalance} <CocoCoinIcon size={22} /></strong></div>
                   </>
                 );
               })()}
@@ -6988,24 +7049,39 @@ export default function App() {
                                   updateRoomState={updateRoomState}
                                   showRules={false}
                                   onToolbarChange={isTinkerGame || t.gameId === 'qwixx' ? setArenaToolbar : undefined}
-                                  onFinish={async (score, detail) => {
+                                onFinish={async (score, detail) => {
                                     const usesDirectReward = t.gameId === 'ricochet' || t.gameId === 'qwixx' || t.gameId === 'piratesplank';
                                     const coinsEarned = usesDirectReward ? score : (score === 3 ? 2 : (score === 2 ? 1 : 0));
-                                    const gameTitle = {
-                                      othello: "Othello",
-                                      dotsboxes: "Rapunzel's Torenkamers",
-                                      colorlines: "Color Lines",
-                                      ricochet: "Ricochet Shot",
-                                      curling: "Curling Duel",
-                                      abalone: "Marble Push (Abalone)",
-                                      tictactinker: "Tic Tac Tinker Bell"
-                                    }[t.gameId] || "Arena Game";
+                                    const gameTitle = getArenaGame(t.gameId)?.name || "Arena Game";
 
                                     if (room.id === 'solo') {
                                       logSoloAttempt(coinsEarned, detail, true);
                                       soloLoggedRef.current = true;
                                     } else {
                                       await addPlayerScore(room.id, localPlayer, coinsEarned, `${gameTitle}: ${detail}`, 'knowledge');
+                                      const completedAt = new Date().toISOString();
+                                      const profileName = localPlayer?.name || activeProfileName || 'Speler';
+                                      const historyEntry = {
+                                        profileName,
+                                        profileKey: getCollectorKey(profileName),
+                                        category: 'arena',
+                                        gameType: gameTitle,
+                                        date: completedAt,
+                                        score: coinsEarned,
+                                        details: detail
+                                      };
+                                      setSoloHistory(previous => {
+                                        const alreadyRecorded = previous.some(item => (
+                                          item.profileKey === historyEntry.profileKey
+                                          && item.gameType === historyEntry.gameType
+                                          && item.details === historyEntry.details
+                                          && Math.abs(new Date(item.date || 0) - new Date(completedAt)) < 120000
+                                        ));
+                                        if (alreadyRecorded) return previous;
+                                        const next = [historyEntry, ...previous];
+                                        localStorage.setItem('disney_solo_history', JSON.stringify(next));
+                                        return next;
+                                      });
                                     }
                                     handleFinishTask();
                                   }}
