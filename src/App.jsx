@@ -3372,6 +3372,7 @@ export default function App() {
         genericAnswers: {},
         genericAwarded: {},
         hintLevel: 1,
+        hostReviews: {},
         roundPhase: 'announcement',
         doubleWishChoices: {}
       }
@@ -3539,6 +3540,7 @@ export default function App() {
         genericAnswers: {},
         genericAwarded: {},
         hintLevel: 1,
+        hostReviews: {},
         roundPhase: 'announcement',
         doubleWishChoices: {}
       }
@@ -4013,7 +4015,12 @@ export default function App() {
   const handleResolvePictionary = async () => {
     const drawer = players[room.current_player_index];
     const guesses = room.current_task_state?.pictionaryGuesses || {};
-    const hasCorrectGuess = Object.values(guesses).some(guess => guess?.correct);
+    const reviews = room.current_task_state?.hostReviews || {};
+    const task = getCurrentTask();
+    const hasCorrectGuess = Object.entries(guesses).some(([playerId, guess]) => {
+      const review = reviews[`${task?.id || room.current_task_id}:${playerId}`];
+      return review?.correct ?? guess?.correct;
+    });
     if (drawer && hasCorrectGuess) {
       await addPlayerScore(
         room.id,
@@ -4056,6 +4063,7 @@ export default function App() {
 
   const handleResolveDiary = async (t) => {
     const answers = room.current_task_state.answers || {};
+    const reviews = room.current_task_state.hostReviews || {};
 
     await Promise.all(players.map(p => {
       const pAns = answers[p.id] || {};
@@ -4066,7 +4074,8 @@ export default function App() {
         if (entry) {
           const charCorrect = match(entry.char, [t.character_nl, t.character_en, ...(t.character_aliases || [])]);
           const movieCorrect = match(entry.movie, [t.movie_nl, t.movie_en, ...(t.movie_aliases || [])]);
-          if (charCorrect && movieCorrect) score++;
+          const review = reviews[`${t.id || room.current_task_id}:${p.id}:${pk}`];
+          if (review?.correct ?? (charCorrect && movieCorrect)) score++;
         }
       });
 
@@ -4718,6 +4727,50 @@ export default function App() {
     );
   };
 
+  const getHostReviewKey = (task, playerId, state = room?.current_task_state) => (
+    `${task.id || room?.current_task_id}:${playerId}${task.type === 'diary' ? `:part${state?.part || 1}` : ''}`
+  );
+
+  const handleHostReviewAnswer = async (task, player, response, desiredCorrect) => {
+    if (!isFacilitatorHost() || !response || response.correct === null || response.correct === undefined) return;
+    const { room: freshRoom, players: freshPlayers } = await fetchRoomData(room.id);
+    const freshState = freshRoom.current_task_state || {};
+    const reviewKey = getHostReviewKey(task, player.id, freshState);
+    const reviews = { ...(freshState.hostReviews || {}) };
+    const currentCorrect = reviews[reviewKey]?.correct ?? response.correct;
+    if (currentCorrect === desiredCorrect) return;
+
+    if (task.type !== 'diary') {
+      const basePoints = task.type === 'quiz' ? (freshState.quizPoints || 1)
+        : task.type === 'whoami' ? ((freshState.hintLevel || 1) === 1 ? 3 : (freshState.hintLevel || 1) === 2 ? 2 : 1)
+        : 2;
+      const points = basePoints * getRoundMultiplier(player.id, freshState);
+      const delta = desiredCorrect ? points : -points;
+      const freshPlayer = freshPlayers.find(item => item.id === player.id) || player;
+      await addPlayerScore(
+        room.id,
+        freshPlayer,
+        delta,
+        `Spelleidercorrectie: ${task.title || task.cat} als ${desiredCorrect ? 'goed' : 'fout'} beoordeeld`,
+        task.type === 'draw' ? 'creative' : 'knowledge',
+        task
+      );
+    }
+
+    reviews[reviewKey] = {
+      correct: desiredCorrect,
+      reviewedAt: new Date().toISOString(),
+      reviewedBy: localPlayer?.name || 'Spelleider'
+    };
+    const { room: latestRoom } = await fetchRoomData(room.id);
+    await updateRoomState(room.id, {
+      current_task_state: {
+        ...(latestRoom.current_task_state || {}),
+        hostReviews: reviews
+      }
+    });
+  };
+
   const renderFacilitatorDashboard = (task) => {
     if (!isFacilitatorHost() || room?.current_task_state?.roundPhase !== 'playing') return null;
     const state = room.current_task_state || {};
@@ -4777,11 +4830,33 @@ export default function App() {
         <div className="players">
           {players.map(player => {
             const response = responseFor(player);
-            const color = response?.correct === true ? 'var(--ok)' : response?.correct === false ? 'var(--danger)' : 'var(--muted)';
+            const review = state.hostReviews?.[getHostReviewKey(task, player.id, state)];
+            const effectiveCorrect = review?.correct ?? response?.correct;
+            const color = effectiveCorrect === true ? 'var(--ok)' : effectiveCorrect === false ? 'var(--danger)' : 'var(--muted)';
             return (
               <div key={player.id} className="playerline" style={{ marginBottom: '5px' }}>
                 <span>{player.name}</span>
-                <strong style={{ color }}>{response ? response.text : 'Nog aan het nadenken…'}</strong>
+                <div style={{ textAlign: 'right' }}>
+                  <strong style={{ color, display: 'block' }}>{response ? response.text : 'Nog aan het nadenken…'}</strong>
+                  {response && response.correct !== null && response.correct !== undefined && (
+                    <span style={{ display: 'inline-flex', gap: '5px', marginTop: '5px' }}>
+                      <button
+                        type="button"
+                        className={`btn mini ${effectiveCorrect === true ? 'ok' : 'ghost'}`}
+                        onClick={() => handleHostReviewAnswer(task, player, response, true)}
+                      >
+                        ✓ Goed
+                      </button>
+                      <button
+                        type="button"
+                        className={`btn mini ${effectiveCorrect === false ? 'danger' : 'ghost'}`}
+                        onClick={() => handleHostReviewAnswer(task, player, response, false)}
+                      >
+                        ✕ Fout
+                      </button>
+                    </span>
+                  )}
+                </div>
               </div>
             );
           })}
@@ -7015,7 +7090,7 @@ export default function App() {
                                       Iedereen kiest eerst een antwoord en bevestigt daarna bewust de keuze.
                                       <strong style={{ display: 'block', marginTop: '4px' }}>{answeredCount}/{players.length} spelers hebben geantwoord.</strong>
                                     </div>
-                                    <div className="answers">
+                                    {!isFacilitatorHost() && <div className="answers">
                                       {t.answers.map((ans, idx) => {
                                         const isTinkActive = room.current_task_state?.tinkActive;
                                         const isIncorrectOption = idx !== t.correct;
@@ -7042,8 +7117,8 @@ export default function App() {
                                           </button>
                                         );
                                       })}
-                                    </div>
-                                    {myQuizAnswer === undefined && quizPendingIndex !== null && (
+                                    </div>}
+                                    {!isFacilitatorHost() && myQuizAnswer === undefined && quizPendingIndex !== null && (
                                       <div className="notice" style={{ marginTop: '12px' }}>
                                         <strong>Gekozen antwoord:</strong> {t.answers[quizPendingIndex]}
                                         <div className="btnrow one" style={{ marginTop: '10px' }}>
@@ -7095,7 +7170,9 @@ export default function App() {
                                     <p style={{ margin: 0, fontStyle: 'italic', fontSize: '16px', lineHeight: '1.5' }}>{fragment}</p>
                                   </div>
 
-                                  {alreadySubmittedThisPart ? (
+                                  {isFacilitatorHost() ? (
+                                    <div className="notice">Wachten op de antwoorden van de spelers: {submittedCount}/{players.length} klaar.</div>
+                                  ) : alreadySubmittedThisPart ? (
                                     <div className="notice green">
                                       Antwoord voor hint {activePart} opgeslagen. {submittedCount}/{players.length} spelers zijn klaar.
                                     </div>
@@ -7224,7 +7301,16 @@ export default function App() {
                                           />
                                         ))}
                                       </svg>
-                                      {myGuess ? (
+                                      {isFacilitatorHost() ? (
+                                        <div className="notice" style={{ marginTop: '12px' }}>
+                                          {Object.keys(guesses).length}/{guessers.length} spelers hebben geantwoord.
+                                          {allGuessed && (
+                                            <button className="btn primary full" style={{ marginTop: '10px' }} onClick={handleResolvePictionary}>
+                                              Uitslag tonen en doorgaan
+                                            </button>
+                                          )}
+                                        </div>
+                                      ) : myGuess ? (
                                         <div className="notice green" style={{ marginTop: '12px' }}>
                                           Antwoord opgeslagen. Wachten op de andere spelers…
                                         </div>
@@ -7256,7 +7342,9 @@ export default function App() {
                                   <div className="notice" style={{ background: '#0a2042' }}>
                                     Iedereen maakt tegelijk een eigen schatting. Wie het dichtst bij het juiste antwoord zit, verdient 2 sterren. Gedeelde eerste plaats betekent gedeelde winst.
                                   </div>
-                                  {myEstimate === undefined ? (
+                                  {isFacilitatorHost() ? (
+                                    <div className="notice">Wachten op de schattingen: {submittedCount}/{players.length} spelers zijn klaar.</div>
+                                  ) : myEstimate === undefined ? (
                                     <div>
                                       <div className="field">
                                         <label>Jouw schatting ({t.unit})</label>
@@ -7310,7 +7398,9 @@ export default function App() {
                                 <div>
                                   {!allVoted ? (
                                     <div>
-                                      {myVote ? (
+                                      {isFacilitatorHost() ? (
+                                        <div className="notice">Wachten tot alle spelers hun keuze hebben bevestigd.</div>
+                                      ) : myVote ? (
                                         <div className="notice green">
                                           Je hebt gestemd op: <strong>{myVote === 'A' ? t.optionA : t.optionB}</strong>. Wachten op de rest...
                                         </div>
@@ -7365,7 +7455,7 @@ export default function App() {
                                         De meerderheid wint +1 ster! Bij een gelijke stand krijgt iedereen +1 ster.
                                       </div>
 
-                                      {isMyTurn && (
+                                      {isHost && (
                                         <button className="btn primary full" onClick={() => handleResolveDilemma(t)}>
                                           Sterren toekennen & doorgaan
                                         </button>
@@ -7388,11 +7478,11 @@ export default function App() {
                                 </div>
                                 
                                 {allAnswered ? (
-                                  <div className="notice" style={{ background: match(myAnswer, [t.movie_nl, t.movie_en, ...(t.movie_aliases || [])]) ? '#123d2b' : '#3d121c' }}>
+                                  <div className="notice" style={{ background: isFacilitatorHost() ? '#10213e' : match(myAnswer, [t.movie_nl, t.movie_en, ...(t.movie_aliases || [])]) ? '#123d2b' : '#3d121c' }}>
                                     <strong>
-                                      {match(myAnswer, [t.movie_nl, t.movie_en, ...(t.movie_aliases || [])]) ? 'Correct! 🎉' : 'Helaas! 💔'}
+                                      {isFacilitatorHost() ? 'Alle spelers hebben geantwoord.' : match(myAnswer, [t.movie_nl, t.movie_en, ...(t.movie_aliases || [])]) ? 'Correct! 🎉' : 'Helaas! 💔'}
                                     </strong>
-                                    <p>Jouw antwoord: <em>{myAnswer || "Geen"}</em></p>
+                                    {!isFacilitatorHost() && <p>Jouw antwoord: <em>{myAnswer || "Geen"}</em></p>}
                                     <p style={{ marginTop: '10px' }}><strong>Oplossing:</strong> {t.movie_nl} / {t.movie_en}</p>
                                     
                                     {isHost && (
@@ -7403,7 +7493,9 @@ export default function App() {
                                   </div>
                                 ) : (
                                   <div>
-                                    {myAnswer === undefined ? (
+                                    {isFacilitatorHost() ? (
+                                      <div className="notice">Wachten op de antwoorden van de spelers…</div>
+                                    ) : myAnswer === undefined ? (
                                       <div>
                                         <div className="field">
                                           <label>Welke Disney film wordt hier uitgebeeld?</label>
@@ -7468,7 +7560,7 @@ export default function App() {
                                     </div>
                                   )}
 
-                                  <div className="answers">
+                                  {!isFacilitatorHost() && <div className="answers">
                                     {t.answers.map((ans, idx) => {
                                       let btnClass = "answer";
                                       if (allAnswered) {
@@ -7489,8 +7581,8 @@ export default function App() {
                                         </button>
                                       );
                                     })}
-                                  </div>
-                                  {myAnswer === undefined && whoamiSelected !== null && !allAnswered && (
+                                  </div>}
+                                  {!isFacilitatorHost() && myAnswer === undefined && whoamiSelected !== null && !allAnswered && (
                                     <div className="notice" style={{ marginTop: '12px' }}>
                                       <strong>Gekozen antwoord:</strong> {t.answers[whoamiSelected]}
                                       <button className="btn primary full" style={{ marginTop: '10px' }} onClick={() => handleWhoamiAnswer(whoamiSelected, t)}>
@@ -7815,9 +7907,9 @@ export default function App() {
                               return (
                               <div>
                                 {allAnswered ? (
-                                  <div className="notice" style={{ background: myAnswer === t.correct ? '#174f43' : '#5b2437', borderColor: myAnswer === t.correct ? '#58d4a4' : '#ff7b8b' }}>
+                                  <div className="notice" style={{ background: isFacilitatorHost() ? '#10213e' : myAnswer === t.correct ? '#174f43' : '#5b2437', borderColor: isFacilitatorHost() ? 'var(--gold)' : myAnswer === t.correct ? '#58d4a4' : '#ff7b8b' }}>
                                     <strong style={{ display: 'block', fontSize: '18px', marginBottom: '6px' }}>
-                                      {myAnswer === t.correct ? 'Correct! 🎉' : 'Helaas! 💔'} Het antwoord is {t.correct ? 'FEIT' : 'FABEL'}.
+                                      {isFacilitatorHost() ? 'Alle spelers hebben geantwoord.' : myAnswer === t.correct ? 'Correct! 🎉' : 'Helaas! 💔'} Het antwoord is {t.correct ? 'FEIT' : 'FABEL'}.
                                     </strong>
                                     <p style={{ margin: 0, fontSize: '15px', lineHeight: '1.4' }}>{t.explanation}</p>
                                     
@@ -7829,7 +7921,9 @@ export default function App() {
                                   </div>
                                 ) : (
                                   <div>
-                                    {myAnswer === undefined ? (
+                                    {isFacilitatorHost() ? (
+                                      <div className="notice">Wachten op de keuzes van de spelers…</div>
+                                    ) : myAnswer === undefined ? (
                                       <>
                                         <div className="btnrow">
                                           <button className={`btn ${factSelected === true ? 'primary' : 'ok'}`} aria-pressed={factSelected === true} onClick={() => setFactSelected(true)}>
