@@ -2176,7 +2176,7 @@ export default function App() {
       true
     );
 
-    const loadSharedProfiles = async () => {
+    const loadSharedProfiles = async (retryCount = 0) => {
       const localProfiles = uniqueProfileNames(cocoProfiles);
       const localState = {
         coco_profiles: localProfiles,
@@ -2335,6 +2335,26 @@ export default function App() {
           updated_at: new Date().toISOString()
         };
 
+        // Never let a startup snapshot overwrite a transaction that completed
+        // after this device read the profile store. Retry from the newest server
+        // state when the optimistic version check no longer matches.
+        if (store?.id) {
+          let startupUpdate = supabase
+            .from('rooms')
+            .update({ current_task_state: mergedState })
+            .eq('id', store.id);
+          const expectedStartupUpdatedAt = String(remoteState.updated_at || '');
+          if (expectedStartupUpdatedAt) startupUpdate = startupUpdate.eq('current_task_state->>updated_at', expectedStartupUpdatedAt);
+          const { data: updatedStartupStore, error: startupUpdateError } = await startupUpdate
+            .select('current_task_state')
+            .maybeSingle();
+          if (startupUpdateError) throw startupUpdateError;
+          if (!updatedStartupStore?.current_task_state) {
+            if (retryCount < 4) return loadSharedProfiles(retryCount + 1);
+            throw new Error('De profielgegevens veranderden tijdens het openen. Probeer opnieuw.');
+          }
+        }
+
         if (!cancelled) {
           cocoProfileStoreIdRef.current = store?.id || null;
           cocoProfileStoreUpdatedAtRef.current = mergedState.updated_at;
@@ -2367,9 +2387,6 @@ export default function App() {
           localStorage.setItem('disney_solo_history', JSON.stringify(mergedGameHistory));
         }
 
-        if (store?.id) {
-          await supabase.from('rooms').update({ current_task_state: mergedState }).eq('id', store.id);
-        }
       } catch (syncError) {
         console.warn('Coco-profielen konden niet worden gesynchroniseerd.', syncError);
       } finally {
@@ -2414,6 +2431,14 @@ export default function App() {
             .maybeSingle();
           if (readError) throw readError;
           const currentState = store?.current_task_state || {};
+          const baselineUpdatedAt = String(baseline.updated_at || '');
+          const currentUpdatedAt = String(currentState.updated_at || '');
+          if (baselineUpdatedAt && currentUpdatedAt && baselineUpdatedAt !== currentUpdatedAt) {
+            // Another device committed newer balances, badges or trade receipts.
+            // Refresh first instead of overlaying this device's older snapshot.
+            refreshSharedProfileStoreRef.current?.();
+            return;
+          }
           const updatedAt = new Date().toISOString();
           const nextState = { ...currentState, ...Object.fromEntries(changedEntries), updated_at: updatedAt };
           let updateQuery = supabase
