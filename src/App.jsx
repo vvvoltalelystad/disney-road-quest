@@ -4229,6 +4229,10 @@ export default function App() {
   const selectNextTask = async (currentRoom, currentPlayers, forcePersonal = false) => {
     const usedTasks = currentRoom.current_task_state?.usedTasks || [];
     const taskHistory = currentRoom.current_task_state?.taskHistory || [];
+    const participatingProfileNames = uniqueProfileNames((currentPlayers || []).map(player => player?.name));
+    const profileUsedTasks = new Set(participatingProfileNames.flatMap(profileName => (
+      contentUsage[getCollectorKey(profileName)]?.['road-race'] || []
+    )));
     const enabledCats = currentRoom.current_task_state?.enabledCategories || ["Disney Dagboek", "Pictionary", "Inschattingsvragen", "Dilemma", "Emoji Quiz", "Wie ben ik?", "Feit of Fabel", "Quiz", "Samen"];
     const isBonusRound = ((currentRoom.round || 0) + 1) % 4 === 0;
     const automaticBonusChoices = isBonusRound
@@ -4296,7 +4300,11 @@ export default function App() {
     const neverSeen = list => list.filter(t => !wasSeen(t.id));
     const notForPlayer = list => currentRoom.game_mode === "Samen" ? list : list.filter(t => !wasSeenByPlayer(t.id, player.id));
 
+    const newForProfiles = list => list.filter(task => !profileUsedTasks.has(task.id));
     const stages = [
+      newForProfiles(neverSeen(unused)),
+      newForProfiles(notForPlayer(unused)),
+      newForProfiles(unused),
       neverSeen(unused),
       notForPlayer(unused),
       unused,
@@ -4358,6 +4366,7 @@ export default function App() {
         doubleWishChoices: automaticBonusChoices
       }
     });
+    await handleMarkContentUsed('road-race', selected.id, participatingProfileNames);
   };
 
   const handleCreateRoom = async () => {
@@ -4495,7 +4504,12 @@ export default function App() {
     const active = DEFAULT_TASKS.filter(t => t.active !== false && t.type === 'quiz' && t.difficulty === difficulty);
     const usedTasks = room.current_task_state?.usedTasks || [];
     const unused = active.filter(t => !usedTasks.includes(t.id));
-    const candidates = unused.length ? unused : active;
+    const participatingProfileNames = uniqueProfileNames((players || []).map(player => player?.name));
+    const profileUsedTasks = new Set(participatingProfileNames.flatMap(profileName => (
+      contentUsage[getCollectorKey(profileName)]?.['road-race'] || []
+    )));
+    const newForProfiles = unused.filter(task => !profileUsedTasks.has(task.id));
+    const candidates = newForProfiles.length ? newForProfiles : (unused.length ? unused : active);
     const selected = candidates[Math.floor(Math.random() * candidates.length)];
     
     if (!selected) {
@@ -4528,6 +4542,7 @@ export default function App() {
           : {}
       }
     });
+    await handleMarkContentUsed('road-race', selected.id, participatingProfileNames);
   };
 
   const getRoundMultiplier = (playerId, state = room?.current_task_state) => (

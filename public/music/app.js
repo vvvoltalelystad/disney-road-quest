@@ -1,6 +1,6 @@
 // Build trigger: 2026-07-04 23:22
 "use strict";
-const DMQ_VERSION='83';
+const DMQ_VERSION='84';
 const cfg=window.DMQ_CONFIG||{};
 const COLORS=[['blue','Blauw','#00e5ff'],['green','Groen','#2eff7d'],['yellow','Geel','#ffd615'],['pink','Roze','#ff2a85'],['purple','Paars','#bd53ed'],['orange','Oranje','#ff6b00']];
 const AVATARS=[['linguini','Alfredo Linguini','avatars/linguini.webp'],['bruno','Bruno','avatars/bruno.png'],['buzz','Buzz Lightyear','avatars/buzz.png'],['heihei','Heihei','avatars/heihei.png'],['hen-wen','Hen Wen','avatars/hen-wen.png'],['jack','Jack Sparrow','avatars/jack.png'],['kuzco','Kuzco','avatars/kuzco.png'],['medusa','Madame Medusa','avatars/medusa.png'],['maximus','Maximus','avatars/maximus.png'],['miguel','Miguel','avatars/miguel.png'],['mufasa','Mufasa','avatars/mufasa.png'],['mushu','Mushu','avatars/mushu.png'],['olaf','Olaf','avatars/olaf.png'],['pascal','Pascal','avatars/pascal.png'],['percy','Percy','avatars/percy.png'],['peter','Peter Pan','avatars/peter.png'],['redpanda','Red Panda','avatars/redpanda.png'],['remy','Remy','avatars/remy.png'],['stitch','Stitch','avatars/stitch.png'],['taran','Taran','avatars/taran.png']];
@@ -383,10 +383,57 @@ function songSupportsMode(song,mode){
   if(mode==='full')return ['film','title','year'].every(type=>allowed.includes(type));
   return allowed.includes(mode);
 }
-function buildSongSequence(total,mode){
+async function musicUsedSongNumbers(){
+  try{
+    const result=await state.sb.from('rooms').select('current_task_state').eq('code','COCO-PROFILES-V1').maybeSingle();
+    if(result.error)throw result.error;
+    const usage=result.data?.current_task_state?.coco_content_usage||{};
+    const numbers=state.players.flatMap(player=>usage[profileStorageKey(player.name)]?.['music-match']||[]);
+    return [...new Set(numbers.map(Number).filter(Number.isFinite))];
+  }catch(error){
+    console.warn('Muziekhistorie kon niet worden gelezen.',error);
+    return [];
+  }
+}
+async function markMusicSongsUsed(songNumbers){
+  const numbers=[...new Set((songNumbers||[]).map(Number).filter(Number.isFinite))];
+  const profileNames=[...new Set(state.players.map(player=>String(player.name||'').trim()).filter(Boolean))];
+  if(!numbers.length||!profileNames.length)return;
+  for(let attempt=0;attempt<4;attempt++){
+    try{
+      const result=await state.sb.from('rooms').select('id,current_task_state').eq('code','COCO-PROFILES-V1').maybeSingle();
+      if(result.error)throw result.error;
+      const row=result.data;
+      if(!row)return;
+      const current=row.current_task_state||{};
+      const usage={...(current.coco_content_usage||{})};
+      profileNames.forEach(profileName=>{
+        const key=profileStorageKey(profileName);
+        const profileUsage={...(usage[key]||{})};
+        profileUsage['music-match']=[...new Set([...(profileUsage['music-match']||[]).map(Number),...numbers])].slice(-600);
+        usage[key]=profileUsage;
+      });
+      const updatedAt=new Date().toISOString();
+      const next={...current,coco_content_usage:usage,updated_at:updatedAt};
+      let update=state.sb.from('rooms').update({current_task_state:next}).eq('id',row.id);
+      if(current.updated_at)update=update.eq('current_task_state->>updated_at',String(current.updated_at));
+      const saved=await update.select('id').maybeSingle();
+      if(saved.error)throw saved.error;
+      if(saved.data){localStorage.setItem('disney_content_usage',JSON.stringify(usage));return;}
+    }catch(error){
+      if(attempt===3)console.warn('Muziekhistorie kon niet worden opgeslagen.',error);
+    }
+  }
+}
+function buildSongSequence(total,mode,usedSongNumbers=[]){
   const eligible=activeSongs().filter(song=>songSupportsMode(song,mode));
-  const vocals=shuffle(eligible.filter(song=>song.question_profile!=='score'));
-  const scores=shuffle(eligible.filter(song=>song.question_profile==='score'));
+  const used=new Set(usedSongNumbers.map(Number));
+  const freshFirst=songs=>[
+    ...shuffle(songs.filter(song=>!used.has(Number(song.song_number)))),
+    ...shuffle(songs.filter(song=>used.has(Number(song.song_number))))
+  ];
+  const vocals=freshFirst(eligible.filter(song=>song.question_profile!=='score'));
+  const scores=freshFirst(eligible.filter(song=>song.question_profile==='score'));
   // Strikte bovengrens: hoogstens één instrumental per volledige tien rondes.
   // Een spel korter dan tien rondes bevat dus geen instrumental.
   const instrumentalCount=(mode==='mix'||mode==='film')?Math.min(scores.length,Math.floor(total/10)):0;
@@ -410,7 +457,8 @@ async function startGame(){
   try{
     const total=state.lobbySettings.roundCount||5;
     const mode=state.lobbySettings.gameMode||'mix';
-    const songs=buildSongSequence(total,mode);
+    const usedSongs=await musicUsedSongNumbers();
+    const songs=buildSongSequence(total,mode,usedSongs);
     if(state.players.length<2)throw new Error('Er zijn minimaal twee spelers nodig.');
     if(!state.players.every(online))throw new Error('Niet alle spelers worden als online gezien. Laat iedereen de wachtruimte openhouden en druk op ↻.');
     if(songs.length<total)throw new Error(`Er zijn ${songs.length} actieve songs, maar je hebt ${total} rondes gekozen. Activeer meer songs in Songbeheer · 300 songs.`);
@@ -435,6 +483,7 @@ async function startGame(){
     loading('Game starten…');
     const r=await state.sb.rpc('dmq_start_game_v2',{p_room_id:state.room.id,p_total_rounds:total,p_game_mode:mode,p_song_sequence:songs.map(s=>s.song_number),p_question_sequence:songs.map(s=>qtype(mode,s)),p_settings:set});
     if(r.error)throw r.error;
+    await markMusicSongsUsed(songs.map(song=>song.song_number));
     await refreshAll();
   }catch(e){
     console.error(e);state.startError=e?.message||String(e);renderLobby();toast('Starten is niet gelukt.');
