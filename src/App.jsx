@@ -72,6 +72,7 @@ const COCO_PROFILE_STORE_CODE = 'COCO-PROFILES-V1';
 const COCO_PROFILE_STORE_VERSION = 10;
 const DAGOBERT_PROFILE_KEY = 'dagobert';
 const DAGOBERT_ACCESS_HASH = 'b904516427494c9f2b856c5477657fa66ebb293dfc390903ce12b033a7b9fdd0';
+const MUSIC_PROFILE_HANDOFF_KEY = 'disney_music_profile_handoff';
 const unlockedProfileKeysForCurrentPage = new Set();
 const BADGE_COLLECTION_KEY = 'disney_badge_collections';
 const BADGE_MARKET_KEY = 'disney_badge_market';
@@ -7087,9 +7088,18 @@ export default function App() {
                   onClick={(e) => {
                     e.stopPropagation();
                     if (selectedPortalGame === 'music_match') {
+                      const profileKey = getCollectorKey(activeProfileName);
+                      const pinHash = getProfilePinHash(activeProfileName, profilePreferences);
+                      if (pinHash && hasProfilePageAccess(activeProfileName)) {
+                        sessionStorage.setItem(MUSIC_PROFILE_HANDOFF_KEY, JSON.stringify({
+                          profileKey,
+                          pinHash,
+                          issuedAt: Date.now()
+                        }));
+                      }
                       window.location.href = room?.code
-                        ? `./music/index.html?room=${room.code}&v=83`
-                        : './music/index.html?v=83';
+                        ? `./music/index.html?room=${room.code}&v=84`
+                        : './music/index.html?v=84';
                     } else {
                       setSelectedPortalGame('music_match');
                     }
