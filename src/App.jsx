@@ -4469,6 +4469,7 @@ export default function App() {
         genericAnswers: {},
         genericAwarded: {},
         hintLevel: 1,
+        hintLevels: {},
         hostReviews: {},
         resultsReleased: false,
         scoreAwardsCommitted: false,
@@ -4649,6 +4650,7 @@ export default function App() {
         genericAnswers: {},
         genericAwarded: {},
         hintLevel: 1,
+        hintLevels: {},
         hostReviews: {},
         roundPhase: 'announcement',
         doubleWishChoices: room.current_task_state?.bonusRound
@@ -5188,9 +5190,14 @@ export default function App() {
   };
 
   const handleRevealWhoamiHint = async (level) => {
-    if (!isRoomHost()) return;
+    if (isFacilitatorHost() || !localPlayer?.id) return;
+    const { room: freshRoom } = await fetchRoomData(room.id);
+    const freshState = freshRoom.current_task_state || {};
+    if (freshState.genericAnswers?.[localPlayer.id] !== undefined) return;
+    const hintLevels = { ...(freshState.hintLevels || {}) };
+    hintLevels[localPlayer.id] = Math.max(1, Math.min(3, Number(level) || 1));
     await updateRoomState(room.id, {
-      current_task_state: { ...room.current_task_state, hintLevel: level }
+      current_task_state: { ...freshState, hintLevels }
     });
   };
 
@@ -5825,7 +5832,8 @@ export default function App() {
         if (answer !== undefined && effectiveCorrect(player, answer === task.correct)) basePoints = state.quizPoints || 1;
       } else if (task.type === 'whoami') {
         const answer = state.genericAnswers?.[player.id];
-        if (answer !== undefined && effectiveCorrect(player, answer === task.correct)) basePoints = (state.hintLevel || 1) === 1 ? 3 : (state.hintLevel || 1) === 2 ? 2 : 1;
+        const playerHintLevel = state.hintLevels?.[player.id] || 1;
+        if (answer !== undefined && effectiveCorrect(player, answer === task.correct)) basePoints = playerHintLevel === 1 ? 3 : playerHintLevel === 2 ? 2 : 1;
       } else if (task.type === 'fact') {
         const answer = state.genericAnswers?.[player.id];
         if (answer !== undefined && effectiveCorrect(player, answer === task.correct)) basePoints = 2;
@@ -5892,6 +5900,15 @@ export default function App() {
       : task.type === 'draw' ? (players[room.current_player_index]?.id === localPlayer?.id || !!state.pictionaryGuesses?.[localPlayer?.id])
       : true;
     if (hostMustAnswer && !hostHasAnswered) return null;
+    const playerHasAnswered = player => task.type === 'quiz' ? state.quizAnswers?.[player.id] !== undefined
+      : ['whoami', 'fact', 'emoji'].includes(task.type) ? state.genericAnswers?.[player.id] !== undefined
+      : task.type === 'diary' ? !!state.answers?.[player.id]?.[`part${state.part || 1}`]
+      : task.type === 'estimate' ? state.estimates?.[player.id] !== undefined
+      : task.type === 'dilemma' ? state.votes?.[player.id] !== undefined
+      : task.type === 'draw' ? (players[room.current_player_index]?.id === player.id || !!state.pictionaryGuesses?.[player.id])
+      : true;
+    const allPlayersAnswered = players.length > 0 && players.every(playerHasAnswered);
+    if (hostMustAnswer && !allPlayersAnswered) return null;
     const diaryPart = state.part || 1;
     const solution = task.type === 'quiz' ? task.answers?.[task.correct]
       : task.type === 'whoami' ? task.answers?.[task.correct]
@@ -8787,9 +8804,9 @@ export default function App() {
 
                             {/* 8. WIE BEN IK (HINT QUEST) */}
                             {t.type === "whoami" && (() => {
-                              const hintLevel = room.current_task_state?.hintLevel || 1;
                               const genericAnswers = room.current_task_state?.genericAnswers || {};
                               const myAnswer = genericAnswers[localPlayer?.id];
+                              const hintLevel = room.current_task_state?.hintLevels?.[localPlayer?.id] || 1;
                               const allAnswered = players.length > 0 && players.every(p => genericAnswers[p.id] !== undefined);
                               const resultsReleased = !!room.current_task_state?.resultsReleased;
                               return (
@@ -8813,13 +8830,10 @@ export default function App() {
                                     )}
                                   </div>
 
-                                  {!allAnswered && isHost && (
+                                  {!isFacilitatorHost() && myAnswer === undefined && hintLevel < 3 && (
                                     <div className="btnrow" style={{ marginBottom: '14px' }}>
-                                      <button className="btn secondary mini" disabled={hintLevel >= 2} onClick={() => handleRevealWhoamiHint(2)}>
-                                        Onthul Hint 2
-                                      </button>
-                                      <button className="btn secondary mini" disabled={hintLevel < 2 || hintLevel >= 3} onClick={() => handleRevealWhoamiHint(3)}>
-                                        Onthul Hint 3
+                                      <button className="btn secondary full" onClick={() => handleRevealWhoamiHint(hintLevel + 1)}>
+                                        Bekijk hint {hintLevel + 1} · goed antwoord wordt {hintLevel === 1 ? 2 : 1} punt{hintLevel === 1 ? 'en' : ''}
                                       </button>
                                     </div>
                                   )}
@@ -8831,22 +8845,22 @@ export default function App() {
                                         if (idx === t.correct) btnClass += " correct";
                                         else if (idx === myAnswer) btnClass += " wrong";
                                       }
-                                      if (!allAnswered && idx === whoamiSelected) btnClass += " selected";
+                                      if (myAnswer === undefined && idx === whoamiSelected) btnClass += " selected";
                                       return (
                                         <button 
                                           key={idx}
                                           className={btnClass}
-                                          disabled={allAnswered || myAnswer !== undefined}
+                                          disabled={myAnswer !== undefined}
                                           aria-pressed={idx === whoamiSelected}
                                           onClick={() => setWhoamiSelected(idx)}
-                                          style={!allAnswered && idx === whoamiSelected ? { borderColor: 'var(--gold)', boxShadow: '0 0 0 2px rgba(255, 212, 92, .28)' } : undefined}
+                                          style={myAnswer === undefined && idx === whoamiSelected ? { borderColor: 'var(--gold)', boxShadow: '0 0 0 2px rgba(255, 212, 92, .28)' } : undefined}
                                         >
                                           {ans}
                                         </button>
                                       );
                                     })}
                                   </div>}
-                                  {!isFacilitatorHost() && myAnswer === undefined && whoamiSelected !== null && !allAnswered && (
+                                  {!isFacilitatorHost() && myAnswer === undefined && whoamiSelected !== null && (
                                     <div className="notice" style={{ marginTop: '12px' }}>
                                       <strong>Gekozen antwoord:</strong> {t.answers[whoamiSelected]}
                                       <button className="btn primary full" style={{ marginTop: '10px' }} onClick={() => handleWhoamiAnswer(whoamiSelected)}>
