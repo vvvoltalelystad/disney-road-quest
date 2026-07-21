@@ -903,6 +903,26 @@ const norm = (str) => {
 
 const getCollectorKey = (name) => norm(name || 'speler') || 'speler';
 
+const reconcileBankWithCaptainsLogs = (bank = {}, logs = {}) => {
+  const reconciled = { ...(bank || {}) };
+  Object.entries(logs || {}).forEach(([profileName, entries]) => {
+    const sortedEntries = [...(entries || [])].sort((a, b) => new Date(a.timestamp || 0) - new Date(b.timestamp || 0));
+    const openingIndex = sortedEntries.findIndex(entry => entry?.ledgerOpening);
+    if (openingIndex >= 0) {
+      const ledgerBalance = sortedEntries.slice(openingIndex).reduce((sum, entry, index) => (
+        sum + (index === 0 ? Math.abs(Number(entry?.amount) || 0) : (Number(entry?.amount) || 0))
+      ), 0);
+      reconciled[getCollectorKey(profileName)] = Math.max(0, ledgerBalance);
+      return;
+    }
+    const latestWithBalance = sortedEntries
+      .filter(entry => Number.isFinite(Number(entry?.balanceAfter)))
+      .sort((a, b) => new Date(b.timestamp || 0) - new Date(a.timestamp || 0))[0];
+    if (latestWithBalance) reconciled[getCollectorKey(profileName)] = Number(latestWithBalance.balanceAfter);
+  });
+  return reconciled;
+};
+
 const match = (val, targets) => {
   const a = norm(val);
   if (!a) return false;
@@ -2127,7 +2147,7 @@ export default function App() {
         const mergedProfiles = migrateLocalState ? uniqueProfileNames([...remoteProfiles, ...localProfiles]) : remoteProfiles;
         const mergedProfilePreferences = mergeProfilePreferences(remoteState.coco_profile_preferences, profilePreferences, mergedProfiles);
         const mergedRewardReceipts = { ...profileRewardReceipts, ...(remoteState.coco_reward_receipts || {}) };
-        const mergedBank = migrateLocalState ? mergeBank(remoteState.coco_bank, starBank) : (remoteState.coco_bank || {});
+        let mergedBank = migrateLocalState ? mergeBank(remoteState.coco_bank, starBank) : (remoteState.coco_bank || {});
         const mergedCollections = migrateLocalState ? mergeCollections(remoteState.coco_collections, collections) : (remoteState.coco_collections || {});
         const mergedClaims = migrateLocalState
           ? { ...(exclusiveClaims || {}), ...(remoteState.coco_exclusive_claims || {}) }
@@ -2171,6 +2191,7 @@ export default function App() {
             };
           });
         }
+        mergedBank = reconcileBankWithCaptainsLogs(mergedBank, mergedCaptainsLogs);
         const mergedGameHistory = mergeGameHistory(remoteState.coco_game_history, soloHistory);
         let remoteTradeRecords = [];
         try {
@@ -2319,7 +2340,8 @@ export default function App() {
           const remoteProfiles = uniqueProfileNames(remoteState.coco_profiles || []);
           const remotePreferences = remoteState.coco_profile_preferences || {};
           const remoteReceipts = remoteState.coco_reward_receipts || {};
-          const remoteBank = remoteState.coco_bank || {};
+          const remoteLogs = remoteState.coco_captains_log || {};
+          const remoteBank = reconcileBankWithCaptainsLogs(remoteState.coco_bank || {}, remoteLogs);
           const remoteCollections = remoteState.coco_collections || {};
           const remoteClaims = remoteState.coco_exclusive_claims || {};
           const remoteBadgeCollections = remoteState.coco_badge_collections || {};
@@ -2327,7 +2349,6 @@ export default function App() {
           const remoteShowcaseSeedVersion = Number(remoteState.coco_badge_showcase_seed_version) || 0;
           const remoteMarket = remoteState.coco_badge_market || createHourlyBadgeMarket();
           const remoteTrades = Array.isArray(remoteState.coco_player_trades) ? remoteState.coco_player_trades : [];
-          const remoteLogs = remoteState.coco_captains_log || {};
           const remoteHistory = Array.isArray(remoteState.coco_game_history) ? remoteState.coco_game_history : [];
 
           setCocoProfiles(remoteProfiles);
@@ -2479,19 +2500,6 @@ export default function App() {
 
     return () => window.clearTimeout(unlockTimer);
   }, [activeProfileName, badgeAchievements, badgeCollections, playerNameInput, shopPlayerName]);
-
-  useEffect(() => {
-    const dagobertProfile = cocoProfiles.find(name => norm(name) === 'dagobert');
-    if (!dagobertProfile) return;
-
-    const dagobertKey = getCollectorKey(dagobertProfile);
-    setStarBank(prev => {
-      if ((prev[dagobertKey] || 0) >= 100) return prev;
-      const next = { ...prev, [dagobertKey]: 100 };
-      localStorage.setItem(COCO_BANK_KEY, JSON.stringify(next));
-      return next;
-    });
-  }, [cocoProfiles]);
 
   const logCaptainMutation = (profileName, amount, type, description, balanceAfter) => {
     const currentLogs = readJsonStorage('disney_captains_log', {});
