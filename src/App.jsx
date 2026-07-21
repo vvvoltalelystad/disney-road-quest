@@ -72,7 +72,7 @@ const COCO_PROFILE_STORE_CODE = 'COCO-PROFILES-V1';
 const COCO_PROFILE_STORE_VERSION = 9;
 const DAGOBERT_PROFILE_KEY = 'dagobert';
 const DAGOBERT_ACCESS_HASH = 'b904516427494c9f2b856c5477657fa66ebb293dfc390903ce12b033a7b9fdd0';
-const DAGOBERT_SESSION_ACCESS_KEY = 'disney_dagobert_access';
+let dagobertAccessGrantedForCurrentPage = false;
 const BADGE_COLLECTION_KEY = 'disney_badge_collections';
 const BADGE_MARKET_KEY = 'disney_badge_market';
 const BADGE_ACHIEVEMENT_KEY = 'disney_badge_achievements';
@@ -917,16 +917,10 @@ const norm = (str) => {
 const getCollectorKey = (name) => norm(name || 'speler') || 'speler';
 
 const isDagobertProfile = name => getCollectorKey(name) === DAGOBERT_PROFILE_KEY;
-const hasDagobertSessionAccess = () => {
-  try {
-    return sessionStorage.getItem(DAGOBERT_SESSION_ACCESS_KEY) === 'granted';
-  } catch {
-    return false;
-  }
-};
+const hasDagobertPageAccess = () => dagobertAccessGrantedForCurrentPage;
 const getStoredActiveProfile = () => {
   const storedName = localStorage.getItem(ACTIVE_PROFILE_KEY) || localStorage.getItem('disney_player_name') || '';
-  if (isDagobertProfile(storedName) && !hasDagobertSessionAccess()) {
+  if (isDagobertProfile(storedName) && !hasDagobertPageAccess()) {
     localStorage.removeItem(ACTIVE_PROFILE_KEY);
     localStorage.removeItem('disney_player_name');
     return '';
@@ -939,8 +933,8 @@ const hashProfileAccessCode = async value => {
   const digest = await globalThis.crypto.subtle.digest('SHA-256', bytes);
   return [...new Uint8Array(digest)].map(byte => byte.toString(16).padStart(2, '0')).join('');
 };
-const requestDagobertSessionAccess = async name => {
-  if (!isDagobertProfile(name) || hasDagobertSessionAccess()) return true;
+const requestDagobertPageAccess = async name => {
+  if (!isDagobertProfile(name) || hasDagobertPageAccess()) return true;
   const accessCode = window.prompt('Voer de toegangscode voor profiel Dagobert in:');
   if (accessCode === null) return false;
   const accessHash = await hashProfileAccessCode(accessCode);
@@ -948,13 +942,8 @@ const requestDagobertSessionAccess = async name => {
     window.alert('Onjuiste toegangscode. Profiel Dagobert blijft vergrendeld.');
     return false;
   }
-  try {
-    sessionStorage.setItem(DAGOBERT_SESSION_ACCESS_KEY, 'granted');
-    return true;
-  } catch {
-    window.alert('De toegang kan in deze browser niet veilig voor de sessie worden onthouden.');
-    return false;
-  }
+  dagobertAccessGrantedForCurrentPage = true;
+  return true;
 };
 
 const reconcileBankWithCaptainsLogs = (bank = {}, logs = {}) => {
@@ -2110,7 +2099,7 @@ export default function App() {
   const activateCocoProfile = async (name) => {
     const cleanName = String(name || '').trim();
     if (!cleanName) return;
-    if (!(await requestDagobertSessionAccess(cleanName))) return;
+    if (!(await requestDagobertPageAccess(cleanName))) return;
     persistCocoProfiles([...cocoProfiles, cleanName]);
     setActiveProfileName(cleanName);
     setShopPlayerName(cleanName);
@@ -3241,7 +3230,7 @@ export default function App() {
 
   const handleRenameShopProfile = async () => {
     const currentName = activeProfileName || shopPlayerName.trim() || 'Speler 1';
-    if (!(await requestDagobertSessionAccess(currentName))) return;
+    if (!(await requestDagobertPageAccess(currentName))) return;
     const keepProfileChooserOpen = !activeProfileName;
     const nextName = window.prompt('Nieuwe profielnaam', currentName)?.trim();
     if (!nextName || nextName === currentName) return;
@@ -3435,7 +3424,7 @@ export default function App() {
 
   const handleDeleteShopProfile = async () => {
     const currentName = activeProfileName || shopPlayerName.trim() || 'Speler 1';
-    if (!(await requestDagobertSessionAccess(currentName))) return;
+    if (!(await requestDagobertPageAccess(currentName))) return;
     const keepProfileChooserOpen = !activeProfileName;
     if (getDisplayShopPlayers().length <= 1) {
       window.alert('Er moet minimaal een profiel overblijven.');
