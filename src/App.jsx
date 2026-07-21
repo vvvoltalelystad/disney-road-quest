@@ -69,6 +69,10 @@ const PROFILE_PREFERENCES_KEY = 'disney_profile_preferences';
 const ARENA_SAVES_KEY = 'disney_arena_saves';
 const ACTIVE_PROFILE_KEY = 'disney_active_profile';
 const COCO_PROFILE_STORE_CODE = 'COCO-PROFILES-V1';
+const COCO_PROFILE_STORE_VERSION = 9;
+const DAGOBERT_PROFILE_KEY = 'dagobert';
+const DAGOBERT_ACCESS_HASH = 'b904516427494c9f2b856c5477657fa66ebb293dfc390903ce12b033a7b9fdd0';
+const DAGOBERT_SESSION_ACCESS_KEY = 'disney_dagobert_access';
 const BADGE_COLLECTION_KEY = 'disney_badge_collections';
 const BADGE_MARKET_KEY = 'disney_badge_market';
 const BADGE_ACHIEVEMENT_KEY = 'disney_badge_achievements';
@@ -912,6 +916,47 @@ const norm = (str) => {
 
 const getCollectorKey = (name) => norm(name || 'speler') || 'speler';
 
+const isDagobertProfile = name => getCollectorKey(name) === DAGOBERT_PROFILE_KEY;
+const hasDagobertSessionAccess = () => {
+  try {
+    return sessionStorage.getItem(DAGOBERT_SESSION_ACCESS_KEY) === 'granted';
+  } catch {
+    return false;
+  }
+};
+const getStoredActiveProfile = () => {
+  const storedName = localStorage.getItem(ACTIVE_PROFILE_KEY) || localStorage.getItem('disney_player_name') || '';
+  if (isDagobertProfile(storedName) && !hasDagobertSessionAccess()) {
+    localStorage.removeItem(ACTIVE_PROFILE_KEY);
+    localStorage.removeItem('disney_player_name');
+    return '';
+  }
+  return storedName;
+};
+const hashProfileAccessCode = async value => {
+  if (!globalThis.crypto?.subtle) return '';
+  const bytes = new TextEncoder().encode(String(value || ''));
+  const digest = await globalThis.crypto.subtle.digest('SHA-256', bytes);
+  return [...new Uint8Array(digest)].map(byte => byte.toString(16).padStart(2, '0')).join('');
+};
+const requestDagobertSessionAccess = async name => {
+  if (!isDagobertProfile(name) || hasDagobertSessionAccess()) return true;
+  const accessCode = window.prompt('Voer de toegangscode voor profiel Dagobert in:');
+  if (accessCode === null) return false;
+  const accessHash = await hashProfileAccessCode(accessCode);
+  if (!accessHash || accessHash !== DAGOBERT_ACCESS_HASH) {
+    window.alert('Onjuiste toegangscode. Profiel Dagobert blijft vergrendeld.');
+    return false;
+  }
+  try {
+    sessionStorage.setItem(DAGOBERT_SESSION_ACCESS_KEY, 'granted');
+    return true;
+  } catch {
+    window.alert('De toegang kan in deze browser niet veilig voor de sessie worden onthouden.');
+    return false;
+  }
+};
+
 const reconcileBankWithCaptainsLogs = (bank = {}, logs = {}) => {
   const reconciled = { ...(bank || {}) };
   Object.entries(logs || {}).forEach(([profileName, entries]) => {
@@ -1487,14 +1532,14 @@ export default function App() {
   const [activeProfileName, setActiveProfileName] = useState(() => {
     const params = new URLSearchParams(window.location.search);
     if (params.get('portal') !== '1' && !params.get('join')) return '';
-    return localStorage.getItem(ACTIVE_PROFILE_KEY) || localStorage.getItem('disney_player_name') || '';
+    return getStoredActiveProfile();
   });
   const [logPopupOpen, setLogPopupOpen] = useState(false);
   const [logProfileName, setLogProfileName] = useState('');
   const [openLedgerSection, setOpenLedgerSection] = useState(null);
   const [selectedPortalGame, setSelectedPortalGame] = useState(null);
   const [showPortalShop, setShowPortalShop] = useState(false);
-  const [playerNameInput, setPlayerNameInput] = useState(() => localStorage.getItem(ACTIVE_PROFILE_KEY) || localStorage.getItem('disney_player_name') || '');
+  const [playerNameInput, setPlayerNameInput] = useState(() => getStoredActiveProfile());
 
   useEffect(() => {
     window.scrollTo({ top: 0, left: 0, behavior: 'auto' });
@@ -2062,9 +2107,10 @@ export default function App() {
     return next;
   };
 
-  const activateCocoProfile = (name) => {
+  const activateCocoProfile = async (name) => {
     const cleanName = String(name || '').trim();
     if (!cleanName) return;
+    if (!(await requestDagobertSessionAccess(cleanName))) return;
     persistCocoProfiles([...cocoProfiles, cleanName]);
     setActiveProfileName(cleanName);
     setShopPlayerName(cleanName);
@@ -2198,7 +2244,7 @@ export default function App() {
         coco_content_usage: contentUsage,
         coco_captains_log: captainsLogs,
         coco_game_history: soloHistory,
-        coco_profile_store_version: 8,
+        coco_profile_store_version: COCO_PROFILE_STORE_VERSION,
         updated_at: new Date().toISOString()
       };
 
@@ -2242,9 +2288,13 @@ export default function App() {
         }
 
         const remoteState = store?.current_task_state || {};
+        const profileStoreVersion = Number(remoteState.coco_profile_store_version) || 0;
         const remoteProfiles = uniqueProfileNames(remoteState.coco_profiles || []);
         const migrateLocalState = remoteProfiles.length === 0 && localProfiles.length > 0;
-        const mergedProfiles = migrateLocalState ? uniqueProfileNames([...remoteProfiles, ...localProfiles]) : remoteProfiles;
+        let mergedProfiles = migrateLocalState ? uniqueProfileNames([...remoteProfiles, ...localProfiles]) : remoteProfiles;
+        if (profileStoreVersion < COCO_PROFILE_STORE_VERSION && !mergedProfiles.some(isDagobertProfile)) {
+          mergedProfiles = uniqueProfileNames([...mergedProfiles, 'Dagobert']);
+        }
         const mergedProfilePreferences = mergeProfilePreferences(remoteState.coco_profile_preferences, profilePreferences, mergedProfiles);
         const mergedRewardReceipts = { ...profileRewardReceipts, ...(remoteState.coco_reward_receipts || {}) };
         let mergedBank = migrateLocalState ? mergeBank(remoteState.coco_bank, starBank) : (remoteState.coco_bank || {});
@@ -2270,7 +2320,6 @@ export default function App() {
         }
         const mergedBadgeAchievements = mergeBadgeAchievements(remoteState.coco_badge_achievements, badgeAchievements);
         let mergedCaptainsLogs = mergeCaptainsLogs(remoteState.coco_captains_log, captainsLogs);
-        const profileStoreVersion = Number(remoteState.coco_profile_store_version) || 0;
         if (profileStoreVersion < 7) {
           const ledgerStartedAt = new Date().toISOString();
           mergedProfiles.forEach(profileName => {
@@ -2290,6 +2339,32 @@ export default function App() {
               }]
             };
           });
+        }
+        if (profileStoreVersion < COCO_PROFILE_STORE_VERSION) {
+          const dagobertName = mergedProfiles.find(isDagobertProfile) || 'Dagobert';
+          const dagobertKey = getCollectorKey(dagobertName);
+          mergedBadgeCollections = {
+            ...mergedBadgeCollections,
+            [dagobertKey]: Object.fromEntries(BADGE_DEFINITIONS.map(badge => [badge.id, 5]))
+          };
+          const reconciledBeforeSeed = reconcileBankWithCaptainsLogs(mergedBank, mergedCaptainsLogs);
+          const currentDagobertBalance = Number(reconciledBeforeSeed[dagobertKey]) || 0;
+          const balanceCorrection = 150 - currentDagobertBalance;
+          mergedBank = { ...mergedBank, [dagobertKey]: 150 };
+          if (balanceCorrection !== 0) {
+            const matchingLogName = Object.keys(mergedCaptainsLogs).find(name => isDagobertProfile(name)) || dagobertName;
+            mergedCaptainsLogs = {
+              ...mergedCaptainsLogs,
+              [matchingLogName]: [...(mergedCaptainsLogs[matchingLogName] || []), {
+                timestamp: new Date().toISOString(),
+                amount: balanceCorrection,
+                type: balanceCorrection > 0 ? 'earn' : 'spend',
+                description: 'Noodvoorraad beheerprofiel ingesteld',
+                balanceAfter: 150,
+                emergencyProfileSeed: true
+              }]
+            };
+          }
         }
         mergedBank = reconcileBankWithCaptainsLogs(mergedBank, mergedCaptainsLogs);
         const mergedGameHistory = mergeGameHistory(remoteState.coco_game_history, soloHistory);
@@ -2336,7 +2411,7 @@ export default function App() {
           coco_content_usage: mergedContentUsage,
           coco_captains_log: mergedCaptainsLogs,
           coco_game_history: mergedGameHistory,
-          coco_profile_store_version: 8,
+          coco_profile_store_version: COCO_PROFILE_STORE_VERSION,
           updated_at: new Date().toISOString()
         };
 
@@ -2423,7 +2498,7 @@ export default function App() {
           coco_content_usage: contentUsage,
           coco_captains_log: captainsLogs,
           coco_game_history: soloHistory,
-          coco_profile_store_version: 8
+          coco_profile_store_version: COCO_PROFILE_STORE_VERSION
         };
         const baseline = cocoProfileSnapshotRef.current || {};
         const changedEntries = Object.entries(localFields).filter(([key, value]) => JSON.stringify(value) !== JSON.stringify(baseline[key]));
@@ -3166,6 +3241,7 @@ export default function App() {
 
   const handleRenameShopProfile = async () => {
     const currentName = activeProfileName || shopPlayerName.trim() || 'Speler 1';
+    if (!(await requestDagobertSessionAccess(currentName))) return;
     const keepProfileChooserOpen = !activeProfileName;
     const nextName = window.prompt('Nieuwe profielnaam', currentName)?.trim();
     if (!nextName || nextName === currentName) return;
@@ -3313,7 +3389,7 @@ export default function App() {
           coco_player_trades: persistedPlayerTrades,
           coco_captains_log: persistedCaptainsLogs,
           coco_game_history: persistedGameHistory,
-          coco_profile_store_version: 8,
+          coco_profile_store_version: COCO_PROFILE_STORE_VERSION,
           updated_at: new Date().toISOString()
         }
       }).eq('id', cocoProfileStoreIdRef.current);
@@ -3357,8 +3433,9 @@ export default function App() {
     });
   }, [localPlayer?.id, room?.id, room?.game_mode, screen]);
 
-  const handleDeleteShopProfile = () => {
+  const handleDeleteShopProfile = async () => {
     const currentName = activeProfileName || shopPlayerName.trim() || 'Speler 1';
+    if (!(await requestDagobertSessionAccess(currentName))) return;
     const keepProfileChooserOpen = !activeProfileName;
     if (getDisplayShopPlayers().length <= 1) {
       window.alert('Er moet minimaal een profiel overblijven.');
@@ -6671,7 +6748,7 @@ export default function App() {
                       ? <img src={assetPath(avatar.image)} alt="" style={{ width: '48px', height: '48px', objectFit: avatar.id === 'olaf' ? 'cover' : 'contain', border: `3px solid ${color}`, borderRadius: '50%', background: '#06152d' }} />
                       : <span style={{ fontSize: '26px', fontWeight: 900, color }}>{name.slice(0, 1).toUpperCase()}</span>}
                     <span>
-                      <strong>{name}</strong>
+                      <strong>{isDagobertProfile(name) ? '🔒 ' : ''}{name}</strong>
                       <small>{formatCocoCoins(balance)} · {ownedCount} badge{ownedCount === 1 ? '' : 's'}</small>
                     </span>
                   </button>
