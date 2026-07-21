@@ -15,6 +15,8 @@ Voorbeelden:
 
 De lange omschrijving na de eerste `.png` mag blijven staan. Voer `powershell -ExecutionPolicy Bypass -File scripts/import-badges.ps1` uit om steeds de nieuwste bestanden te selecteren, optimaliseren en onder hun vaste app-naam te plaatsen.
 
+De importer accepteert zowel een spatie als een koppelteken rond categorie en volgnummer. De huidige doorlopende Legendary-reeks wordt ook ondersteund: `disneyland-legendary 1` t/m `4` gaat naar Disneyland Park en `5` t/m `8` wordt automatisch Disney Adventure World 1 t/m 4. Na iedere import wordt gecontroleerd of alle 76 vaste posities aanwezig zijn; bij een ontbrekende badge stopt het script met een duidelijke melding.
+
 Bestandsopbouw:
 
 `[park]-[categorie]-[volgnummer].png`

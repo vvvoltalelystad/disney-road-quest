@@ -74,7 +74,7 @@ const BADGE_MARKET_KEY = 'disney_badge_market';
 const BADGE_ACHIEVEMENT_KEY = 'disney_badge_achievements';
 const BADGE_PACK_COST = 5;
 const BADGE_SELL_VALUE = 2;
-const BADGE_SHOWCASE_SEED_VERSION = 2;
+const BADGE_SHOWCASE_SEED_VERSION = 3;
 const ENABLE_LEGACY_SHOP = false;
 
 const DISNEY_PROFILE_COLORS = [
@@ -110,17 +110,17 @@ const BADGE_RARITIES = [
 const BADGE_NAMES = {
   disneyland: {
     common: ['Main Street Station', 'Town Square', 'Horse-Drawn Streetcars', 'Casey’s Corner', 'Liberty Arcade', 'Discovery Arcade', 'Sleeping Beauty Castle', 'Le Carrousel de Lancelot', 'Alice’s Curious Labyrinth', 'Mad Hatter’s Tea Cups', 'Le Pays des Contes de Fées', 'It’s a Small World'],
-    uncommon: ['Pirates’ Beach', 'Adventure Isle', 'Swiss Family Treehouse', 'Frontierland Depot', 'Thunder Mesa', 'Phantom Manor', 'Orbitron', 'Autopia'],
-    rare: ['Peter Pan’s Flight', 'Pirates of the Caribbean', 'Star Tours', 'Buzz Lightyear Laser Blast', 'Mickey’s PhilharMagic', 'Big Thunder Mountain', 'Indiana Jones Temple', 'Dragon’s Lair'],
-    epic: ['Disney Stars on Parade', 'Disney Tales of Magic', 'Meet Mickey Mouse', 'Princess Pavilion', 'Star Wars Hyperspace Mountain', 'Castle Dream'],
-    legendary: ['Disneyland Hotel', 'Walt & Mickey', 'Sleeping Beauty Castle Gold', 'Disneyland Park Icon']
+    uncommon: ['Pirates’ Beach', 'Adventure Isle', 'La Cabane des Robinson', 'Frontierland Depot', 'Thunder Mesa', 'Phantom Manor', 'Orbitron', 'Autopia'],
+    rare: ['Peter Pan’s Flight', 'Pirates of the Caribbean', 'Star Tours – The Adventures Continue', 'Buzz Lightyear Laser Blast', 'Mickey’s PhilharMagic', 'Big Thunder Mountain', 'Indiana Jones and the Temple of Peril', 'La Tanière du Dragon'],
+    epic: ['Disney Stars on Parade', 'Disney Tales of Magic', 'Meet Mickey Mouse', 'Princess Pavilion', 'Star Wars Hyperspace Mountain', 'The Lion King: Rhythms of the Pride Lands'],
+    legendary: ['Disneyland Hotel', 'Partners Statue', 'Sleeping Beauty Castle at Golden Hour', 'Disneyland Park Entrance']
   },
   adventure: {
     common: ['World Premiere Entrance', 'Studio Theater', 'Worlds of Pixar Entrance', 'World Premiere Plaza', 'Animation Celebration', 'Cars ROAD TRIP', 'Toy Story Playland', 'Slinky Dog Zigzag Spin', 'Cars Quatre Roues Rallye', 'Flying Carpets Over Agrabah', 'Stitch Live!', 'Minnie’s Dream Factory'],
-    uncommon: ['Ratatouille Courtyard', 'Place de Rémy', 'Spider-Man W.E.B.', 'Avengers Headquarters', 'Training Center', 'Frozen Promenade', 'Arendelle Village', 'Raiponce Tangled Spin'],
-    rare: ['Ratatouille Adventure', 'Crush’s Coaster', 'Tower of Terror', 'RC Racer', 'Toy Soldiers Parachute Drop', 'Avengers Flight Force', 'Frozen Ever After', 'Mickey and the Magician'],
-    epic: ['World of Frozen', 'Avengers Campus', 'Together: Pixar Adventure', 'Disney Studio 1', 'Adventure Bay', 'Adventure Way'],
-    legendary: ['Hollywood Tower', 'Arendelle Castle', 'Adventure Bay Night', 'Disney Adventure World Icon']
+    uncommon: ['Ratatouille Courtyard', 'Place de Rémy', 'Spider-Man W.E.B. Adventure', 'Avengers Headquarters', 'Hero Training Center', 'Arendelle Clock Tower', 'Arendelle Village', 'Raiponce Tangled Spin'],
+    rare: ['Ratatouille: The Adventure', 'Crush’s Coaster', 'The Twilight Zone Tower of Terror', 'RC Racer', 'Toy Soldiers Parachute Drop', 'Avengers Assemble: Flight Force', 'Frozen Ever After', 'Mickey and the Magician'],
+    epic: ['World of Frozen', 'Marvel Avengers Campus', 'TOGETHER: A Pixar Musical Adventure', 'World Premiere at Night', 'Adventure Bay', 'Adventure Way'],
+    legendary: ['The Hollywood Tower Hotel', 'Arendelle Castle', 'Disney Cascade of Lights', 'Disney Adventure World Entrance']
   }
 };
 
@@ -180,34 +180,11 @@ const BADGE_ACHIEVEMENTS = [
 ];
 
 const BADGE_CATEGORY_ACHIEVEMENTS = BADGE_ACHIEVEMENTS.filter(achievement => !achievement.ultimate);
-const JACCO_BADGE_SHOWCASE_COUNTS = {
-  'disneyland-common-1': 3,
-  'disneyland-common-2': 2,
-  'disneyland-common-3': 4,
-  'disneyland-common-4': 1,
-  'disneyland-common-5': 2,
-  'disneyland-common-6': 3,
-  'disneyland-common-7': 1,
-  'disneyland-common-8': 2,
-  'disneyland-common-9': 4,
-  'disneyland-common-10': 2,
-  'disneyland-common-11': 3,
-  'disneyland-common-12': 2,
-  'adventure-common-1': 3,
-  'adventure-common-2': 2,
-  'adventure-common-3': 4,
-  'adventure-common-4': 1,
-  'adventure-common-5': 3,
-  'adventure-common-6': 2,
-  'adventure-common-7': 4,
-  'adventure-common-8': 2,
-  'adventure-common-9': 1,
-  'adventure-common-10': 3,
-  'adventure-common-11': 2,
-  'adventure-common-12': 4,
-  'disneyland-uncommon-1': 2,
-  'disneyland-uncommon-2': 3
-};
+// Jacco is het vaste testprofiel. De variatie van 1 t/m 4 exemplaren maakt zowel
+// enkele badges, dubbele badges als de aantaltellers in één complete collectie testbaar.
+const JACCO_BADGE_SHOWCASE_COUNTS = Object.fromEntries(
+  BADGE_DEFINITIONS.map((badge, index) => [badge.id, (index % 4) + 1])
+);
 const BADGE_FACTS = {
   'disneyland-common-1': 'Een volledige ronde met de Disneyland Railroad duurt ongeveer dertig minuten.',
   'disneyland-common-2': 'Town Square is het eerste plein na de ingang en vormt de poort naar Main Street, U.S.A.',
@@ -234,7 +211,57 @@ const BADGE_FACTS = {
   'adventure-common-11': 'Stitch reageert tijdens deze interactieve ontmoeting live op wat bezoekers zeggen en doen.',
   'adventure-common-12': 'Voor de vernieuwde Minnie’s Dream Factory deden meer dan achthonderd artiesten auditie.',
   'disneyland-uncommon-1': 'Pirates’ Beach is een piratenspeelplaats in Adventureland waar jonge avonturiers zelf kunnen klimmen en klauteren.',
-  'disneyland-uncommon-2': 'Adventure Isle is een wandelavontuur vol smokkelaarspaden, grotten en verborgen plekken.'
+  'disneyland-uncommon-2': 'Adventure Isle is een wandelavontuur vol smokkelaarspaden, grotten en verborgen plekken.',
+  'disneyland-uncommon-3': 'La Cabane des Robinson is gebouwd in een enorme kunstboom en is geïnspireerd op Swiss Family Robinson.',
+  'disneyland-uncommon-4': 'Frontierland Depot is een halte van de Disneyland Railroad en ademt de sfeer van een station uit het Wilde Westen.',
+  'disneyland-uncommon-5': 'Thunder Mesa is het fictieve goudzoekersstadje dat de verhalen van Frontierland met elkaar verbindt.',
+  'disneyland-uncommon-6': 'Phantom Manor vertelt het mysterieuze verhaal van bruid Melanie Ravenswood en haar verdwenen bruidegom.',
+  'disneyland-uncommon-7': 'Orbitron combineert een vliegende carrousel met futuristische ontwerpen in de stijl van Leonardo da Vinci.',
+  'disneyland-uncommon-8': 'In Autopia bestuur je zelf een retrofuturistische auto over een kronkelend snelweglandschap.',
+  'adventure-uncommon-1': 'Ratatouille Courtyard laat bezoekers al op straat krimpen tot het formaat van Rémy.',
+  'adventure-uncommon-2': 'Place de Rémy gebruikt uitvergrote voorwerpen en scheve perspectieven om je zo klein als een rat te laten voelen.',
+  'adventure-uncommon-3': 'Tijdens Spider-Man W.E.B. Adventure schiet je met handgebaren virtuele webben op ontsnapte Spider-Bots.',
+  'adventure-uncommon-4': 'Boven Avengers Headquarters staat de Quinjet klaar alsof de Avengers ieder moment kunnen vertrekken.',
+  'adventure-uncommon-5': 'In het Hero Training Center ontmoeten bezoekers Marvel-helden voor een persoonlijke trainingsmissie.',
+  'adventure-uncommon-6': 'De Arendelle Clock Tower vormt een herkenbaar oriëntatiepunt in de wereld van Frozen.',
+  'adventure-uncommon-7': 'Arendelle Village is vormgegeven met Scandinavische kleuren, houtwerk en details uit de Frozen-films.',
+  'adventure-uncommon-8': 'Raiponce Tangled Spin laat gasten ronddraaien tussen de zwevende lantaarns uit Rapunzels bekendste scène.',
+  'disneyland-rare-1': 'Peter Pan’s Flight laat je in een vliegend piratenschip boven Londen en Never Land zweven.',
+  'disneyland-rare-2': 'Pirates of the Caribbean in Parijs begint met een vaart door een fort voordat de piratenchaos losbarst.',
+  'disneyland-rare-3': 'Star Tours kiest scènes uit verschillende missies, waardoor niet iedere vlucht hetzelfde verloopt.',
+  'disneyland-rare-4': 'Bij Buzz Lightyear Laser Blast kun je tijdens de rit zelf doelen raken en een persoonlijke score opbouwen.',
+  'disneyland-rare-5': 'Mickey’s PhilharMagic combineert 3D-film met muziek en personages uit meerdere Disney-klassiekers.',
+  'disneyland-rare-6': 'Big Thunder Mountain ligt als enige Disney-achtbaan van dit type op een eiland midden in een meer.',
+  'disneyland-rare-7': 'Indiana Jones and the Temple of Peril was de eerste Disney-achtbaan met een inversie.',
+  'disneyland-rare-8': 'La Tanière du Dragon verbergt onder het kasteel een bewegende draak die rook en geluid produceert.',
+  'adventure-rare-1': 'Ratatouille: The Adventure gebruikt enorme decors om Parijs vanuit het perspectief van Rémy te beleven.',
+  'adventure-rare-2': 'Crush’s Coaster combineert een donkere rit met vrij draaiende schildpadschild-voertuigen.',
+  'adventure-rare-3': 'The Twilight Zone Tower of Terror gebruikt wisselende valprofielen, zodat de rit onvoorspelbaar blijft.',
+  'adventure-rare-4': 'RC Racer laat zijn voertuig heen en weer racen over een baan die lijkt op Andy’s speelgoedset.',
+  'adventure-rare-5': 'Toy Soldiers Parachute Drop is vormgegeven als een trainingsmissie van de groene speelgoedsoldaatjes.',
+  'adventure-rare-6': 'Avengers Assemble: Flight Force stuurt gasten samen met Iron Man en Captain Marvel op een supersnelle missie.',
+  'adventure-rare-7': 'Frozen Ever After neemt bezoekers per boot mee langs bekende liedjes en locaties uit Arendelle.',
+  'adventure-rare-8': 'Mickey and the Magician combineert live zang, illusies en scènes uit verschillende Disney-films.',
+  'disneyland-epic-1': 'Disney Stars on Parade brengt praalwagens uit verschillende Disney-werelden samen op één lange route.',
+  'disneyland-epic-2': 'Disney Tales of Magic gebruikt het kasteel en Main Street als decor voor projecties, licht en fonteinen.',
+  'disneyland-epic-3': 'Meet Mickey Mouse speelt zich af in een theater vol rekwisieten en verwijzingen naar Mickeys filmcarrière.',
+  'disneyland-epic-4': 'In Princess Pavilion heeft iedere ontmoeting een koninklijk decor dat bij de Disney-prinsessen past.',
+  'disneyland-epic-5': 'Star Wars Hyperspace Mountain lanceert zijn treinen vanuit een enorm kanon een ruimtemissie in.',
+  'disneyland-epic-6': 'The Lion King: Rhythms of the Pride Lands brengt de film tot leven met live zang, dans en acrobatiek.',
+  'adventure-epic-1': 'World of Frozen is ontworpen als een wandeling door Arendelle, van het dorp tot het koninklijke kasteel.',
+  'adventure-epic-2': 'Marvel Avengers Campus is opgezet als een actieve basis waar nieuwe helden worden getraind.',
+  'adventure-epic-3': 'TOGETHER: A Pixar Musical Adventure wordt begeleid door een live orkest en grote bewegende decors.',
+  'adventure-epic-4': 'World Premiere krijgt in het donker extra glans door neon, theaterlicht en verwijzingen naar Hollywood.',
+  'adventure-epic-5': 'Adventure Bay vormt het grote waterhart van Disney Adventure World en biedt ruimte voor shows rondom het meer.',
+  'adventure-epic-6': 'Adventure Way verbindt meerdere werelden met tuinen, promenades en details uit Disney-verhalen.',
+  'disneyland-legendary-1': 'Het Disneyland Hotel staat direct boven de ingang van Disneyland Park en vormt zo letterlijk de toegangspoort.',
+  'disneyland-legendary-2': 'De Partners Statue toont Walt Disney hand in hand met Mickey Mouse, samen kijkend naar de toekomst.',
+  'disneyland-legendary-3': 'Sleeping Beauty Castle is bewust in zachtroze tinten geschilderd om mooi af te steken tegen de vaak grijze lucht.',
+  'disneyland-legendary-4': 'De ingang van Disneyland Park leidt onder het Disneyland Hotel door naar Main Street Station.',
+  'adventure-legendary-1': 'The Hollywood Tower Hotel is van ver te herkennen aan zijn verweerde gevel en bliksemschade.',
+  'adventure-legendary-2': 'Arendelle Castle staat hoog boven het dorp en is geïnspireerd op Scandinavische architectuur.',
+  'adventure-legendary-3': 'Disney Cascade of Lights gebruikt het water van Adventure Bay als spiegel voor licht, kleur en effecten.',
+  'adventure-legendary-4': 'De entree van Disney Adventure World vormt de overgang van de filmwereld naar verschillende avonturenlanden.'
 };
 const getAchievement = achievementId => BADGE_ACHIEVEMENTS.find(achievement => achievement.id === achievementId);
 const getRarityBadgeProgress = (ownedBadges, rarity) => {

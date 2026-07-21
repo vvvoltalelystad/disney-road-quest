@@ -14,11 +14,31 @@ if (-not (Test-Path -LiteralPath $SourceDirectory)) {
 $destination = [System.IO.Path]::GetFullPath($DestinationDirectory)
 [System.IO.Directory]::CreateDirectory($destination) | Out-Null
 
+$rarityLimits = @{
+  common = 12
+  uncommon = 8
+  rare = 8
+  epic = 6
+  legendary = 4
+}
+
 $candidates = foreach ($file in Get-ChildItem -LiteralPath $SourceDirectory -File) {
-  if ($file.Name -match '^(?<park>disneyland|adventure)[ -](?<rarity>common|uncommon|rare|epic|legendary)-?(?<number>\d+)') {
+  if ($file.Name -match '^(?<park>disneyland|adventure)[ -](?<rarity>common|uncommon|rare|epic|legendary)[ -]?(?<number>\d+)') {
     $park = $Matches.park.ToLowerInvariant()
     $rarity = $Matches.rarity.ToLowerInvariant()
     $number = [int]$Matches.number
+
+    # De Legendary-set is doorlopend genummerd: 1-4 Disneyland Park en
+    # 5-8 Disney Adventure World. Intern bewaart de app beide parken als 1-4.
+    if ($park -eq 'disneyland' -and $rarity -eq 'legendary' -and $number -ge 5 -and $number -le 8) {
+      $park = 'adventure'
+      $number -= 4
+    }
+
+    if ($number -lt 1 -or $number -gt $rarityLimits[$rarity]) {
+      Write-Warning "Badge valt buiten de collectie-indeling en wordt overgeslagen: $($file.Name)"
+      continue
+    }
     $version = 1
     # Een versienummer mag direct achter het slotnummer staan, of achter de lange badgenaam.
     # Voorbeelden: common-1_3.png en common-1.png — Badge Name_3.png.
@@ -41,6 +61,22 @@ $latest = $candidates |
   Group-Object Key |
   ForEach-Object { $_.Group | Sort-Object Version, @{ Expression = { $_.File.LastWriteTimeUtc } } -Descending | Select-Object -First 1 } |
   Sort-Object Key
+
+$expectedKeys = foreach ($rarity in $rarityLimits.Keys) {
+  foreach ($park in @('disneyland', 'adventure')) {
+    for ($number = 1; $number -le $rarityLimits[$rarity]; $number++) {
+      "$park-$rarity-$number"
+    }
+  }
+}
+$importedKeys = @($latest | ForEach-Object Key)
+$missingKeys = @($expectedKeys | Where-Object { $_ -notin $importedKeys } | Sort-Object)
+
+if ($missingKeys.Count -gt 0) {
+  throw "De badgecollectie is niet compleet. Ontbrekend: $($missingKeys -join ', ')"
+}
+
+Write-Host ("Validatie geslaagd: alle {0} collectieplekken hebben een afbeelding." -f $expectedKeys.Count)
 
 foreach ($badge in $latest) {
   $targetPath = Join-Path $destination "$($badge.Key).png"
