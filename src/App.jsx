@@ -108,6 +108,11 @@ const DISNEY_PROFILE_AVATARS = [
   .map(([id, name, file, publicRoot = false]) => ({ id, name, image: publicRoot ? file : `music/avatars/${file}` }))
   .sort((left, right) => left.name.localeCompare(right.name, 'nl', { sensitivity: 'base' }));
 
+const getAvatarImageStyle = avatarId => ({
+  objectFit: ['olaf', 'miguel', 'percy'].includes(avatarId) ? 'cover' : 'contain',
+  objectPosition: avatarId === 'miguel' ? '50% 38%' : avatarId === 'percy' ? '50% 42%' : '50% 50%'
+});
+
 const BADGE_RARITIES = [
   { id: 'common', name: 'Common', subtitle: 'De eerste stap van ieder Disney-avontuur', perPark: 12, frame: 'badges/frames/common-silver.png' },
   { id: 'uncommon', name: 'Uncommon', subtitle: 'Bijzondere herinneringen uit beide parken', perPark: 8, frame: 'badges/frames/uncommon-green.png' },
@@ -5667,7 +5672,7 @@ export default function App() {
               aria-label="Wijzig avatar en spelerskleur"
             >
               {profileAvatar
-                ? <img className="global-profile-avatar" src={assetPath(profileAvatar.image)} alt="" style={{ borderColor: profileColor, objectFit: profileAvatar.id === 'olaf' ? 'cover' : 'contain' }} />
+                ? <img className="global-profile-avatar" src={assetPath(profileAvatar.image)} alt="" style={{ borderColor: profileColor, ...getAvatarImageStyle(profileAvatar.id) }} />
                 : <span className="global-profile-avatar-fallback" style={{ borderColor: profileColor }}>{activeProfileName.slice(0, 1).toUpperCase()}</span>}
             </button>
             <span className="global-profile-divider" aria-hidden="true">•</span>
@@ -6737,7 +6742,7 @@ export default function App() {
                       aria-pressed={profileDraftAvatar === avatar.id}
                       title={avatar.name}
                     >
-                      <img src={assetPath(avatar.image)} alt={avatar.name} style={{ objectFit: avatar.id === 'olaf' ? 'cover' : 'contain' }} />
+                      <img src={assetPath(avatar.image)} alt={avatar.name} style={getAvatarImageStyle(avatar.id)} />
                       <span>{avatar.name}</span>
                     </button>
                   ))}
@@ -9454,7 +9459,7 @@ export default function App() {
                         <img
                           src={assetPath(avatar?.image || DISNEY_PROFILE_AVATARS[0].image)}
                           alt={`Avatar van ${player.name}`}
-                          style={{ width: `${size}px`, height: `${size}px`, objectFit: avatar?.id === 'olaf' ? 'cover' : 'contain', borderRadius: '50%', border: `4px solid ${color}`, background: '#07152c', boxShadow: rank === 1 ? `0 0 28px ${color}` : '0 8px 22px rgba(0,0,0,.35)' }}
+                          style={{ width: `${size}px`, height: `${size}px`, ...getAvatarImageStyle(avatar?.id), borderRadius: '50%', border: `4px solid ${color}`, background: '#07152c', boxShadow: rank === 1 ? `0 0 28px ${color}` : '0 8px 22px rgba(0,0,0,.35)' }}
                         />
                         <strong style={{ display: 'block', marginTop: '5px', color: rank === 1 ? 'var(--gold)' : '#fff' }}>{getRankMedal(rank)} {player.name}</strong>
                       </div>
