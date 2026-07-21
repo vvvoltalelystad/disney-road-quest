@@ -1522,6 +1522,7 @@ export default function App() {
   const [cocoProfilesReady, setCocoProfilesReady] = useState(false);
   const cocoProfileStoreIdRef = useRef(null);
   const cocoProfileStoreUpdatedAtRef = useRef('');
+  const refreshSharedProfileStoreRef = useRef(null);
   const [aiLevel, setAiLevel] = useState(() => localStorage.getItem('disney_ai_level') || 'normal');
   const [piratesDifficulty, setPiratesDifficulty] = useState(() => localStorage.getItem('disney_pirates_difficulty') || 'normal');
 
@@ -2379,12 +2380,35 @@ export default function App() {
       }
     };
 
+    refreshSharedProfileStoreRef.current = refreshSharedProfileStore;
     const intervalId = window.setInterval(refreshSharedProfileStore, 3000);
+    const refreshWhenActive = () => {
+      if (document.visibilityState === 'visible') refreshSharedProfileStore();
+    };
+    window.addEventListener('focus', refreshWhenActive);
+    document.addEventListener('visibilitychange', refreshWhenActive);
+    const realtimeChannel = supabase
+      .channel(`coco-profile-sync-${cocoProfileStoreIdRef.current}`)
+      .on('postgres_changes', {
+        event: 'UPDATE',
+        schema: 'public',
+        table: 'rooms',
+        filter: `id=eq.${cocoProfileStoreIdRef.current}`
+      }, refreshSharedProfileStore)
+      .subscribe();
     return () => {
       cancelled = true;
       window.clearInterval(intervalId);
+      window.removeEventListener('focus', refreshWhenActive);
+      document.removeEventListener('visibilitychange', refreshWhenActive);
+      if (refreshSharedProfileStoreRef.current === refreshSharedProfileStore) refreshSharedProfileStoreRef.current = null;
+      supabase.removeChannel(realtimeChannel);
     };
   }, [cocoProfilesReady]);
+
+  useEffect(() => {
+    if (logPopupOpen) refreshSharedProfileStoreRef.current?.();
+  }, [logPopupOpen]);
 
   useEffect(() => {
     const updateMarketClock = () => {
@@ -6325,8 +6349,8 @@ export default function App() {
                     e.stopPropagation();
                     if (selectedPortalGame === 'music_match') {
                       window.location.href = room?.code
-                        ? `./music/index.html?room=${room.code}&v=78`
-                        : './music/index.html?v=78';
+                        ? `./music/index.html?room=${room.code}&v=80`
+                        : './music/index.html?v=80';
                     } else {
                       setSelectedPortalGame('music_match');
                     }
