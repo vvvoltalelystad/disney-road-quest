@@ -2870,7 +2870,9 @@ export default function App() {
         names.forEach(profileName => {
           const profileKey = getCollectorKey(profileName);
           const profileUsage = { ...(nextUsage[profileKey] || {}) };
-          profileUsage[gameKey] = [...new Set([...(profileUsage[gameKey] || []), contentId])].slice(-600);
+          // Road Race now contains more than one thousand unique items. Keep
+          // enough history to exhaust the complete pool before any repeat.
+          profileUsage[gameKey] = [...new Set([...(profileUsage[gameKey] || []), contentId])].slice(-2000);
           nextUsage[profileKey] = profileUsage;
         });
         return { ...currentState, coco_content_usage: nextUsage };
@@ -4233,6 +4235,15 @@ export default function App() {
     const profileUsedTasks = new Set(participatingProfileNames.flatMap(profileName => (
       contentUsage[getCollectorKey(profileName)]?.['road-race'] || []
     )));
+    const profileUsedNews = new Set(participatingProfileNames.flatMap(profileName => (
+      contentUsage[getCollectorKey(profileName)]?.['magic-news'] || []
+    )));
+    const unusedNewsIndexes = MAGIC_NEWS.map((_, index) => index).filter(index => (
+      !profileUsedNews.has(`news-${String(index + 1).padStart(3, '0')}`)
+    ));
+    const newsPool = unusedNewsIndexes.length ? unusedNewsIndexes : MAGIC_NEWS.map((_, index) => index);
+    const magicNewsIndex = newsPool[Math.floor(Math.random() * newsPool.length)] || 0;
+    const magicNewsId = `news-${String(magicNewsIndex + 1).padStart(3, '0')}`;
     const enabledCats = currentRoom.current_task_state?.enabledCategories || ["Disney Dagboek", "Pictionary", "Inschattingsvragen", "Dilemma", "Emoji Quiz", "Wie ben ik?", "Feit of Fabel", "Quiz", "Samen"];
     const isBonusRound = ((currentRoom.round || 0) + 1) % 4 === 0;
     const automaticBonusChoices = isBonusRound
@@ -4281,9 +4292,11 @@ export default function App() {
           stagePause: false,
           roundPhase: 'difficulty',
           bonusRound: isBonusRound,
+          magicNewsIndex,
           doubleWishChoices: automaticBonusChoices
         }
       });
+      await handleMarkContentUsed('magic-news', magicNewsId, participatingProfileNames);
       return;
     }
 
@@ -4362,11 +4375,13 @@ export default function App() {
         hintLevel: 1,
         hostReviews: {},
         bonusRound: isBonusRound,
+        magicNewsIndex,
         roundPhase: 'announcement',
         doubleWishChoices: automaticBonusChoices
       }
     });
     await handleMarkContentUsed('road-race', selected.id, participatingProfileNames);
+    await handleMarkContentUsed('magic-news', magicNewsId, participatingProfileNames);
   };
 
   const handleCreateRoom = async () => {
@@ -9194,7 +9209,7 @@ export default function App() {
             <div>
               {/* breaking news trivia banner */}
               {(() => {
-                const newsIndex = (room?.round || 0) % MAGIC_NEWS.length;
+                const newsIndex = room?.current_task_state?.magicNewsIndex ?? ((room?.round || 0) % MAGIC_NEWS.length);
                 const newsItem = MAGIC_NEWS[newsIndex];
                 return (
                   <div className="breaking-news" style={{
