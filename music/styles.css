@@ -767,6 +767,7 @@ img.emoji {
   background: rgba(255,255,255,0.05);
   padding: 2px;
 }
+.avatar-id-olaf{object-fit:cover!important;padding:0!important}
 
 /* 1. Join choice screen button adjustments */
 .avatarchoice {
