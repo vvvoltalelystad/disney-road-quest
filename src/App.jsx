@@ -5791,6 +5791,8 @@ export default function App() {
     const hostHasAnswered = task.type === 'quiz' ? state.quizAnswers?.[localPlayer?.id] !== undefined
       : ['whoami', 'fact', 'emoji'].includes(task.type) ? state.genericAnswers?.[localPlayer?.id] !== undefined
       : task.type === 'diary' ? !!state.answers?.[localPlayer?.id]?.[`part${state.part || 1}`]
+      : task.type === 'estimate' ? state.estimates?.[localPlayer?.id] !== undefined
+      : task.type === 'dilemma' ? state.votes?.[localPlayer?.id] !== undefined
       : task.type === 'draw' ? (players[room.current_player_index]?.id === localPlayer?.id || !!state.pictionaryGuesses?.[localPlayer?.id])
       : true;
     if (hostMustAnswer && !hostHasAnswered) return null;
