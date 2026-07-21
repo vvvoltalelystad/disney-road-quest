@@ -2157,7 +2157,7 @@ export default function App() {
 
   const uniqueProfileNames = (names) => {
     const seen = new Set();
-    return names
+    const uniqueNames = names
       .filter(Boolean)
       .map(name => String(name).trim())
       .filter(name => {
@@ -2165,8 +2165,14 @@ export default function App() {
         if (!name || seen.has(key)) return false;
         seen.add(key);
         return true;
-      })
-      .slice(0, 12);
+      });
+    const dagobertName = uniqueNames.find(isDagobertProfile);
+    const alphabeticalNames = uniqueNames
+      .filter(name => !isDagobertProfile(name))
+      .sort((left, right) => left.localeCompare(right, 'nl', { sensitivity: 'base', numeric: true }));
+    return dagobertName
+      ? [...alphabeticalNames.slice(0, 11), dagobertName]
+      : alphabeticalNames.slice(0, 12);
   };
 
   const persistCocoProfiles = (names) => {
