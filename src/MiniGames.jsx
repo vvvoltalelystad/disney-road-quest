@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
+import { PIRATES_PLANK_WORDS } from './piratesWords.js';
 
 // Emojis mapping for players
 const P1_CHAR = "👑"; // King/Mickey theme
@@ -2089,7 +2090,7 @@ export function AbaloneGame({ mode, room, localPlayer, players, updateRoomState,
   );
 }
 
-const PIRATES_PLANK_WORDS = [
+const LEGACY_PIRATES_PLANK_WORDS = [
   { word: "PHANTOM MANOR", language: "en", category: "Attractie", hint: "Een spookachtig landhuis in Frontierland." },
   { word: "THUNDER MESA", language: "en", category: "Disney-locatie", hint: "Het mijnstadje rond Big Thunder Mountain." },
   { word: "CASEY JR CIRCUS TRAIN", language: "en", category: "Attractie", hint: "Een kleine circustrein uit Fantasyland." },
@@ -2306,14 +2307,17 @@ const isPlankWordSolved = (word, guesses) => (
   word.split("").every(char => !PLANK_LETTERS.includes(char) || guesses.includes(char))
 );
 
-function createPiratesPlankState(difficulty = "normal") {
+function createPiratesPlankState(difficulty = "normal", excludedWordIds = []) {
   const safeDifficulty = PLANK_DIFFICULTIES[difficulty] ? difficulty : "normal";
   const config = PLANK_DIFFICULTIES[safeDifficulty];
   const candidates = PIRATES_PLANK_WORDS.filter(entry => getPlankLetterCount(entry.word) <= config.maxLetters);
+  const excluded = new Set(excludedWordIds || []);
+  const unusedCandidates = candidates.filter(entry => !excluded.has(entry.id));
+  const selectionPool = unusedCandidates.length ? unusedCandidates : candidates;
   const weightedCandidates = [
-    ...candidates,
-    ...candidates.filter(entry => getPlankLetterCount(entry.word) <= 14),
-    ...(safeDifficulty === "easy" ? candidates.filter(entry => getPlankLetterCount(entry.word) <= 11) : [])
+    ...selectionPool,
+    ...selectionPool.filter(entry => getPlankLetterCount(entry.word) <= 14),
+    ...(safeDifficulty === "easy" ? selectionPool.filter(entry => getPlankLetterCount(entry.word) <= 11) : [])
   ];
   const entry = weightedCandidates[Math.floor(Math.random() * weightedCandidates.length)];
   const uniqueLetters = Array.from(new Set(entry.word.split("").filter(char => PLANK_LETTERS.includes(char))));
@@ -2321,6 +2325,7 @@ function createPiratesPlankState(difficulty = "normal") {
   const startingGuesses = shuffledLetters.slice(0, Math.min(config.preReveal, Math.max(0, uniqueLetters.length - 2)));
   return {
     piratesDifficulty: safeDifficulty,
+    plankWordId: entry.id,
     plankWord: entry.word,
     plankLanguage: entry.language || "en",
     plankCategory: entry.category,
@@ -2489,7 +2494,7 @@ function LegacyPiratesPlankGame({ mode, room, localPlayer, players, updateRoomSt
   );
 }
 
-export function PiratesPlankGame({ mode, room, localPlayer, players, updateRoomState, onFinish }) {
+export function PiratesPlankGame({ mode, room, localPlayer, players, updateRoomState, onFinish, usedWordIds = [], onWordUsed }) {
   const isSolo = mode === 'solo' || room.id === 'solo';
   const [isRolling, setIsRolling] = useState(false);
   const rollTimerRef = useRef(null);
@@ -2501,8 +2506,9 @@ export function PiratesPlankGame({ mode, room, localPlayer, players, updateRoomS
   const word = taskState.plankWord || "";
   const difficulty = PLANK_DIFFICULTIES[taskState.piratesDifficulty] ? taskState.piratesDifficulty : "normal";
   const difficultyConfig = PLANK_DIFFICULTIES[difficulty];
-  const wordLanguage = taskState.plankLanguage || PIRATES_PLANK_WORDS.find(entry => entry.word === word)?.language || "en";
-  const wordEntry = PIRATES_PLANK_WORDS.find(entry => entry.word === word);
+  const wordEntry = PIRATES_PLANK_WORDS.find(entry => entry.id === taskState.plankWordId || entry.word === word)
+    || LEGACY_PIRATES_PLANK_WORDS.find(entry => entry.word === word);
+  const wordLanguage = taskState.plankLanguage || wordEntry?.language || "en";
   const wordCategory = taskState.plankCategory || wordEntry?.category || "Disney";
   const wordHint = taskState.plankHint || wordEntry?.hint || "Een bekende naam uit de Disney-wereld.";
   const languageInfo = PLANK_LANGUAGES[wordLanguage] || PLANK_LANGUAGES.en;
@@ -2522,13 +2528,16 @@ export function PiratesPlankGame({ mode, room, localPlayer, players, updateRoomS
 
   useEffect(() => {
     if (!taskState.plankWord) {
+      if (!isSolo && myIndex !== 0) return;
+      const nextPlankState = createPiratesPlankState(taskState.piratesDifficulty || "normal", usedWordIds);
       updateRoomState(room.id, {
         current_player_index: 0,
         current_task_state: {
           ...taskState,
-          ...createPiratesPlankState(taskState.piratesDifficulty || "normal")
+          ...nextPlankState
         }
       });
+      onWordUsed?.(nextPlankState.plankWordId, (players || []).map(player => player?.name).filter(Boolean));
     }
   }, []);
 
@@ -2708,8 +2717,8 @@ export function PiratesPlankGame({ mode, room, localPlayer, players, updateRoomS
     const attempt = window.prompt('Wat is de volledige oplossing?')?.trim().toUpperCase();
     if (!attempt) return;
 
-    const normalizedAttempt = attempt.replace(/\s+/g, ' ');
-    const normalizedWord = word.replace(/\s+/g, ' ');
+    const normalizedAttempt = attempt.normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/[^A-Z0-9]/g, '');
+    const normalizedWord = word.normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/[^A-Z0-9]/g, '');
     const solved = normalizedAttempt === normalizedWord;
     const nextStrikes = solved ? strikes : Math.min(difficultyConfig.maxStrikes, strikes + difficultyConfig.solvePenalty);
     const hintResult = solved
@@ -5408,7 +5417,7 @@ export function MiniGameRulesButton({ gameId, mode, compact = false }) {
 // ----------------------------------------------------
 // MAIN WRAPPER RENDERER
 // ----------------------------------------------------
-export function MiniGameRenderer({ gameId, mode, room, localPlayer, players, updateRoomState, onFinish, showRules = true, onToolbarChange }) {
+export function MiniGameRenderer({ gameId, mode, room, localPlayer, players, updateRoomState, onFinish, showRules = true, onToolbarChange, usedContent = [], onContentUsed }) {
   const safeUpdateRoomState = updateRoomState || (async () => {});
   let gameView;
 
@@ -5467,6 +5476,8 @@ export function MiniGameRenderer({ gameId, mode, room, localPlayer, players, upd
           players={players}
           updateRoomState={safeUpdateRoomState}
           onFinish={onFinish}
+          usedWordIds={usedContent}
+          onWordUsed={onContentUsed}
         />
       );
       break;

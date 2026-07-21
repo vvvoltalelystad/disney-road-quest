@@ -74,6 +74,7 @@ const BADGE_MARKET_KEY = 'disney_badge_market';
 const BADGE_ACHIEVEMENT_KEY = 'disney_badge_achievements';
 const PLAYER_TRADES_KEY = 'disney_player_trades';
 const PLAYER_NOTIFICATION_SEEN_KEY = 'disney_player_notification_seen';
+const CONTENT_USAGE_KEY = 'disney_content_usage';
 const PLAYER_TRADE_MODE = 'player-trade';
 const BADGE_PACK_COST = 5;
 const BADGE_SELL_VALUE = 2;
@@ -1507,6 +1508,7 @@ export default function App() {
   });
   const [badgeMarketNow, setBadgeMarketNow] = useState(() => Date.now());
   const [playerTrades, setPlayerTrades] = useState(() => readJsonStorage(PLAYER_TRADES_KEY, []));
+  const [contentUsage, setContentUsage] = useState(() => readJsonStorage(CONTENT_USAGE_KEY, {}));
   const [seenPlayerNotifications, setSeenPlayerNotifications] = useState(() => {
     const savedSeen = readJsonStorage(PLAYER_NOTIFICATION_SEEN_KEY, {});
     const savedLogs = readJsonStorage('disney_captains_log', {});
@@ -1562,6 +1564,7 @@ export default function App() {
   const [cocoProfilesReady, setCocoProfilesReady] = useState(false);
   const cocoProfileStoreIdRef = useRef(null);
   const cocoProfileStoreUpdatedAtRef = useRef('');
+  const cocoProfileSnapshotRef = useRef(null);
   const refreshSharedProfileStoreRef = useRef(null);
   const [aiLevel, setAiLevel] = useState(() => localStorage.getItem('disney_ai_level') || 'normal');
   const [piratesDifficulty, setPiratesDifficulty] = useState(() => localStorage.getItem('disney_pirates_difficulty') || 'normal');
@@ -2054,6 +2057,17 @@ export default function App() {
       ]));
     };
 
+    const mergeContentUsage = (remoteUsage = {}, localUsage = {}) => {
+      const profileKeys = new Set([...Object.keys(remoteUsage || {}), ...Object.keys(localUsage || {})]);
+      return Object.fromEntries([...profileKeys].map(profileKey => {
+        const gameKeys = new Set([...Object.keys(remoteUsage?.[profileKey] || {}), ...Object.keys(localUsage?.[profileKey] || {})]);
+        return [profileKey, Object.fromEntries([...gameKeys].map(gameKey => [
+          gameKey,
+          [...new Set([...(remoteUsage?.[profileKey]?.[gameKey] || []), ...(localUsage?.[profileKey]?.[gameKey] || [])])]
+        ]))];
+      }));
+    };
+
     const mergeProfilePreferences = (remotePreferences, localPreferences, profileNames) => {
       const merged = { ...(localPreferences || {}), ...(remotePreferences || {}) };
       profileNames.forEach((profileName, index) => {
@@ -2112,6 +2126,7 @@ export default function App() {
         coco_badge_showcase_seed_version: badgeShowcaseSeedVersion,
         coco_badge_market: badgeMarket,
         coco_player_trades: playerTrades,
+        coco_content_usage: contentUsage,
         coco_captains_log: captainsLogs,
         coco_game_history: soloHistory,
         coco_profile_store_version: 8,
@@ -2229,11 +2244,15 @@ export default function App() {
           remoteTradeRecords,
           mergePlayerTradeLists(remoteState.coco_player_trades, playerTrades)
         );
+        const mergedContentUsage = migrateLocalState
+          ? mergeContentUsage(remoteState.coco_content_usage, contentUsage)
+          : (remoteState.coco_content_usage || {});
         const remoteMarket = remoteState.coco_badge_market;
         const mergedBadgeMarket = remoteMarket?.hour === getMarketHour() && Array.isArray(remoteMarket.offers) && remoteMarket.offers.length === 3
           ? remoteMarket
           : createHourlyBadgeMarket();
         const mergedState = {
+          ...remoteState,
           coco_profiles: mergedProfiles,
           coco_profile_preferences: mergedProfilePreferences,
           coco_reward_receipts: mergedRewardReceipts,
@@ -2245,6 +2264,7 @@ export default function App() {
           coco_badge_showcase_seed_version: mergedBadgeShowcaseSeedVersion,
           coco_badge_market: mergedBadgeMarket,
           coco_player_trades: mergedPlayerTrades,
+          coco_content_usage: mergedContentUsage,
           coco_captains_log: mergedCaptainsLogs,
           coco_game_history: mergedGameHistory,
           coco_profile_store_version: 8,
@@ -2254,6 +2274,7 @@ export default function App() {
         if (!cancelled) {
           cocoProfileStoreIdRef.current = store?.id || null;
           cocoProfileStoreUpdatedAtRef.current = mergedState.updated_at;
+          cocoProfileSnapshotRef.current = mergedState;
           setCocoProfiles(mergedProfiles);
           setProfilePreferences(mergedProfilePreferences);
           setProfileRewardReceipts(mergedRewardReceipts);
@@ -2265,6 +2286,7 @@ export default function App() {
           setBadgeShowcaseSeedVersion(mergedBadgeShowcaseSeedVersion);
           setBadgeMarket(mergedBadgeMarket);
           setPlayerTrades(mergedPlayerTrades);
+          setContentUsage(mergedContentUsage);
           setCaptainsLogs(mergedCaptainsLogs);
           setSoloHistory(mergedGameHistory);
           localStorage.setItem(COCO_PROFILES_KEY, JSON.stringify(mergedProfiles));
@@ -2276,6 +2298,7 @@ export default function App() {
           localStorage.setItem(BADGE_ACHIEVEMENT_KEY, JSON.stringify(mergedBadgeAchievements));
           localStorage.setItem(BADGE_MARKET_KEY, JSON.stringify(mergedBadgeMarket));
           localStorage.setItem(PLAYER_TRADES_KEY, JSON.stringify(mergedPlayerTrades));
+          localStorage.setItem(CONTENT_USAGE_KEY, JSON.stringify(mergedContentUsage));
           localStorage.setItem('disney_captains_log', JSON.stringify(mergedCaptainsLogs));
           localStorage.setItem('disney_solo_history', JSON.stringify(mergedGameHistory));
         }
@@ -2298,41 +2321,61 @@ export default function App() {
     if (!cocoProfilesReady || !cocoProfileStoreIdRef.current) return;
 
     const timeoutId = window.setTimeout(() => {
-      const updatedAt = new Date().toISOString();
-      const previousUpdatedAt = cocoProfileStoreUpdatedAtRef.current;
-      cocoProfileStoreUpdatedAtRef.current = updatedAt;
-      supabase
-        .from('rooms')
-        .update({
-          current_task_state: {
-            coco_profiles: uniqueProfileNames(cocoProfiles),
-            coco_profile_preferences: profilePreferences,
-            coco_reward_receipts: profileRewardReceipts,
-            coco_bank: starBank,
-            coco_collections: collections,
-            coco_exclusive_claims: exclusiveClaims,
-            coco_badge_collections: badgeCollections,
-            coco_badge_achievements: badgeAchievements,
-            coco_badge_showcase_seed_version: badgeShowcaseSeedVersion,
-            coco_badge_market: badgeMarket,
-            coco_player_trades: playerTrades,
-            coco_captains_log: captainsLogs,
-            coco_game_history: soloHistory,
-            coco_profile_store_version: 8,
-            updated_at: updatedAt
+      const saveChangedProfileFields = async () => {
+        const localFields = {
+          coco_profiles: uniqueProfileNames(cocoProfiles),
+          coco_profile_preferences: profilePreferences,
+          coco_reward_receipts: profileRewardReceipts,
+          coco_bank: starBank,
+          coco_collections: collections,
+          coco_exclusive_claims: exclusiveClaims,
+          coco_badge_collections: badgeCollections,
+          coco_badge_achievements: badgeAchievements,
+          coco_badge_showcase_seed_version: badgeShowcaseSeedVersion,
+          coco_badge_market: badgeMarket,
+          coco_player_trades: playerTrades,
+          coco_content_usage: contentUsage,
+          coco_captains_log: captainsLogs,
+          coco_game_history: soloHistory,
+          coco_profile_store_version: 8
+        };
+        const baseline = cocoProfileSnapshotRef.current || {};
+        const changedEntries = Object.entries(localFields).filter(([key, value]) => JSON.stringify(value) !== JSON.stringify(baseline[key]));
+        if (!changedEntries.length) return;
+        try {
+          const { data: store, error: readError } = await supabase
+            .from('rooms')
+            .select('current_task_state')
+            .eq('id', cocoProfileStoreIdRef.current)
+            .maybeSingle();
+          if (readError) throw readError;
+          const currentState = store?.current_task_state || {};
+          const updatedAt = new Date().toISOString();
+          const nextState = { ...currentState, ...Object.fromEntries(changedEntries), updated_at: updatedAt };
+          let updateQuery = supabase
+            .from('rooms')
+            .update({ current_task_state: nextState })
+            .eq('id', cocoProfileStoreIdRef.current);
+          const expectedUpdatedAt = String(currentState.updated_at || '');
+          if (expectedUpdatedAt) updateQuery = updateQuery.eq('current_task_state->>updated_at', expectedUpdatedAt);
+          const { data: updatedStore, error: updateError } = await updateQuery.select('current_task_state').maybeSingle();
+          if (updateError) throw updateError;
+          if (!updatedStore?.current_task_state) {
+            refreshSharedProfileStoreRef.current?.();
+            return;
           }
-        })
-        .eq('id', cocoProfileStoreIdRef.current)
-        .then(({ error }) => {
-          if (error) {
-            cocoProfileStoreUpdatedAtRef.current = previousUpdatedAt;
-            console.warn('Coco-profielen konden niet worden opgeslagen.', error);
-          }
-        });
+          cocoProfileStoreUpdatedAtRef.current = updatedAt;
+          cocoProfileSnapshotRef.current = updatedStore.current_task_state;
+        } catch (saveError) {
+          console.warn('Coco-profielen konden niet worden opgeslagen.', saveError);
+          refreshSharedProfileStoreRef.current?.();
+        }
+      };
+      saveChangedProfileFields();
     }, 250);
 
     return () => window.clearTimeout(timeoutId);
-  }, [badgeAchievements, badgeCollections, badgeMarket, badgeShowcaseSeedVersion, captainsLogs, cocoProfiles, cocoProfilesReady, collections, exclusiveClaims, playerTrades, profilePreferences, profileRewardReceipts, soloHistory, starBank]);
+  }, [badgeAchievements, badgeCollections, badgeMarket, badgeShowcaseSeedVersion, captainsLogs, cocoProfiles, cocoProfilesReady, collections, contentUsage, exclusiveClaims, playerTrades, profilePreferences, profileRewardReceipts, soloHistory, starBank]);
 
   useEffect(() => {
     if (!cocoProfilesReady || !cocoProfileStoreIdRef.current) return undefined;
@@ -2353,6 +2396,7 @@ export default function App() {
         const remoteUpdatedAt = String(remoteState.updated_at || '');
         if (remoteUpdatedAt && remoteUpdatedAt > cocoProfileStoreUpdatedAtRef.current && !cancelled) {
           cocoProfileStoreUpdatedAtRef.current = remoteUpdatedAt;
+          cocoProfileSnapshotRef.current = remoteState;
           const remoteProfiles = uniqueProfileNames(remoteState.coco_profiles || []);
           const remotePreferences = remoteState.coco_profile_preferences || {};
           const remoteReceipts = remoteState.coco_reward_receipts || {};
@@ -2365,6 +2409,7 @@ export default function App() {
           const remoteShowcaseSeedVersion = Number(remoteState.coco_badge_showcase_seed_version) || 0;
           const remoteMarket = remoteState.coco_badge_market || createHourlyBadgeMarket();
           const remoteTrades = Array.isArray(remoteState.coco_player_trades) ? remoteState.coco_player_trades : [];
+          const remoteContentUsage = remoteState.coco_content_usage || {};
           const remoteHistory = Array.isArray(remoteState.coco_game_history) ? remoteState.coco_game_history : [];
 
           setCocoProfiles(remoteProfiles);
@@ -2382,6 +2427,7 @@ export default function App() {
             localStorage.setItem(PLAYER_TRADES_KEY, JSON.stringify(mergedTrades));
             return mergedTrades;
           });
+          setContentUsage(remoteContentUsage);
           setCaptainsLogs(remoteLogs);
           setSoloHistory(remoteHistory);
           localStorage.setItem(COCO_PROFILES_KEY, JSON.stringify(remoteProfiles));
@@ -2392,6 +2438,7 @@ export default function App() {
           localStorage.setItem(BADGE_COLLECTION_KEY, JSON.stringify(remoteBadgeCollections));
           localStorage.setItem(BADGE_ACHIEVEMENT_KEY, JSON.stringify(remoteAchievements));
           localStorage.setItem(BADGE_MARKET_KEY, JSON.stringify(remoteMarket));
+          localStorage.setItem(CONTENT_USAGE_KEY, JSON.stringify(remoteContentUsage));
           localStorage.setItem('disney_captains_log', JSON.stringify(remoteLogs));
           localStorage.setItem('disney_solo_history', JSON.stringify(remoteHistory));
         }
@@ -2738,8 +2785,10 @@ export default function App() {
     const committedAchievements = committedState.coco_badge_achievements || {};
     const committedMarket = committedState.coco_badge_market || createHourlyBadgeMarket();
     const committedTrades = Array.isArray(committedState.coco_player_trades) ? committedState.coco_player_trades : [];
+    const committedContentUsage = committedState.coco_content_usage || {};
     const committedHistory = Array.isArray(committedState.coco_game_history) ? committedState.coco_game_history : [];
     cocoProfileStoreUpdatedAtRef.current = String(committedState.updated_at || '');
+    cocoProfileSnapshotRef.current = committedState;
     setCocoProfiles(committedProfiles);
     setProfilePreferences(committedPreferences);
     setProfileRewardReceipts(committedReceipts);
@@ -2751,6 +2800,7 @@ export default function App() {
     setBadgeShowcaseSeedVersion(Number(committedState.coco_badge_showcase_seed_version) || 0);
     setBadgeMarket(committedMarket);
     setPlayerTrades(current => mergePlayerTradeLists(committedTrades, current));
+    setContentUsage(committedContentUsage);
     setCaptainsLogs(committedLogs);
     setSoloHistory(committedHistory);
     localStorage.setItem(COCO_PROFILES_KEY, JSON.stringify(committedProfiles));
@@ -2762,6 +2812,7 @@ export default function App() {
     localStorage.setItem(BADGE_ACHIEVEMENT_KEY, JSON.stringify(committedAchievements));
     localStorage.setItem(BADGE_MARKET_KEY, JSON.stringify(committedMarket));
     localStorage.setItem(PLAYER_TRADES_KEY, JSON.stringify(mergePlayerTradeLists(committedTrades, playerTrades)));
+    localStorage.setItem(CONTENT_USAGE_KEY, JSON.stringify(committedContentUsage));
     localStorage.setItem('disney_captains_log', JSON.stringify(committedLogs));
     localStorage.setItem('disney_solo_history', JSON.stringify(committedHistory));
   };
@@ -2801,6 +2852,35 @@ export default function App() {
       throw new Error('De spelersgegevens werden tegelijk op een ander toestel gewijzigd.');
     } finally {
       sharedProfileActionBusyRef.current = false;
+    }
+  };
+
+  const handleMarkContentUsed = async (gameKey, contentId, profileNames = [], retryCount = 0) => {
+    if (!gameKey || !contentId) return;
+    const names = uniqueProfileNames(profileNames.length ? profileNames : [activeProfileName || localPlayer?.name]);
+    if (!names.length) return;
+    if (sharedProfileActionBusyRef.current) {
+      if (retryCount < 3) window.setTimeout(() => handleMarkContentUsed(gameKey, contentId, names, retryCount + 1), 350);
+      return;
+    }
+    try {
+      await commitProfileStoreAction(currentState => {
+        const currentUsage = currentState.coco_content_usage || {};
+        const nextUsage = { ...currentUsage };
+        names.forEach(profileName => {
+          const profileKey = getCollectorKey(profileName);
+          const profileUsage = { ...(nextUsage[profileKey] || {}) };
+          profileUsage[gameKey] = [...new Set([...(profileUsage[gameKey] || []), contentId])].slice(-600);
+          nextUsage[profileKey] = profileUsage;
+        });
+        return { ...currentState, coco_content_usage: nextUsage };
+      });
+    } catch (usageError) {
+      if (/al een actie verwerkt/i.test(String(usageError?.message || '')) && retryCount < 3) {
+        window.setTimeout(() => handleMarkContentUsed(gameKey, contentId, names, retryCount + 1), 350);
+        return;
+      }
+      console.warn('Gebruikte spelinhoud kon niet worden bijgehouden.', usageError);
     }
   };
 
@@ -2878,13 +2958,7 @@ export default function App() {
       }
       if (!committedState) throw new Error('De winkel werd tegelijk op een ander toestel bijgewerkt.');
 
-      cocoProfileStoreUpdatedAtRef.current = String(committedState.updated_at || '');
-      setStarBank(committedState.coco_bank || {});
-      setBadgeCollections(committedState.coco_badge_collections || {});
-      setCaptainsLogs(committedState.coco_captains_log || {});
-      localStorage.setItem(COCO_BANK_KEY, JSON.stringify(committedState.coco_bank || {}));
-      localStorage.setItem(BADGE_COLLECTION_KEY, JSON.stringify(committedState.coco_badge_collections || {}));
-      localStorage.setItem('disney_captains_log', JSON.stringify(committedState.coco_captains_log || {}));
+      applyCommittedProfileState(committedState);
       setOpenedBadgePack(wonBadges);
     } catch (purchaseError) {
       console.warn('Badgepakje kon niet betrouwbaar worden geopend.', purchaseError);
@@ -7860,7 +7934,12 @@ export default function App() {
                                   updateRoomState={updateRoomState}
                                   showRules={false}
                                   onToolbarChange={isTinkerGame || t.gameId === 'qwixx' ? setArenaToolbar : undefined}
+                                  usedContent={t.gameId === 'piratesplank' ? [...new Set((players?.length ? players : [localPlayer]).flatMap(player => contentUsage[getCollectorKey(player?.name || activeProfileName)]?.piratesplank || []))] : []}
+                                  onContentUsed={t.gameId === 'piratesplank' ? (wordId, profileNames) => handleMarkContentUsed('piratesplank', wordId, profileNames) : undefined}
                                 onFinish={async (score, detail) => {
+                                    if (t.gameId === 'piratesplank' && room.current_task_state?.plankWordId) {
+                                      await handleMarkContentUsed('piratesplank', room.current_task_state.plankWordId, (players?.length ? players : [localPlayer]).map(player => player?.name).filter(Boolean));
+                                    }
                                     const usesDirectReward = t.gameId === 'ricochet' || t.gameId === 'qwixx' || t.gameId === 'piratesplank';
                                     const coinsEarned = usesDirectReward ? score : (score === 3 ? 2 : (score === 2 ? 1 : 0));
                                     const gameTitle = getArenaGame(t.gameId)?.name || "Arena Game";
