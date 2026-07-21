@@ -930,10 +930,26 @@ const reconcileBankWithCaptainsLogs = (bank = {}, logs = {}) => {
 const match = (val, targets) => {
   const a = norm(val);
   if (!a) return false;
+  const editDistance = (left, right) => {
+    const row = Array.from({ length: right.length + 1 }, (_, index) => index);
+    for (let i = 1; i <= left.length; i++) {
+      let previous = row[0];
+      row[0] = i;
+      for (let j = 1; j <= right.length; j++) {
+        const old = row[j];
+        row[j] = Math.min(row[j] + 1, row[j - 1] + 1, previous + (left[i - 1] === right[j - 1] ? 0 : 1));
+        previous = old;
+      }
+    }
+    return row[right.length];
+  };
   return targets.some(t => {
     const b = norm(t);
     if (!b) return false;
-    return a === b || (a.length >= 4 && (a.includes(b) || b.includes(a)));
+    const typoAllowance = Math.min(a.length, b.length) >= 10 ? 2 : Math.min(a.length, b.length) >= 6 ? 1 : 0;
+    return a === b
+      || (a.length >= 4 && (a.includes(b) || b.includes(a)))
+      || (typoAllowance > 0 && Math.abs(a.length - b.length) <= typoAllowance && editDistance(a, b) <= typoAllowance);
   });
 };
 
@@ -3640,7 +3656,10 @@ export default function App() {
       }
       return;
     }
-    if (player?.id === localPlayer?.id) {
+    // Road Race-round points only determine the final ranking. Persistent Coco Coins
+    // are awarded once, from the final result, never per mini-game. Duel Arena keeps
+    // its own direct match reward.
+    if (room?.game_mode?.startsWith('arcade-') && player?.id === localPlayer?.id) {
       awardStarsToCollector(player?.name, delta, reason);
     }
     await dbAddPlayerScore(roomId, player, delta, reason, bucket, taskObj);
@@ -4066,25 +4085,6 @@ export default function App() {
     setFactSelected(selAns);
   }, [room?.current_task_state?.quizLocked, room?.current_task_state?.selectedAnswer]);
 
-  // Auto-advance quiz after answer is selected (3-second delay)
-  useEffect(() => {
-    const isLocked = room?.current_task_state?.quizLocked;
-    const currentTask = getCurrentTask();
-    if (!isLocked || !currentTask) return;
-
-    const isAutoAdvanceType = ['quiz', 'whoami', 'fact', 'emoji'].includes(currentTask.type);
-    if (!isAutoAdvanceType) return;
-
-    const isHost = isRoomHost();
-    if (!isHost) return;
-
-    const timeout = setTimeout(async () => {
-      await handleFinishTask();
-    }, 3000);
-
-    return () => clearTimeout(timeout);
-  }, [room?.current_task_state?.quizLocked, room?.id, players[0]?.id]);
-
   // Real-time Group Timer Synchronization Hook
   useEffect(() => {
     const timerStartedAt = room?.current_task_state?.timerStartedAt;
@@ -4096,8 +4096,8 @@ export default function App() {
       return;
     }
 
-    const elapsed = Math.floor((Date.now() - new Date(timerStartedAt).getTime()) / 1000);
-    const initialLeft = Math.max(0, timerDuration - elapsed);
+    const endAt = new Date(timerStartedAt).getTime() + (timerDuration * 1000);
+    const initialLeft = Math.max(0, Math.min(timerDuration, Math.ceil((endAt - Date.now()) / 1000)));
 
     setSecondsLeft(initialLeft);
     setTimerRunning(initialLeft > 0);
@@ -4105,8 +4105,7 @@ export default function App() {
     if (initialLeft <= 0) return;
 
     const interval = setInterval(() => {
-      const currentElapsed = Math.floor((Date.now() - new Date(timerStartedAt).getTime()) / 1000);
-      const left = Math.max(0, timerDuration - currentElapsed);
+      const left = Math.max(0, Math.min(timerDuration, Math.ceil((endAt - Date.now()) / 1000)));
       setSecondsLeft(left);
       if (left <= 0) {
         setTimerRunning(false);
@@ -4255,6 +4254,7 @@ export default function App() {
     const activeTasks = DEFAULT_TASKS.filter(t => 
       t.active !== false && 
       t.type !== 'mastermind' &&
+      !(t.type === 'dilemma' && currentPlayers.length <= 2) &&
       (currentRoom.game_mode === 'mix' || t.cat === currentRoom.game_mode) &&
       enabledCats.includes(t.cat)
     );
@@ -4376,6 +4376,9 @@ export default function App() {
         genericAwarded: {},
         hintLevel: 1,
         hostReviews: {},
+        resultsReleased: false,
+        scoreAwardsCommitted: false,
+        awardedPoints: {},
         bonusRound: isBonusRound,
         magicNewsIndex,
         roundPhase: 'announcement',
@@ -4596,7 +4599,7 @@ export default function App() {
     });
   };
 
-  const handleAnswerQuiz = async (answerIndex, correctAnswerIndex, points) => {
+  const handleAnswerQuiz = async (answerIndex) => {
     if (isFacilitatorHost()) return;
     if (room.current_task_state?.quizLocked) return;
     if (!localPlayer?.id) return;
@@ -4610,31 +4613,14 @@ export default function App() {
 
     quizAnswers[localPlayer.id] = answerIndex;
 
-    const isCorrect = answerIndex === correctAnswerIndex;
-    const ptsToAward = points * getRoundMultiplier(localPlayer.id, freshState);
-    const quizAwarded = { ...(freshState.quizAwarded || {}) };
-
-    if (isCorrect && !quizAwarded[localPlayer.id]) {
-      await addPlayerScore(
-        room.id, 
-        freshPlayers.find(p => p.id === localPlayer.id) || localPlayer, 
-        ptsToAward, 
-        `Quiz ${room.current_task_state.quizDifficulty || 'makkelijk'}: ${getCurrentTask()?.text}`,
-        'knowledge',
-        getCurrentTask()
-      );
-      quizAwarded[localPlayer.id] = true;
-    }
-
     const allAnswered = freshPlayers.every(p => quizAnswers[p.id] !== undefined);
 
     await updateRoomState(room.id, {
       current_task_state: {
         ...freshState,
         quizAnswers,
-        quizAwarded,
         quizLocked: allAnswered,
-        selectedAnswer: allAnswered ? answerIndex : undefined
+        selectedAnswer: undefined
       }
     });
   };
@@ -5009,21 +4995,12 @@ export default function App() {
     if (isFacilitatorHost()) return;
     const typed = localEstimate.trim();
     if (!typed || !localPlayer?.id) return;
-    const { room: freshRoom, players: freshPlayers } = await fetchRoomData(room.id);
+    const { room: freshRoom } = await fetchRoomData(room.id);
     const freshState = freshRoom.current_task_state || {};
     const guesses = { ...(freshState.pictionaryGuesses || {}) };
     if (guesses[localPlayer.id]) return;
     const correct = match(typed, [t.text]);
     guesses[localPlayer.id] = { text: typed, correct };
-    if (correct) {
-      await addPlayerScore(
-        room.id,
-        freshPlayers.find(p => p.id === localPlayer.id) || localPlayer,
-        2 * getRoundMultiplier(localPlayer.id, freshState),
-        'Pictionary: tekening correct geraden',
-        'creative'
-      );
-    }
     await updateRoomState(room.id, {
       current_task_state: { ...freshState, pictionaryGuesses: guesses }
     });
@@ -5031,37 +5008,22 @@ export default function App() {
   };
 
   const handleResolvePictionary = async () => {
-    const drawer = players[room.current_player_index];
-    const guesses = room.current_task_state?.pictionaryGuesses || {};
-    const reviews = room.current_task_state?.hostReviews || {};
-    const task = getCurrentTask();
-    const hasCorrectGuess = Object.entries(guesses).some(([playerId, guess]) => {
-      const review = reviews[`${task?.id || room.current_task_id}:${playerId}`];
-      return review?.correct ?? guess?.correct;
-    });
-    if (drawer && hasCorrectGuess) {
-      await addPlayerScore(
-        room.id,
-        drawer,
-        2 * getRoundMultiplier(drawer.id),
-        'Pictionary: tekening succesvol geraden',
-        'creative'
-      );
-    }
-    await handleFinishTask();
+    await handleReleaseRoundResults(getCurrentTask());
   };
 
   // Disney Dagboek
   const handleSubmitDiaryPart = async (partNum) => {
     if (isFacilitatorHost()) return;
-    const answers = room.current_task_state.answers || {};
-    const pAns = answers[localPlayer.id] || {};
+    const { room: freshRoom } = await fetchRoomData(room.id);
+    const freshState = freshRoom.current_task_state || {};
+    const answers = { ...(freshState.answers || {}) };
+    const pAns = { ...(answers[localPlayer.id] || {}) };
     pAns[`part${partNum}`] = { char: diaryChar.trim(), movie: diaryMovie.trim() };
     answers[localPlayer.id] = pAns;
     
     await updateRoomState(room.id, {
       current_task_state: {
-        ...room.current_task_state,
+        ...freshState,
         answers
       }
     });
@@ -5071,39 +5033,21 @@ export default function App() {
   };
 
   const handleNextDiaryPart = async (nextPart) => {
+    if (!isRoomHost()) return;
+    const { room: freshRoom, players: freshPlayers } = await fetchRoomData(room.id);
+    const freshState = freshRoom.current_task_state || {};
+    const currentPart = freshState.part || 1;
+    if (!freshPlayers.every(player => freshState.answers?.[player.id]?.[`part${currentPart}`])) return;
     await updateRoomState(room.id, {
       current_task_state: {
-        ...room.current_task_state,
+        ...freshState,
         part: nextPart
       }
     });
   };
 
   const handleResolveDiary = async (t) => {
-    const answers = room.current_task_state.answers || {};
-    const reviews = room.current_task_state.hostReviews || {};
-
-    await Promise.all(players.map(p => {
-      const pAns = answers[p.id] || {};
-      let score = 0;
-
-      ['part1', 'part2', 'part3'].forEach(pk => {
-        const entry = pAns[pk];
-        if (entry) {
-          const charCorrect = match(entry.char, [t.character_nl, t.character_en, ...(t.character_aliases || [])]);
-          const movieCorrect = match(entry.movie, [t.movie_nl, t.movie_en, ...(t.movie_aliases || [])]);
-          const review = reviews[`${t.id || room.current_task_id}:${p.id}:${pk}`];
-          if (review?.correct ?? (charCorrect && movieCorrect)) score++;
-        }
-      });
-
-      if (score > 0) {
-        return addPlayerScore(room.id, p, score * getRoundMultiplier(p.id), `Disney Dagboek: ${score} beurt(en) correct geraden`, 'knowledge');
-      }
-      return Promise.resolve();
-    }));
-
-    await handleFinishTask();
+    await handleReleaseRoundResults(t);
   };
 
   // Mastermind (Code Breaker)
@@ -5131,7 +5075,7 @@ export default function App() {
   };
 
   // Wie ben ik
-  const handleWhoamiAnswer = async (idx, t) => {
+  const handleWhoamiAnswer = async (idx) => {
     if (isFacilitatorHost()) return;
     if (!localPlayer?.id) return;
     const { room: freshRoom, players: freshPlayers } = await fetchRoomData(room.id);
@@ -5139,21 +5083,11 @@ export default function App() {
     const genericAnswers = { ...(freshState.genericAnswers || {}) };
     if (genericAnswers[localPlayer.id] !== undefined) return;
     genericAnswers[localPlayer.id] = idx;
-    const correct = idx === t.correct;
-    const hintLevel = freshState.hintLevel || 1;
-    const genericAwarded = { ...(freshState.genericAwarded || {}) };
-    if (correct && !genericAwarded[localPlayer.id]) {
-      const basePts = hintLevel === 1 ? 3 : hintLevel === 2 ? 2 : 1;
-      const pts = basePts * getRoundMultiplier(localPlayer.id, freshState);
-      await addPlayerScore(room.id, freshPlayers.find(p => p.id === localPlayer.id) || localPlayer, pts, `Hint Quest: correct geraden met ${hintLevel} hint(s)`, 'knowledge');
-      genericAwarded[localPlayer.id] = true;
-    }
     const allAnswered = freshPlayers.every(p => genericAnswers[p.id] !== undefined);
     await updateRoomState(room.id, {
       current_task_state: {
         ...freshState,
         genericAnswers,
-        genericAwarded,
         quizLocked: allAnswered
       }
     });
@@ -5167,7 +5101,7 @@ export default function App() {
   };
 
   // Feit of Fabel
-  const handleFactAnswer = async (isTrue, t) => {
+  const handleFactAnswer = async (isTrue) => {
     if (isFacilitatorHost()) return;
     if (!localPlayer?.id) return;
     const { room: freshRoom, players: freshPlayers } = await fetchRoomData(room.id);
@@ -5175,26 +5109,18 @@ export default function App() {
     const genericAnswers = { ...(freshState.genericAnswers || {}) };
     if (genericAnswers[localPlayer.id] !== undefined) return;
     genericAnswers[localPlayer.id] = isTrue;
-    const correct = isTrue === t.correct;
-    const genericAwarded = { ...(freshState.genericAwarded || {}) };
-    if (correct && !genericAwarded[localPlayer.id]) {
-      const pts = 2 * getRoundMultiplier(localPlayer.id, freshState);
-      await addPlayerScore(room.id, freshPlayers.find(p => p.id === localPlayer.id) || localPlayer, pts, `Feit of Fabel: stelling correct beoordeeld`, 'knowledge');
-      genericAwarded[localPlayer.id] = true;
-    }
     const allAnswered = freshPlayers.every(p => genericAnswers[p.id] !== undefined);
     await updateRoomState(room.id, {
       current_task_state: {
         ...freshState,
         genericAnswers,
-        genericAwarded,
         quizLocked: allAnswered
       }
     });
   };
 
   // Emoji Quiz text submission
-  const handleEmojiTextAnswer = async (t) => {
+  const handleEmojiTextAnswer = async () => {
     if (isFacilitatorHost()) return;
     const typed = localEstimate.trim();
     if (!typed || !localPlayer?.id) return;
@@ -5204,19 +5130,11 @@ export default function App() {
     if (genericAnswers[localPlayer.id] !== undefined) return;
     genericAnswers[localPlayer.id] = typed;
     setQuizSelectedAnswer(typed);
-    const isCorrect = match(typed, [t.movie_nl, t.movie_en, ...(t.movie_aliases || [])]);
-    const genericAwarded = { ...(freshState.genericAwarded || {}) };
-    if (isCorrect && !genericAwarded[localPlayer.id]) {
-      const pts = 2 * getRoundMultiplier(localPlayer.id, freshState);
-      await addPlayerScore(room.id, freshPlayers.find(p => p.id === localPlayer.id) || localPlayer, pts, `Emoji Quiz: correct geraden`, 'knowledge');
-      genericAwarded[localPlayer.id] = true;
-    }
     const allAnswered = freshPlayers.every(p => genericAnswers[p.id] !== undefined);
     await updateRoomState(room.id, {
       current_task_state: {
         ...freshState,
         genericAnswers,
-        genericAwarded,
         quizLocked: allAnswered
       }
     });
@@ -5772,53 +5690,110 @@ export default function App() {
     );
   };
 
-  const getHostReviewKey = (task, playerId, state = room?.current_task_state) => (
-    `${task.id || room?.current_task_id}:${playerId}${task.type === 'diary' ? `:part${state?.part || 1}` : ''}`
+  const getHostReviewKey = (task, playerId, state = room?.current_task_state, diaryPart = null) => (
+    `${task.id || room?.current_task_id}:${playerId}${task.type === 'diary' ? `:part${diaryPart || state?.part || 1}` : ''}`
   );
 
   const handleHostReviewAnswer = async (task, player, response, desiredCorrect) => {
-    if (!isFacilitatorHost() || !response || response.correct === null || response.correct === undefined) return;
-    const { room: freshRoom, players: freshPlayers } = await fetchRoomData(room.id);
+    if (!isRoomHost() || !response || response.correct === null || response.correct === undefined) return;
+    const { room: freshRoom } = await fetchRoomData(room.id);
     const freshState = freshRoom.current_task_state || {};
     const reviewKey = getHostReviewKey(task, player.id, freshState);
     const reviews = { ...(freshState.hostReviews || {}) };
-    const currentCorrect = reviews[reviewKey]?.correct ?? response.correct;
-    if (currentCorrect === desiredCorrect) return;
-
-    if (task.type !== 'diary') {
-      const basePoints = task.type === 'quiz' ? (freshState.quizPoints || 1)
-        : task.type === 'whoami' ? ((freshState.hintLevel || 1) === 1 ? 3 : (freshState.hintLevel || 1) === 2 ? 2 : 1)
-        : 2;
-      const points = basePoints * getRoundMultiplier(player.id, freshState);
-      const delta = desiredCorrect ? points : -points;
-      const freshPlayer = freshPlayers.find(item => item.id === player.id) || player;
-      await addPlayerScore(
-        room.id,
-        freshPlayer,
-        delta,
-        `Spelleidercorrectie: ${task.title || task.cat} als ${desiredCorrect ? 'goed' : 'fout'} beoordeeld`,
-        task.type === 'draw' ? 'creative' : 'knowledge',
-        task
-      );
-    }
-
     reviews[reviewKey] = {
       correct: desiredCorrect,
       reviewedAt: new Date().toISOString(),
       reviewedBy: localPlayer?.name || 'Spelleider'
     };
-    const { room: latestRoom } = await fetchRoomData(room.id);
     await updateRoomState(room.id, {
       current_task_state: {
-        ...(latestRoom.current_task_state || {}),
+        ...freshState,
         hostReviews: reviews
       }
     });
   };
 
+  const handleReleaseRoundResults = async (task) => {
+    if (!isRoomHost() || !task) return;
+    const { room: freshRoom, players: freshPlayers } = await fetchRoomData(room.id);
+    const state = freshRoom.current_task_state || {};
+    if (state.resultsReleased || state.scoreAwardsCommitted) return;
+    const reviews = state.hostReviews || {};
+    const awards = [];
+    const effectiveCorrect = (player, automatic, diaryPart = null) => (
+      reviews[getHostReviewKey(task, player.id, state, diaryPart)]?.correct ?? automatic
+    );
+
+    freshPlayers.forEach(player => {
+      let basePoints = 0;
+      if (task.type === 'quiz') {
+        const answer = state.quizAnswers?.[player.id];
+        if (answer !== undefined && effectiveCorrect(player, answer === task.correct)) basePoints = state.quizPoints || 1;
+      } else if (task.type === 'whoami') {
+        const answer = state.genericAnswers?.[player.id];
+        if (answer !== undefined && effectiveCorrect(player, answer === task.correct)) basePoints = (state.hintLevel || 1) === 1 ? 3 : (state.hintLevel || 1) === 2 ? 2 : 1;
+      } else if (task.type === 'fact') {
+        const answer = state.genericAnswers?.[player.id];
+        if (answer !== undefined && effectiveCorrect(player, answer === task.correct)) basePoints = 2;
+      } else if (task.type === 'emoji') {
+        const answer = state.genericAnswers?.[player.id];
+        if (answer !== undefined && effectiveCorrect(player, match(answer, [task.movie_nl, task.movie_en, ...(task.movie_aliases || [])]))) basePoints = 2;
+      } else if (task.type === 'draw') {
+        const drawer = freshPlayers[freshRoom.current_player_index];
+        if (player.id !== drawer?.id) {
+          const guess = state.pictionaryGuesses?.[player.id];
+          if (guess && effectiveCorrect(player, guess.correct)) basePoints = 2;
+        }
+      } else if (task.type === 'diary') {
+        const playerAnswers = state.answers?.[player.id] || {};
+        for (let part = 1; part <= 3; part++) {
+          const entry = playerAnswers[`part${part}`];
+          if (!entry) continue;
+          const automatic = match(entry.char, [task.character_nl, task.character_en, ...(task.character_aliases || [])])
+            && match(entry.movie, [task.movie_nl, task.movie_en, ...(task.movie_aliases || [])]);
+          if (effectiveCorrect(player, automatic, part)) {
+            basePoints = part === 1 ? 3 : part === 2 ? 2 : 1;
+            break;
+          }
+        }
+      }
+      if (basePoints > 0) awards.push({ player, points: basePoints * getRoundMultiplier(player.id, state) });
+    });
+
+    if (task.type === 'draw') {
+      const drawer = freshPlayers[freshRoom.current_player_index];
+      const hasCorrectGuess = freshPlayers.some(player => {
+        if (player.id === drawer?.id) return false;
+        const guess = state.pictionaryGuesses?.[player.id];
+        return guess && effectiveCorrect(player, guess.correct);
+      });
+      if (drawer && hasCorrectGuess) awards.push({ player: drawer, points: 2 * getRoundMultiplier(drawer.id, state) });
+    }
+
+    await Promise.all(awards.map(({ player, points }) => addPlayerScore(
+      room.id, player, points, `${task.cat || task.title}: door host bevestigde score`, task.type === 'draw' ? 'creative' : 'knowledge', task
+    )));
+    await updateRoomState(room.id, {
+      current_task_state: {
+        ...state,
+        scoreAwardsCommitted: true,
+        resultsReleased: true,
+        quizLocked: true,
+        awardedPoints: Object.fromEntries(awards.map(({ player, points }) => [player.id, points]))
+      }
+    });
+  };
+
   const renderFacilitatorDashboard = (task) => {
-    if (!isFacilitatorHost() || room?.current_task_state?.roundPhase !== 'playing') return null;
+    if (!isRoomHost() || room?.current_task_state?.roundPhase !== 'playing') return null;
     const state = room.current_task_state || {};
+    const hostMustAnswer = localPlayer?.id && players.some(player => player.id === localPlayer.id);
+    const hostHasAnswered = task.type === 'quiz' ? state.quizAnswers?.[localPlayer?.id] !== undefined
+      : ['whoami', 'fact', 'emoji'].includes(task.type) ? state.genericAnswers?.[localPlayer?.id] !== undefined
+      : task.type === 'diary' ? !!state.answers?.[localPlayer?.id]?.[`part${state.part || 1}`]
+      : task.type === 'draw' ? (players[room.current_player_index]?.id === localPlayer?.id || !!state.pictionaryGuesses?.[localPlayer?.id])
+      : true;
+    if (hostMustAnswer && !hostHasAnswered) return null;
     const diaryPart = state.part || 1;
     const solution = task.type === 'quiz' ? task.answers?.[task.correct]
       : task.type === 'whoami' ? task.answers?.[task.correct]
@@ -5906,6 +5881,24 @@ export default function App() {
             );
           })}
         </div>
+        {!state.resultsReleased && ['quiz', 'whoami', 'fact', 'emoji', 'draw'].includes(task.type) && (
+          <button
+            className="btn primary full"
+            style={{ marginTop: '10px' }}
+            disabled={task.type === 'draw'
+              ? !players.filter(player => player.id !== players[room.current_player_index]?.id).every(player => state.pictionaryGuesses?.[player.id])
+              : !state.quizLocked}
+            onClick={() => handleReleaseRoundResults(task)}
+          >
+            Scores bevestigen en uitslag vrijgeven
+          </button>
+        )}
+        {state.resultsReleased && (
+          <div style={{ marginTop: '10px' }}>
+            <div className="notice green">Uitslag vrijgegeven. Ga pas verder wanneer iedereen klaar is.</div>
+            <button className="btn primary full" style={{ marginTop: '10px' }} onClick={handleFinishTask}>Volgende opdracht</button>
+          </div>
+        )}
       </div>
     );
   };
@@ -7882,12 +7875,16 @@ export default function App() {
                                       </button>
                                     )}
                                     <button className="btn secondary" onClick={() => handleDoubleWishChoice('normal')}>
-                                      Bewaar mijn wens
+                                      {canUseWish ? 'Bewaar mijn wens' : 'Klaar voor deze ronde'}
                                     </button>
                                   </div>
                                 ) : (
                                   <div className="notice green" style={{ marginTop: '14px' }}>
-                                    {myWishChoice === 'double' ? 'Jouw Wens op een Ster staat aan: deze ronde telt dubbel.' : 'Keuze opgeslagen: je bewaart jouw Wens op een Ster.'}
+                                    {myWishChoice === 'double'
+                                      ? 'Jouw Wens op een Ster staat aan: deze ronde telt dubbel.'
+                                      : canUseWish
+                                        ? 'Keuze opgeslagen: je bewaart jouw Wens op een Ster.'
+                                        : 'Keuze opgeslagen. Jouw Wens op een Ster is al gebruikt; deze ronde telt normaal.'}
                                   </div>
                                 )}
                                 <p className="small" style={{ marginTop: '12px' }}>
@@ -8234,8 +8231,6 @@ export default function App() {
                                 const quizAnswers = room.current_task_state?.quizAnswers || {};
                                 const myQuizAnswer = quizAnswers[localPlayer?.id];
                                 const answeredCount = players.filter(p => quizAnswers[p.id] !== undefined).length;
-                                const allAnswered = players.length > 0 && answeredCount >= players.length;
-
                                 return (
                                   <div>
                                     <div className="notice" style={{ background: '#0a2042', marginBottom: '12px' }}>
@@ -8252,7 +8247,7 @@ export default function App() {
 
                                         let btnClass = "answer";
                                         if (idx === quizPendingIndex && myQuizAnswer === undefined) btnClass += " selected";
-                                        if (quizLocked || allAnswered) {
+                                        if (room.current_task_state?.resultsReleased) {
                                           if (idx === t.correct) btnClass += " correct";
                                           else if (idx === myQuizAnswer) btnClass += " wrong";
                                         }
@@ -8276,7 +8271,7 @@ export default function App() {
                                         <div className="btnrow one" style={{ marginTop: '10px' }}>
                                           <button
                                             className="btn primary"
-                                            onClick={() => handleAnswerQuiz(quizPendingIndex, t.correct, room.current_task_state.quizPoints || 1)}
+                                            onClick={() => handleAnswerQuiz(quizPendingIndex)}
                                           >
                                             Antwoord bevestigen
                                           </button>
@@ -8286,12 +8281,12 @@ export default function App() {
                                         </div>
                                       </div>
                                     )}
-                                    {myQuizAnswer !== undefined && !quizLocked && (
+                                    {myQuizAnswer !== undefined && !room.current_task_state?.resultsReleased && (
                                       <div className="notice green" style={{ marginTop: '12px' }}>
-                                        Antwoord opgeslagen. Wachten op de rest...
+                                        Antwoord opgeslagen: <strong>{t.answers[myQuizAnswer]}</strong>. Wachten op hostcontrole...
                                       </div>
                                     )}
-                                    {quizLocked && isRoomHost() && (
+                                    {room.current_task_state?.resultsReleased && isRoomHost() && (
                                       <div style={{ marginTop: '12px' }}>
                                         <button className="btn primary full" onClick={handleFinishTask}>
                                           Volgende opdracht
@@ -8322,6 +8317,17 @@ export default function App() {
                                     <p style={{ margin: 0, fontStyle: 'italic', fontSize: '16px', lineHeight: '1.5' }}>{fragment}</p>
                                   </div>
 
+                                  {room.current_task_state?.resultsReleased && (
+                                    <div className="notice green" style={{ marginBottom: '14px' }}>
+                                      <strong style={{ display: 'block' }}>Oplossing: {t.character_nl} · {t.movie_nl}</strong>
+                                      {players.map(player => (
+                                        <span key={player.id} style={{ display: 'block', marginTop: '4px' }}>
+                                          {player.name}: {room.current_task_state?.awardedPoints?.[player.id] || 0} punt(en)
+                                        </span>
+                                      ))}
+                                    </div>
+                                  )}
+
                                   {isFacilitatorHost() ? (
                                     <div className="notice">Wachten op de antwoorden van de spelers: {submittedCount}/{players.length} klaar.</div>
                                   ) : alreadySubmittedThisPart ? (
@@ -8346,13 +8352,15 @@ export default function App() {
 
                                   {isHost && (
                                     <div className="btnrow one" style={{ marginTop: '12px' }}>
-                                      {activePart < 3 ? (
+                                      {room.current_task_state?.resultsReleased ? (
+                                        <button className="btn primary" onClick={handleFinishTask}>Volgende opdracht</button>
+                                      ) : activePart < 3 ? (
                                         <button className="btn primary" disabled={!allSubmitted} onClick={() => handleNextDiaryPart(activePart + 1)}>
                                           Toon hint {activePart + 1}
                                         </button>
                                       ) : (
                                         <button className="btn primary" disabled={!allSubmitted} onClick={() => handleResolveDiary(t)}>
-                                          Toon uitslag
+                                          Scores bevestigen en uitslag vrijgeven
                                         </button>
                                       )}
                                     </div>
@@ -8419,13 +8427,13 @@ export default function App() {
                                         {guessers.map(p => (
                                           <div key={p.id} className="playerline" style={{ marginBottom: '5px' }}>
                                             <span>{p.name}</span>
-                                            <strong style={{ color: guesses[p.id] ? (guesses[p.id].correct ? 'var(--ok)' : 'var(--danger)') : 'var(--muted)' }}>
-                                              {guesses[p.id] ? `${guesses[p.id].text} ${guesses[p.id].correct ? '✓' : '✕'}` : 'Tekening bekijken…'}
+                                            <strong style={{ color: guesses[p.id] ? 'var(--gold)' : 'var(--muted)' }}>
+                                              {guesses[p.id] ? guesses[p.id].text : 'Tekening bekijken…'}
                                             </strong>
                                           </div>
                                         ))}
                                         <button className="btn primary full" disabled={!allGuessed} onClick={handleResolvePictionary} style={{ marginTop: '10px' }}>
-                                          Uitslag tonen en doorgaan
+                                          Scores bevestigen en uitslag vrijgeven
                                         </button>
                                       </div>
                                     </div>
@@ -8458,7 +8466,7 @@ export default function App() {
                                           {Object.keys(guesses).length}/{guessers.length} spelers hebben geantwoord.
                                           {allGuessed && (
                                             <button className="btn primary full" style={{ marginTop: '10px' }} onClick={handleResolvePictionary}>
-                                              Uitslag tonen en doorgaan
+                                              Scores bevestigen en uitslag vrijgeven
                                             </button>
                                           )}
                                         </div>
@@ -8622,17 +8630,20 @@ export default function App() {
                             {t.type === "emoji" && (() => {
                               const genericAnswers = room.current_task_state?.genericAnswers || {};
                               const myAnswer = genericAnswers[localPlayer?.id];
-                              const allAnswered = players.length > 0 && players.every(p => genericAnswers[p.id] !== undefined);
+                              const resultsReleased = !!room.current_task_state?.resultsReleased;
+                              const automaticCorrect = match(myAnswer, [t.movie_nl, t.movie_en, ...(t.movie_aliases || [])]);
+                              const myReview = room.current_task_state?.hostReviews?.[getHostReviewKey(t, localPlayer?.id, room.current_task_state)];
+                              const myEffectiveCorrect = myReview?.correct ?? automaticCorrect;
                               return (
                               <div>
                                 <div className="center" style={{ fontSize: '48px', margin: '20px 0', letterSpacing: '4px', filter: 'drop-shadow(0 4px 10px rgba(0,0,0,0.3))' }}>
                                   {t.text}
                                 </div>
                                 
-                                {allAnswered ? (
-                                  <div className="notice" style={{ background: isFacilitatorHost() ? '#10213e' : match(myAnswer, [t.movie_nl, t.movie_en, ...(t.movie_aliases || [])]) ? '#123d2b' : '#3d121c' }}>
+                                {resultsReleased ? (
+                                  <div className="notice" style={{ background: isFacilitatorHost() ? '#10213e' : myEffectiveCorrect ? '#123d2b' : '#3d121c' }}>
                                     <strong>
-                                      {isFacilitatorHost() ? 'Alle spelers hebben geantwoord.' : match(myAnswer, [t.movie_nl, t.movie_en, ...(t.movie_aliases || [])]) ? 'Correct! 🎉' : 'Helaas! 💔'}
+                                      {isFacilitatorHost() ? 'Alle spelers hebben geantwoord.' : myEffectiveCorrect ? 'Correct! 🎉' : 'Helaas! 💔'}
                                     </strong>
                                     {!isFacilitatorHost() && <p>Jouw antwoord: <em>{myAnswer || "Geen"}</em></p>}
                                     <p style={{ marginTop: '10px' }}><strong>Oplossing:</strong> {t.movie_nl} / {t.movie_en}</p>
@@ -8660,13 +8671,13 @@ export default function App() {
                                         <button 
                                           className="btn primary full" 
                                           disabled={!localEstimate.trim()} 
-                                          onClick={() => handleEmojiTextAnswer(t)}
+                                          onClick={handleEmojiTextAnswer}
                                         >
                                           Antwoord bevestigen
                                         </button>
                                       </div>
                                     ) : (
-                                      <div className="notice green">Antwoord opgeslagen. Wachten op de rest…</div>
+                                      <div className="notice green">Antwoord opgeslagen: <strong>{myAnswer}</strong>. Wachten op hostcontrole…</div>
                                     )}
                                   </div>
                                 )}
@@ -8680,6 +8691,7 @@ export default function App() {
                               const genericAnswers = room.current_task_state?.genericAnswers || {};
                               const myAnswer = genericAnswers[localPlayer?.id];
                               const allAnswered = players.length > 0 && players.every(p => genericAnswers[p.id] !== undefined);
+                              const resultsReleased = !!room.current_task_state?.resultsReleased;
                               return (
                                 <div>
                                   <div style={{ padding: '12px', background: '#091c38', borderRadius: '12px', marginBottom: '14px', border: '1px solid var(--line)' }}>
@@ -8715,7 +8727,7 @@ export default function App() {
                                   {!isFacilitatorHost() && <div className="answers">
                                     {t.answers.map((ans, idx) => {
                                       let btnClass = "answer";
-                                      if (allAnswered) {
+                                      if (resultsReleased) {
                                         if (idx === t.correct) btnClass += " correct";
                                         else if (idx === myAnswer) btnClass += " wrong";
                                       }
@@ -8737,15 +8749,15 @@ export default function App() {
                                   {!isFacilitatorHost() && myAnswer === undefined && whoamiSelected !== null && !allAnswered && (
                                     <div className="notice" style={{ marginTop: '12px' }}>
                                       <strong>Gekozen antwoord:</strong> {t.answers[whoamiSelected]}
-                                      <button className="btn primary full" style={{ marginTop: '10px' }} onClick={() => handleWhoamiAnswer(whoamiSelected, t)}>
+                                      <button className="btn primary full" style={{ marginTop: '10px' }} onClick={() => handleWhoamiAnswer(whoamiSelected)}>
                                         Antwoord bevestigen
                                       </button>
                                     </div>
                                   )}
-                                  {myAnswer !== undefined && !allAnswered && (
-                                    <div className="notice green" style={{ marginTop: '12px' }}>Antwoord opgeslagen. Wachten op de rest…</div>
+                                  {myAnswer !== undefined && !resultsReleased && (
+                                    <div className="notice green" style={{ marginTop: '12px' }}>Antwoord opgeslagen: <strong>{t.answers[myAnswer]}</strong>. Wachten op hostcontrole…</div>
                                   )}
-                                  {allAnswered && isHost && (
+                                  {resultsReleased && isHost && (
                                     <div style={{ marginTop: '12px' }}>
                                       <button className="btn primary full" onClick={handleFinishTask}>
                                         Volgende opdracht
@@ -9055,10 +9067,10 @@ export default function App() {
                             {t.type === "fact" && (() => {
                               const genericAnswers = room.current_task_state?.genericAnswers || {};
                               const myAnswer = genericAnswers[localPlayer?.id];
-                              const allAnswered = players.length > 0 && players.every(p => genericAnswers[p.id] !== undefined);
+                              const resultsReleased = !!room.current_task_state?.resultsReleased;
                               return (
                               <div>
-                                {allAnswered ? (
+                                {resultsReleased ? (
                                   <div className="notice" style={{ background: isFacilitatorHost() ? '#10213e' : myAnswer === t.correct ? '#174f43' : '#5b2437', borderColor: isFacilitatorHost() ? 'var(--gold)' : myAnswer === t.correct ? '#58d4a4' : '#ff7b8b' }}>
                                     <strong style={{ display: 'block', fontSize: '18px', marginBottom: '6px' }}>
                                       {isFacilitatorHost() ? 'Alle spelers hebben geantwoord.' : myAnswer === t.correct ? 'Correct! 🎉' : 'Helaas! 💔'} Het antwoord is {t.correct ? 'FEIT' : 'FABEL'}.
@@ -9088,14 +9100,14 @@ export default function App() {
                                         {factSelected !== null && (
                                           <div className="notice" style={{ marginTop: '12px' }}>
                                             Je kiest <strong>{factSelected ? 'FEIT' : 'FABEL'}</strong>.
-                                            <button className="btn primary full" style={{ marginTop: '10px' }} onClick={() => handleFactAnswer(factSelected, t)}>
+                                            <button className="btn primary full" style={{ marginTop: '10px' }} onClick={() => handleFactAnswer(factSelected)}>
                                               Keuze bevestigen
                                             </button>
                                           </div>
                                         )}
                                       </>
                                     ) : (
-                                      <div className="notice green">Keuze opgeslagen. Wachten op de rest…</div>
+                                      <div className="notice green">Keuze opgeslagen: <strong>{myAnswer ? 'FEIT' : 'FABEL'}</strong>. Wachten op hostcontrole…</div>
                                     )}
                                   </div>
                                 )}
@@ -9246,7 +9258,7 @@ export default function App() {
                           </span>
                           <span className="name">{p.name}</span>
                         </div>
-                        <div className="pts" style={{ textAlign: 'right' }}>{p.score} ★<small style={{ display: 'block', color: 'var(--muted)', fontSize: '10px' }}>{getRoadRaceReward(p, players)} Coco Coins</small></div>
+                        <div className="pts" style={{ textAlign: 'right' }}>{p.score} ★<small style={{ display: 'block', color: 'var(--gold)', fontSize: '11px' }}>Als het nu eindigt: {getRoadRaceReward(p, players)} Coco Coins</small></div>
                       </div>
                     ))
                   }
@@ -9333,22 +9345,27 @@ export default function App() {
           {/* SCREEN: END */}
           {screen === 'end' && room && (
             <div>
-              {/* Render confetti overlay */}
-              {Array.from({ length: 20 }).map((_, i) => (
-                <div 
-                  key={i} 
-                  className="confetti-piece"
-                  style={{
-                    left: `${Math.random() * 100}%`,
-                    background: ['#ff7b8b', '#ffd45c', '#74d7ff', '#65d9a3'][Math.floor(Math.random() * 4)],
-                    animationDelay: `${Math.random() * 3}s`,
-                    animationDuration: `${2 + Math.random() * 2}s`
-                  }}
-                ></div>
-              ))}
-
               <section className="card hero">
-                <div className="bigicon">🎇🏰🎇</div>
+                <div style={{ display: 'flex', alignItems: 'flex-end', justifyContent: 'flex-start', gap: '12px', minHeight: '155px', overflowX: 'auto', padding: '8px 4px 14px' }}>
+                  {[...players].sort((a, b) => b.score - a.score).map(player => {
+                    const rank = getCompetitionRank(player, players);
+                    const scale = rank === 1 ? 1 : rank === 2 ? 0.7 : rank === 3 ? 0.5 : 0.4;
+                    const preference = profilePreferences[getCollectorKey(player.name)] || createProfilePreference(player.name);
+                    const avatar = DISNEY_PROFILE_AVATARS.find(item => item.id === preference.avatar);
+                    const color = DISNEY_PROFILE_COLORS.find(item => item.id === preference.color)?.hex || 'var(--gold)';
+                    const size = Math.round(132 * scale);
+                    return (
+                      <div key={player.id} style={{ flex: '0 0 auto', textAlign: 'center', order: rank }}>
+                        <img
+                          src={assetPath(avatar?.image || DISNEY_PROFILE_AVATARS[0].image)}
+                          alt={`Avatar van ${player.name}`}
+                          style={{ width: `${size}px`, height: `${size}px`, objectFit: avatar?.id === 'olaf' ? 'cover' : 'contain', borderRadius: '50%', border: `4px solid ${color}`, background: '#07152c', boxShadow: rank === 1 ? `0 0 28px ${color}` : '0 8px 22px rgba(0,0,0,.35)' }}
+                        />
+                        <strong style={{ display: 'block', marginTop: '5px', color: rank === 1 ? 'var(--gold)' : '#fff' }}>{getRankMedal(rank)} {player.name}</strong>
+                      </div>
+                    );
+                  })}
+                </div>
                 <div className="badge">De magie is bereikt</div>
                 <h1>Road Race Voltooid!</h1>
                 <p>Jullie zijn aangekomen op jullie bestemming!</p>
