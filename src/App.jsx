@@ -3571,12 +3571,18 @@ export default function App() {
       return false;
     }
 
-    let finalResolution = resolution;
+    const resolvedAt = new Date().toISOString();
+    const resolvedTrade = { ...trade, status: resolution, updatedAt: resolvedAt, resolvedBy: activeName };
     if (resolution === 'accepted') {
       try {
-        await commitProfileStoreAction(currentState => {
+        const committedState = await commitProfileStoreAction(currentState => {
           const receipts = currentState.coco_trade_receipts || {};
-          if (receipts[trade.id]) return currentState;
+          if (receipts[trade.id]) {
+            return {
+              ...currentState,
+              coco_player_trades: mergePlayerTradeLists([resolvedTrade], currentState.coco_player_trades || [])
+            };
+          }
           const currentCollections = currentState.coco_badge_collections || {};
           const fromBadges = { ...(currentCollections[trade.fromKey] || {}) };
           const toBadges = { ...(currentCollections[trade.toKey] || {}) };
@@ -3595,11 +3601,21 @@ export default function App() {
           const toLogName = Object.keys(currentLogs).find(name => getCollectorKey(name) === trade.toKey) || trade.toName;
           const offeredName = getBadge(trade.offeredBadgeId)?.name;
           const requestedName = getBadge(trade.requestedBadgeId)?.name;
-          const completedAt = new Date().toISOString();
+          const completedAt = resolvedAt;
           return {
             ...currentState,
             coco_badge_collections: { ...currentCollections, [trade.fromKey]: fromBadges, [trade.toKey]: toBadges },
-            coco_trade_receipts: { ...receipts, [trade.id]: completedAt },
+            coco_trade_receipts: {
+              ...receipts,
+              [trade.id]: {
+                completedAt,
+                fromKey: trade.fromKey,
+                toKey: trade.toKey,
+                offeredBadgeId: trade.offeredBadgeId,
+                requestedBadgeId: trade.requestedBadgeId
+              }
+            },
+            coco_player_trades: mergePlayerTradeLists([resolvedTrade], currentState.coco_player_trades || []),
             coco_captains_log: {
               ...currentLogs,
               [fromLogName]: [...(currentLogs[fromLogName] || []), { timestamp: completedAt, amount: 0, type: 'badge', description: `Badge geruild met ${trade.toName}: ${offeredName} voor ${requestedName}`, balanceAfter: Number(currentBank[trade.fromKey]) || 0, transactionId: trade.id }],
@@ -3607,6 +3623,9 @@ export default function App() {
             }
           };
         });
+        if (!committedState?.coco_trade_receipts?.[trade.id]) {
+          throw new Error('Het transactiebewijs ontbreekt na het opslaan.');
+        }
       } catch (acceptError) {
         console.warn('Ruil kon niet veilig worden uitgevoerd.', acceptError);
         window.alert(`${acceptError.message || 'De ruil kon niet worden opgeslagen.'} Er zijn geen badges overgedragen.`);
@@ -3614,8 +3633,6 @@ export default function App() {
       }
     }
 
-    const now = new Date().toISOString();
-    const resolvedTrade = { ...trade, status: finalResolution, updatedAt: now, resolvedBy: activeName };
     if (trade.storeId) {
       const { error } = await supabase
         .from('rooms')
@@ -3630,6 +3647,7 @@ export default function App() {
       }
     }
     persistPlayerTrades(playerTrades.map(item => item.id === tradeId ? resolvedTrade : item));
+    await refreshSharedProfileStoreRef.current?.();
     return true;
   };
 
