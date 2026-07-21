@@ -73,6 +73,7 @@ const BADGE_COLLECTION_KEY = 'disney_badge_collections';
 const BADGE_MARKET_KEY = 'disney_badge_market';
 const BADGE_ACHIEVEMENT_KEY = 'disney_badge_achievements';
 const PLAYER_TRADES_KEY = 'disney_player_trades';
+const PLAYER_TRADE_MODE = 'player-trade';
 const BADGE_PACK_COST = 5;
 const BADGE_SELL_VALUE = 2;
 const BADGE_SHOWCASE_SEED_VERSION = 3;
@@ -470,8 +471,8 @@ function PlayerTradeSquare({
   const submitBadgeGift = () => {
     if (onGiftBadge(selectedTargetName, selectedGiftBadgeId)) setGiftBadgeId('');
   };
-  const submitTradeProposal = () => {
-    if (onCreateTrade(selectedTargetName, selectedOfferedBadgeId, selectedRequestedBadgeId)) {
+  const submitTradeProposal = async () => {
+    if (await onCreateTrade(selectedTargetName, selectedOfferedBadgeId, selectedRequestedBadgeId)) {
       setOfferedBadgeId('');
       setRequestedBadgeId('');
     }
@@ -2166,7 +2167,26 @@ export default function App() {
           });
         }
         const mergedGameHistory = mergeGameHistory(remoteState.coco_game_history, soloHistory);
-        const mergedPlayerTrades = mergePlayerTradeLists(remoteState.coco_player_trades, playerTrades);
+        let remoteTradeRecords = [];
+        try {
+          const { data: tradeRows, error: tradeRowsError } = await supabase
+            .from('rooms')
+            .select('id,current_task_state')
+            .eq('game_mode', PLAYER_TRADE_MODE);
+          if (tradeRowsError) throw tradeRowsError;
+          remoteTradeRecords = (tradeRows || [])
+            .map(row => {
+              const trade = row.current_task_state?.trade || row.current_task_state;
+              return trade?.id ? { ...trade, storeId: row.id } : null;
+            })
+            .filter(Boolean);
+        } catch (tradeLoadError) {
+          console.warn('Ruilvoorstellen konden nog niet afzonderlijk worden opgehaald.', tradeLoadError);
+        }
+        const mergedPlayerTrades = mergePlayerTradeLists(
+          remoteTradeRecords,
+          mergePlayerTradeLists(remoteState.coco_player_trades, playerTrades)
+        );
         const remoteMarket = remoteState.coco_badge_market;
         const mergedBadgeMarket = remoteMarket?.hour === getMarketHour() && Array.isArray(remoteMarket.offers) && remoteMarket.offers.length === 3
           ? remoteMarket
@@ -2289,47 +2309,69 @@ export default function App() {
         if (error) throw error;
         const remoteState = data?.current_task_state || {};
         const remoteUpdatedAt = String(remoteState.updated_at || '');
-        if (!remoteUpdatedAt || remoteUpdatedAt <= cocoProfileStoreUpdatedAtRef.current || cancelled) return;
+        if (remoteUpdatedAt && remoteUpdatedAt > cocoProfileStoreUpdatedAtRef.current && !cancelled) {
+          cocoProfileStoreUpdatedAtRef.current = remoteUpdatedAt;
+          const remoteProfiles = uniqueProfileNames(remoteState.coco_profiles || []);
+          const remotePreferences = remoteState.coco_profile_preferences || {};
+          const remoteReceipts = remoteState.coco_reward_receipts || {};
+          const remoteBank = remoteState.coco_bank || {};
+          const remoteCollections = remoteState.coco_collections || {};
+          const remoteClaims = remoteState.coco_exclusive_claims || {};
+          const remoteBadgeCollections = remoteState.coco_badge_collections || {};
+          const remoteAchievements = remoteState.coco_badge_achievements || {};
+          const remoteShowcaseSeedVersion = Number(remoteState.coco_badge_showcase_seed_version) || 0;
+          const remoteMarket = remoteState.coco_badge_market || createHourlyBadgeMarket();
+          const remoteTrades = Array.isArray(remoteState.coco_player_trades) ? remoteState.coco_player_trades : [];
+          const remoteLogs = remoteState.coco_captains_log || {};
+          const remoteHistory = Array.isArray(remoteState.coco_game_history) ? remoteState.coco_game_history : [];
 
-        cocoProfileStoreUpdatedAtRef.current = remoteUpdatedAt;
-        const remoteProfiles = uniqueProfileNames(remoteState.coco_profiles || []);
-        const remotePreferences = remoteState.coco_profile_preferences || {};
-        const remoteReceipts = remoteState.coco_reward_receipts || {};
-        const remoteBank = remoteState.coco_bank || {};
-        const remoteCollections = remoteState.coco_collections || {};
-        const remoteClaims = remoteState.coco_exclusive_claims || {};
-        const remoteBadgeCollections = remoteState.coco_badge_collections || {};
-        const remoteAchievements = remoteState.coco_badge_achievements || {};
-        const remoteShowcaseSeedVersion = Number(remoteState.coco_badge_showcase_seed_version) || 0;
-        const remoteMarket = remoteState.coco_badge_market || createHourlyBadgeMarket();
-        const remoteTrades = Array.isArray(remoteState.coco_player_trades) ? remoteState.coco_player_trades : [];
-        const remoteLogs = remoteState.coco_captains_log || {};
-        const remoteHistory = Array.isArray(remoteState.coco_game_history) ? remoteState.coco_game_history : [];
+          setCocoProfiles(remoteProfiles);
+          setProfilePreferences(remotePreferences);
+          setProfileRewardReceipts(remoteReceipts);
+          setStarBank(remoteBank);
+          setCollections(remoteCollections);
+          setExclusiveClaims(remoteClaims);
+          setBadgeCollections(remoteBadgeCollections);
+          setBadgeAchievements(remoteAchievements);
+          setBadgeShowcaseSeedVersion(remoteShowcaseSeedVersion);
+          setBadgeMarket(remoteMarket);
+          setPlayerTrades(current => {
+            const mergedTrades = mergePlayerTradeLists(remoteTrades, current);
+            localStorage.setItem(PLAYER_TRADES_KEY, JSON.stringify(mergedTrades));
+            return mergedTrades;
+          });
+          setCaptainsLogs(remoteLogs);
+          setSoloHistory(remoteHistory);
+          localStorage.setItem(COCO_PROFILES_KEY, JSON.stringify(remoteProfiles));
+          localStorage.setItem(PROFILE_PREFERENCES_KEY, JSON.stringify(remotePreferences));
+          localStorage.setItem(COCO_BANK_KEY, JSON.stringify(remoteBank));
+          localStorage.setItem('disney_collections', JSON.stringify(remoteCollections));
+          localStorage.setItem('disney_exclusive_claims', JSON.stringify(remoteClaims));
+          localStorage.setItem(BADGE_COLLECTION_KEY, JSON.stringify(remoteBadgeCollections));
+          localStorage.setItem(BADGE_ACHIEVEMENT_KEY, JSON.stringify(remoteAchievements));
+          localStorage.setItem(BADGE_MARKET_KEY, JSON.stringify(remoteMarket));
+          localStorage.setItem('disney_captains_log', JSON.stringify(remoteLogs));
+          localStorage.setItem('disney_solo_history', JSON.stringify(remoteHistory));
+        }
 
-        setCocoProfiles(remoteProfiles);
-        setProfilePreferences(remotePreferences);
-        setProfileRewardReceipts(remoteReceipts);
-        setStarBank(remoteBank);
-        setCollections(remoteCollections);
-        setExclusiveClaims(remoteClaims);
-        setBadgeCollections(remoteBadgeCollections);
-        setBadgeAchievements(remoteAchievements);
-        setBadgeShowcaseSeedVersion(remoteShowcaseSeedVersion);
-        setBadgeMarket(remoteMarket);
-        setPlayerTrades(remoteTrades);
-        setCaptainsLogs(remoteLogs);
-        setSoloHistory(remoteHistory);
-        localStorage.setItem(COCO_PROFILES_KEY, JSON.stringify(remoteProfiles));
-        localStorage.setItem(PROFILE_PREFERENCES_KEY, JSON.stringify(remotePreferences));
-        localStorage.setItem(COCO_BANK_KEY, JSON.stringify(remoteBank));
-        localStorage.setItem('disney_collections', JSON.stringify(remoteCollections));
-        localStorage.setItem('disney_exclusive_claims', JSON.stringify(remoteClaims));
-        localStorage.setItem(BADGE_COLLECTION_KEY, JSON.stringify(remoteBadgeCollections));
-        localStorage.setItem(BADGE_ACHIEVEMENT_KEY, JSON.stringify(remoteAchievements));
-        localStorage.setItem(BADGE_MARKET_KEY, JSON.stringify(remoteMarket));
-        localStorage.setItem(PLAYER_TRADES_KEY, JSON.stringify(remoteTrades));
-        localStorage.setItem('disney_captains_log', JSON.stringify(remoteLogs));
-        localStorage.setItem('disney_solo_history', JSON.stringify(remoteHistory));
+        const { data: tradeRows, error: tradeRowsError } = await supabase
+          .from('rooms')
+          .select('id,current_task_state')
+          .eq('game_mode', PLAYER_TRADE_MODE);
+        if (tradeRowsError) throw tradeRowsError;
+        const remoteTradeRecords = (tradeRows || [])
+          .map(row => {
+            const trade = row.current_task_state?.trade || row.current_task_state;
+            return trade?.id ? { ...trade, storeId: row.id } : null;
+          })
+          .filter(Boolean);
+        if (!cancelled) {
+          setPlayerTrades(current => {
+            const mergedTrades = mergePlayerTradeLists(remoteTradeRecords, current);
+            localStorage.setItem(PLAYER_TRADES_KEY, JSON.stringify(mergedTrades));
+            return mergedTrades;
+          });
+        }
       } catch (refreshError) {
         console.warn('Nieuwe donaties en ruilvoorstellen konden nog niet worden opgehaald.', refreshError);
       } finally {
@@ -3034,7 +3076,7 @@ export default function App() {
     return true;
   };
 
-  const handleCreatePlayerTrade = (targetName, offeredBadgeId, requestedBadgeId) => {
+  const handleCreatePlayerTrade = async (targetName, offeredBadgeId, requestedBadgeId) => {
     const { name: fromName, key: fromKey } = getActiveBadgeProfile();
     const toKey = getCollectorKey(targetName);
     const offeredBadge = getBadge(offeredBadgeId);
@@ -3062,11 +3104,31 @@ export default function App() {
       createdAt: now,
       updatedAt: now
     };
-    persistPlayerTrades([trade, ...playerTrades]);
-    return true;
+    try {
+      const { data, error } = await supabase
+        .from('rooms')
+        .insert({
+          code: `TR-${trade.id.replace(/[^a-z0-9]/gi, '').slice(0, 18).toUpperCase()}`,
+          status: 'active',
+          game_mode: PLAYER_TRADE_MODE,
+          game_version: 1,
+          rounds_per_player: 0,
+          total_rounds: 0,
+          current_task_state: { trade }
+        })
+        .select('id')
+        .single();
+      if (error) throw error;
+      persistPlayerTrades([{ ...trade, storeId: data.id }, ...playerTrades]);
+      return true;
+    } catch (tradeError) {
+      console.warn('Ruilvoorstel kon niet worden verstuurd.', tradeError);
+      window.alert('Het ruilvoorstel kon niet online worden opgeslagen. Probeer het nogmaals wanneer je verbinding hebt.');
+      return false;
+    }
   };
 
-  const handleResolvePlayerTrade = (tradeId, resolution) => {
+  const handleResolvePlayerTrade = async (tradeId, resolution) => {
     const activeName = activeProfileName || shopPlayerName.trim() || 'Speler 1';
     const activeKey = getCollectorKey(activeName);
     const trade = playerTrades.find(item => item.id === tradeId);
@@ -3078,6 +3140,7 @@ export default function App() {
     }
 
     let finalResolution = resolution;
+    let nextBadgeCollections = null;
     if (resolution === 'accepted') {
       const fromBadges = { ...(badgeCollections[trade.fromKey] || {}) };
       const toBadges = { ...(badgeCollections[trade.toKey] || {}) };
@@ -3093,16 +3156,31 @@ export default function App() {
         if (toBadges[trade.requestedBadgeId] <= 0) delete toBadges[trade.requestedBadgeId];
         fromBadges[trade.requestedBadgeId] = (Number(fromBadges[trade.requestedBadgeId]) || 0) + 1;
         toBadges[trade.offeredBadgeId] = (Number(toBadges[trade.offeredBadgeId]) || 0) + 1;
-        persistBadgeCollections({ ...badgeCollections, [trade.fromKey]: fromBadges, [trade.toKey]: toBadges });
-        const offeredName = getBadge(trade.offeredBadgeId)?.name;
-        const requestedName = getBadge(trade.requestedBadgeId)?.name;
-        logCaptainMutation(trade.fromName, 0, 'badge', `Badge geruild met ${trade.toName}: ${offeredName} voor ${requestedName}`, starBank[trade.fromKey] || 0);
-        logCaptainMutation(trade.toName, 0, 'badge', `Badge geruild met ${trade.fromName}: ${requestedName} voor ${offeredName}`, starBank[trade.toKey] || 0);
+        nextBadgeCollections = { ...badgeCollections, [trade.fromKey]: fromBadges, [trade.toKey]: toBadges };
       }
     }
 
     const now = new Date().toISOString();
-    persistPlayerTrades(playerTrades.map(item => item.id === tradeId ? { ...item, status: finalResolution, updatedAt: now, resolvedBy: activeName } : item));
+    const resolvedTrade = { ...trade, status: finalResolution, updatedAt: now, resolvedBy: activeName };
+    if (trade.storeId) {
+      const { error } = await supabase
+        .from('rooms')
+        .update({ status: 'ended', current_task_state: { trade: resolvedTrade } })
+        .eq('id', trade.storeId);
+      if (error) {
+        console.warn('Ruilvoorstel kon niet worden afgehandeld.', error);
+        window.alert('De ruil kon niet online worden bevestigd. Er zijn nog geen badges overgedragen.');
+        return false;
+      }
+    }
+    if (nextBadgeCollections) {
+      persistBadgeCollections(nextBadgeCollections);
+      const offeredName = getBadge(trade.offeredBadgeId)?.name;
+      const requestedName = getBadge(trade.requestedBadgeId)?.name;
+      logCaptainMutation(trade.fromName, 0, 'badge', `Badge geruild met ${trade.toName}: ${offeredName} voor ${requestedName}`, starBank[trade.fromKey] || 0);
+      logCaptainMutation(trade.toName, 0, 'badge', `Badge geruild met ${trade.fromName}: ${requestedName} voor ${offeredName}`, starBank[trade.toKey] || 0);
+    }
+    persistPlayerTrades(playerTrades.map(item => item.id === tradeId ? resolvedTrade : item));
     return true;
   };
 
@@ -5415,6 +5493,11 @@ export default function App() {
     );
   };
 
+  const portalTradeProfileKey = getCollectorKey(activeProfileName || shopPlayerName.trim() || 'Speler 1');
+  const incomingPlayerTradeCount = playerTrades.filter(trade => (
+    trade.status === 'pending' && trade.toKey === portalTradeProfileKey
+  )).length;
+
   return (
     <div className="app">
       {/* 3D Styles Injection */}
@@ -6315,7 +6398,7 @@ export default function App() {
                       setSelectedPortalGame('coin_shop');
                     }
                   }}
-                  className={`portal-card coin-shop-card ${selectedPortalGame === 'coin_shop' ? 'selected-glow' : ''}`}
+                  className={`portal-card coin-shop-card ${selectedPortalGame === 'coin_shop' ? 'selected-glow' : ''} ${incomingPlayerTradeCount > 0 ? 'has-trade-alert' : ''}`}
                   style={selectedPortalGame === 'coin_shop' ? { border: '3.5px solid #ff9800', boxShadow: '0 0 25px rgba(255, 152, 0, 0.75)', transform: 'scale(1.03)', transition: 'all 0.25s ease' } : { transition: 'all 0.25s ease' }}
                   role="button" 
                   tabIndex={0}
@@ -6324,10 +6407,11 @@ export default function App() {
                     <div className="portal-card-media portal-glow-shop">
                       <img src={assetPath("portal/miguel-market.png")} className="portal-media-img" alt="Miguel speelt gitaar" />
                     </div>
-                    <span className="portal-card-badge shop">Badgemarkt</span>
+                    <span className="portal-card-badge shop">{incomingPlayerTradeCount > 0 ? `${incomingPlayerTradeCount} ruil${incomingPlayerTradeCount === 1 ? '' : 'en'} wacht${incomingPlayerTradeCount === 1 ? '' : 'en'}` : 'Badgemarkt'}</span>
                   </div>
                   <div className="portal-card-body">
                     <h3>Miguel's Market</h3>
+                    {incomingPlayerTradeCount > 0 && <p className="portal-trade-alert-text">Miguel heeft een nieuw ruilvoorstel voor je!</p>}
                     <p style={{ color: '#ff9800', fontSize: '12px', marginTop: '-4px' }}>Koop, verzamel en ruil badges</p>
                     <p>Open verrassingspakjes, verzamel badges uit beide Disney-parken en ontdek ieder uur een nieuw ruilaanbod van Miguel.</p>
                   </div>
