@@ -73,12 +73,13 @@ const BADGE_COLLECTION_KEY = 'disney_badge_collections';
 const BADGE_MARKET_KEY = 'disney_badge_market';
 const BADGE_ACHIEVEMENT_KEY = 'disney_badge_achievements';
 const PLAYER_TRADES_KEY = 'disney_player_trades';
+const PLAYER_NOTIFICATION_SEEN_KEY = 'disney_player_notification_seen';
 const PLAYER_TRADE_MODE = 'player-trade';
 const BADGE_PACK_COST = 5;
 const BADGE_SELL_VALUE = 2;
-const BADGE_PACK_FIRST_WEIGHTS = { common: 70, uncommon: 23, rare: 6, epic: 1 };
-const BADGE_PACK_SECOND_WEIGHTS = { common: 55, uncommon: 25, rare: 13, epic: 6, legendary: 1 };
-const BADGE_MARKET_WEIGHTS = { common: 75, uncommon: 18, rare: 5, epic: 1.7, legendary: 0.3 };
+const BADGE_PACK_FIRST_WEIGHTS = { common: 70, uncommon: 20, rare: 8, epic: 2, legendary: 0 };
+const BADGE_PACK_SECOND_WEIGHTS = { common: 50, uncommon: 25, rare: 15, epic: 8, legendary: 2 };
+const BADGE_MARKET_WEIGHTS = { common: 60, uncommon: 20, rare: 12, epic: 6, legendary: 2 };
 const BADGE_SHOWCASE_SEED_VERSION = 3;
 const ENABLE_LEGACY_SHOP = false;
 
@@ -467,11 +468,11 @@ function PlayerTradeSquare({
     .sort((a, b) => new Date(b.updatedAt || b.createdAt || 0) - new Date(a.updatedAt || a.createdAt || 0))
     .slice(0, 5);
 
-  const submitCoinDonation = () => {
-    if (onDonateCoins(selectedTargetName, coinAmount)) setCoinAmount('');
+  const submitCoinDonation = async () => {
+    if (await onDonateCoins(selectedTargetName, coinAmount)) setCoinAmount('');
   };
-  const submitBadgeGift = () => {
-    if (onGiftBadge(selectedTargetName, selectedGiftBadgeId)) setGiftBadgeId('');
+  const submitBadgeGift = async () => {
+    if (await onGiftBadge(selectedTargetName, selectedGiftBadgeId)) setGiftBadgeId('');
   };
   const submitTradeProposal = async () => {
     if (await onCreateTrade(selectedTargetName, selectedOfferedBadgeId, selectedRequestedBadgeId)) {
@@ -1506,10 +1507,25 @@ export default function App() {
   });
   const [badgeMarketNow, setBadgeMarketNow] = useState(() => Date.now());
   const [playerTrades, setPlayerTrades] = useState(() => readJsonStorage(PLAYER_TRADES_KEY, []));
+  const [seenPlayerNotifications, setSeenPlayerNotifications] = useState(() => {
+    const savedSeen = readJsonStorage(PLAYER_NOTIFICATION_SEEN_KEY, {});
+    const savedLogs = readJsonStorage('disney_captains_log', {});
+    const seededSeen = { ...savedSeen };
+    Object.entries(savedLogs).forEach(([profileName, entries]) => {
+      const profileKey = getCollectorKey(profileName);
+      if (Object.prototype.hasOwnProperty.call(seededSeen, profileKey)) return;
+      seededSeen[profileKey] = (entries || [])
+        .filter(entry => /^Donatie ontvangen van |^Badge cadeau ontvangen van /i.test(String(entry?.description || '')))
+        .reduce((latest, entry) => String(entry?.timestamp || '') > latest ? String(entry.timestamp) : latest, new Date().toISOString());
+    });
+    localStorage.setItem(PLAYER_NOTIFICATION_SEEN_KEY, JSON.stringify(seededSeen));
+    return seededSeen;
+  });
   const [marketTradeOfferIndex, setMarketTradeOfferIndex] = useState(null);
   const [badgeSellOpen, setBadgeSellOpen] = useState(false);
   const [packPurchaseBusy, setPackPurchaseBusy] = useState(false);
   const packPurchaseBusyRef = useRef(false);
+  const sharedProfileActionBusyRef = useRef(false);
   const [openedBadgePack, setOpenedBadgePack] = useState(null);
   const [shopPlayerName, setShopPlayerName] = useState(() => localStorage.getItem('disney_player_name') || 'Speler 1');
   const [cocoProfiles, setCocoProfiles] = useState(() => {
@@ -2710,6 +2726,84 @@ export default function App() {
     localStorage.setItem(PLAYER_TRADES_KEY, JSON.stringify(cleanTrades));
   };
 
+  const applyCommittedProfileState = committedState => {
+    const committedLogs = committedState.coco_captains_log || {};
+    const committedBank = reconcileBankWithCaptainsLogs(committedState.coco_bank || {}, committedLogs);
+    const committedProfiles = uniqueProfileNames(committedState.coco_profiles || []);
+    const committedPreferences = committedState.coco_profile_preferences || {};
+    const committedReceipts = committedState.coco_reward_receipts || {};
+    const committedCollections = committedState.coco_collections || {};
+    const committedClaims = committedState.coco_exclusive_claims || {};
+    const committedBadgeCollections = committedState.coco_badge_collections || {};
+    const committedAchievements = committedState.coco_badge_achievements || {};
+    const committedMarket = committedState.coco_badge_market || createHourlyBadgeMarket();
+    const committedTrades = Array.isArray(committedState.coco_player_trades) ? committedState.coco_player_trades : [];
+    const committedHistory = Array.isArray(committedState.coco_game_history) ? committedState.coco_game_history : [];
+    cocoProfileStoreUpdatedAtRef.current = String(committedState.updated_at || '');
+    setCocoProfiles(committedProfiles);
+    setProfilePreferences(committedPreferences);
+    setProfileRewardReceipts(committedReceipts);
+    setStarBank(committedBank);
+    setCollections(committedCollections);
+    setExclusiveClaims(committedClaims);
+    setBadgeCollections(committedBadgeCollections);
+    setBadgeAchievements(committedAchievements);
+    setBadgeShowcaseSeedVersion(Number(committedState.coco_badge_showcase_seed_version) || 0);
+    setBadgeMarket(committedMarket);
+    setPlayerTrades(current => mergePlayerTradeLists(committedTrades, current));
+    setCaptainsLogs(committedLogs);
+    setSoloHistory(committedHistory);
+    localStorage.setItem(COCO_PROFILES_KEY, JSON.stringify(committedProfiles));
+    localStorage.setItem(PROFILE_PREFERENCES_KEY, JSON.stringify(committedPreferences));
+    localStorage.setItem(COCO_BANK_KEY, JSON.stringify(committedBank));
+    localStorage.setItem('disney_collections', JSON.stringify(committedCollections));
+    localStorage.setItem('disney_exclusive_claims', JSON.stringify(committedClaims));
+    localStorage.setItem(BADGE_COLLECTION_KEY, JSON.stringify(committedBadgeCollections));
+    localStorage.setItem(BADGE_ACHIEVEMENT_KEY, JSON.stringify(committedAchievements));
+    localStorage.setItem(BADGE_MARKET_KEY, JSON.stringify(committedMarket));
+    localStorage.setItem(PLAYER_TRADES_KEY, JSON.stringify(mergePlayerTradeLists(committedTrades, playerTrades)));
+    localStorage.setItem('disney_captains_log', JSON.stringify(committedLogs));
+    localStorage.setItem('disney_solo_history', JSON.stringify(committedHistory));
+  };
+
+  const commitProfileStoreAction = async buildNextState => {
+    if (sharedProfileActionBusyRef.current) throw new Error('Er wordt al een actie verwerkt. Wacht een ogenblik en probeer opnieuw.');
+    sharedProfileActionBusyRef.current = true;
+    try {
+      for (let attempt = 0; attempt < 4; attempt += 1) {
+        const { data: store, error: readError } = await supabase
+          .from('rooms')
+          .select('id,current_task_state')
+          .eq('code', COCO_PROFILE_STORE_CODE)
+          .maybeSingle();
+        if (readError) throw readError;
+        if (!store?.id) throw new Error('De centrale spelersgegevens zijn niet beschikbaar.');
+        const currentState = store.current_task_state || {};
+        const nextState = await buildNextState(currentState);
+        if (!nextState) return null;
+        const committedAt = new Date().toISOString();
+        const stateToCommit = { ...nextState, updated_at: committedAt };
+        let updateQuery = supabase
+          .from('rooms')
+          .update({ current_task_state: stateToCommit })
+          .eq('id', store.id);
+        const expectedUpdatedAt = String(currentState.updated_at || '');
+        if (expectedUpdatedAt) updateQuery = updateQuery.eq('current_task_state->>updated_at', expectedUpdatedAt);
+        const { data: updatedStore, error: updateError } = await updateQuery
+          .select('current_task_state')
+          .maybeSingle();
+        if (updateError) throw updateError;
+        if (updatedStore?.current_task_state) {
+          applyCommittedProfileState(updatedStore.current_task_state);
+          return updatedStore.current_task_state;
+        }
+      }
+      throw new Error('De spelersgegevens werden tegelijk op een ander toestel gewijzigd.');
+    } finally {
+      sharedProfileActionBusyRef.current = false;
+    }
+  };
+
   const handleOpenBadgePack = async () => {
     if (packPurchaseBusyRef.current) return;
     const { name, key } = getActiveBadgeProfile();
@@ -2801,49 +2895,89 @@ export default function App() {
     }
   };
 
-  const handleTradeBadge = offeredBadgeId => {
+  const handleTradeBadge = async offeredBadgeId => {
     if (marketTradeOfferIndex === null) return;
     const { name, key } = getActiveBadgeProfile();
     const receivedBadgeId = badgeMarket.offers[marketTradeOfferIndex];
-    const profileBadges = { ...(badgeCollections[key] || {}) };
-    if (!profileBadges[offeredBadgeId] || offeredBadgeId === receivedBadgeId) return;
+    const localProfileBadges = { ...(badgeCollections[key] || {}) };
+    if (!localProfileBadges[offeredBadgeId] || offeredBadgeId === receivedBadgeId) return;
     const offeredBadge = getBadge(offeredBadgeId);
     const receivedBadge = getBadge(receivedBadgeId);
-    const onlyCopyWarning = profileBadges[offeredBadgeId] === 1 ? '\n\nDit is je enige exemplaar van deze badge.' : '';
+    const onlyCopyWarning = localProfileBadges[offeredBadgeId] === 1 ? '\n\nDit is je enige exemplaar van deze badge.' : '';
     if (!window.confirm(`${offeredBadge?.name} ruilen voor ${receivedBadge?.name}?${onlyCopyWarning}`)) return;
 
-    profileBadges[offeredBadgeId] -= 1;
-    if (profileBadges[offeredBadgeId] <= 0) delete profileBadges[offeredBadgeId];
-    profileBadges[receivedBadgeId] = (profileBadges[receivedBadgeId] || 0) + 1;
-    const nextCollections = { ...badgeCollections, [key]: profileBadges };
-    const nextMarket = {
-      ...badgeMarket,
-      offers: badgeMarket.offers.map((badgeId, index) => index === marketTradeOfferIndex ? offeredBadgeId : badgeId)
-    };
-    persistBadgeCollections(nextCollections);
-    setBadgeMarket(nextMarket);
-    localStorage.setItem(BADGE_MARKET_KEY, JSON.stringify(nextMarket));
-    logCaptainMutation(name, 0, 'earn', `Badge geruild: ${offeredBadge?.name} voor ${receivedBadge?.name}`, starBank[key] || 0);
-    setMarketTradeOfferIndex(null);
+    try {
+      const committed = await commitProfileStoreAction(currentState => {
+        const currentMarket = currentState.coco_badge_market;
+        if (!currentMarket || currentMarket.hour !== getMarketHour() || currentMarket.offers?.[marketTradeOfferIndex] !== receivedBadgeId) {
+          throw new Error('Het aanbod van Miguel is inmiddels gewijzigd.');
+        }
+        const currentCollections = currentState.coco_badge_collections || {};
+        const profileBadges = { ...(currentCollections[key] || {}) };
+        if ((Number(profileBadges[offeredBadgeId]) || 0) <= 0) throw new Error('De gekozen badge is inmiddels niet meer beschikbaar.');
+        profileBadges[offeredBadgeId] -= 1;
+        if (profileBadges[offeredBadgeId] <= 0) delete profileBadges[offeredBadgeId];
+        profileBadges[receivedBadgeId] = (Number(profileBadges[receivedBadgeId]) || 0) + 1;
+        const nextMarket = {
+          ...currentMarket,
+          offers: currentMarket.offers.map((badgeId, index) => index === marketTradeOfferIndex ? offeredBadgeId : badgeId)
+        };
+        const currentLogs = currentState.coco_captains_log || {};
+        const currentBank = reconcileBankWithCaptainsLogs(currentState.coco_bank || {}, currentLogs);
+        const logName = Object.keys(currentLogs).find(profileName => getCollectorKey(profileName) === key) || name;
+        const now = new Date().toISOString();
+        return {
+          ...currentState,
+          coco_badge_collections: { ...currentCollections, [key]: profileBadges },
+          coco_badge_market: nextMarket,
+          coco_captains_log: {
+            ...currentLogs,
+            [logName]: [...(currentLogs[logName] || []), { timestamp: now, amount: 0, type: 'badge', description: `Badge geruild: ${offeredBadge?.name} voor ${receivedBadge?.name}`, balanceAfter: Number(currentBank[key]) || 0 }]
+          }
+        };
+      });
+      if (committed) setMarketTradeOfferIndex(null);
+    } catch (tradeError) {
+      console.warn('Ruil met Miguel kon niet veilig worden verwerkt.', tradeError);
+      window.alert(`${tradeError.message || 'De ruil kon niet worden opgeslagen.'} Er zijn geen badges overgedragen.`);
+      await refreshSharedProfileStoreRef.current?.();
+    }
   };
 
-  const handleSellBadge = badgeId => {
+  const handleSellBadge = async badgeId => {
     const { name, key } = getActiveBadgeProfile();
     const badge = getBadge(badgeId);
-    const profileBadges = { ...(badgeCollections[key] || {}) };
-    const count = Number(profileBadges[badgeId]) || 0;
+    const count = Number(badgeCollections[key]?.[badgeId]) || 0;
     if (!badge || count <= 0) return;
     const onlyCopyWarning = count === 1 ? '\n\nDit is je enige exemplaar van deze badge.' : '';
     if (!window.confirm(`${badge.name} aan Miguel verkopen voor ${BADGE_SELL_VALUE} Coco Coins?${onlyCopyWarning}`)) return;
 
-    profileBadges[badgeId] -= 1;
-    if (profileBadges[badgeId] <= 0) delete profileBadges[badgeId];
-    const nextCollections = { ...badgeCollections, [key]: profileBadges };
-    const nextBank = { ...starBank, [key]: (starBank[key] || 0) + BADGE_SELL_VALUE };
-    persistBadgeCollections(nextCollections);
-    setStarBank(nextBank);
-    localStorage.setItem(COCO_BANK_KEY, JSON.stringify(nextBank));
-    logCaptainMutation(name, BADGE_SELL_VALUE, 'earn', `Badge verkocht aan Miguel: ${badge.name}`, nextBank[key]);
+    try {
+      await commitProfileStoreAction(currentState => {
+        const currentCollections = currentState.coco_badge_collections || {};
+        const profileBadges = { ...(currentCollections[key] || {}) };
+        if ((Number(profileBadges[badgeId]) || 0) <= 0) throw new Error('De badge is inmiddels niet meer beschikbaar.');
+        profileBadges[badgeId] -= 1;
+        if (profileBadges[badgeId] <= 0) delete profileBadges[badgeId];
+        const currentLogs = currentState.coco_captains_log || {};
+        const currentBank = reconcileBankWithCaptainsLogs(currentState.coco_bank || {}, currentLogs);
+        const nextBank = { ...currentBank, [key]: (Number(currentBank[key]) || 0) + BADGE_SELL_VALUE };
+        const logName = Object.keys(currentLogs).find(profileName => getCollectorKey(profileName) === key) || name;
+        const now = new Date().toISOString();
+        return {
+          ...currentState,
+          coco_bank: nextBank,
+          coco_badge_collections: { ...currentCollections, [key]: profileBadges },
+          coco_captains_log: {
+            ...currentLogs,
+            [logName]: [...(currentLogs[logName] || []), { timestamp: now, amount: BADGE_SELL_VALUE, type: 'earn', description: `Badge verkocht aan Miguel: ${badge.name}`, balanceAfter: nextBank[key] }]
+          }
+        };
+      });
+    } catch (sellError) {
+      console.warn('Badgeverkoop kon niet veilig worden verwerkt.', sellError);
+      window.alert(`${sellError.message || 'De badgeverkoop kon niet worden opgeslagen.'} Er is geen badge verkocht.`);
+    }
   };
 
   const handleAddShopPlayer = () => {
@@ -3123,7 +3257,7 @@ export default function App() {
     }
   };
 
-  const handleDonateCoins = (chosenTargetName = '', chosenAmount = '') => {
+  const handleDonateCoins = async (chosenTargetName = '', chosenAmount = '') => {
     const fromName = activeProfileName || shopPlayerName.trim() || 'Speler 1';
     const fromKey = getCollectorKey(fromName);
     const targetName = (typeof chosenTargetName === 'string' && chosenTargetName) || donationTargetName || getDisplayShopPlayers().find(name => getCollectorKey(name) !== fromKey);
@@ -3138,49 +3272,88 @@ export default function App() {
       window.alert('Vul een positief aantal Coco Coins in.');
       return false;
     }
-    if ((starBank[fromKey] || 0) < amount) {
-      window.alert('Dit profiel heeft niet genoeg Coco Coins.');
-      return false;
-    }
     if (!window.confirm(`${amount} Coco Coin${amount === 1 ? '' : 's'} doneren aan ${targetName}?`)) return false;
 
-    const nextProfiles = persistCocoProfiles([...cocoProfiles, targetName]);
-    const nextBank = {
-      ...starBank,
-      [fromKey]: (starBank[fromKey] || 0) - amount,
-      [targetKey]: (starBank[targetKey] || 0) + amount
-    };
-
-    setStarBank(nextBank);
-    setDonationAmount('');
-    setDonationTargetName(nextProfiles.find(name => getCollectorKey(name) === targetKey) || '');
-    localStorage.setItem(COCO_BANK_KEY, JSON.stringify(nextBank));
-    logCaptainMutation(fromName, -amount, 'spend', `Donatie aan ${targetName}`, nextBank[fromKey]);
-    logCaptainMutation(targetName, amount, 'earn', `Donatie ontvangen van ${fromName}`, nextBank[targetKey]);
-    return true;
+    try {
+      const transactionId = globalThis.crypto?.randomUUID?.() || `donation-${Date.now()}-${Math.random().toString(36).slice(2, 9)}`;
+      const committed = await commitProfileStoreAction(currentState => {
+        const currentLogs = currentState.coco_captains_log || {};
+        const currentBank = reconcileBankWithCaptainsLogs(currentState.coco_bank || {}, currentLogs);
+        const fromBalance = Number(currentBank[fromKey]) || 0;
+        if (fromBalance < amount) throw new Error('Dit profiel heeft niet genoeg Coco Coins.');
+        const nextBank = {
+          ...currentBank,
+          [fromKey]: fromBalance - amount,
+          [targetKey]: (Number(currentBank[targetKey]) || 0) + amount
+        };
+        const fromLogName = Object.keys(currentLogs).find(name => getCollectorKey(name) === fromKey) || fromName;
+        const targetLogName = Object.keys(currentLogs).find(name => getCollectorKey(name) === targetKey) || targetName;
+        const now = new Date().toISOString();
+        return {
+          ...currentState,
+          coco_profiles: uniqueProfileNames([...(currentState.coco_profiles || []), targetName]),
+          coco_bank: nextBank,
+          coco_captains_log: {
+            ...currentLogs,
+            [fromLogName]: [...(currentLogs[fromLogName] || []), { timestamp: now, amount: -amount, type: 'spend', description: `Donatie aan ${targetName}`, balanceAfter: nextBank[fromKey], transactionId }],
+            [targetLogName]: [...(currentLogs[targetLogName] || []), { timestamp: now, amount, type: 'earn', description: `Donatie ontvangen van ${fromName}`, balanceAfter: nextBank[targetKey], transactionId }]
+          }
+        };
+      });
+      if (!committed) return false;
+      setDonationAmount('');
+      setDonationTargetName(targetName);
+      return true;
+    } catch (donationError) {
+      console.warn('Donatie kon niet veilig worden verwerkt.', donationError);
+      window.alert(`${donationError.message || 'De donatie kon niet worden opgeslagen.'} Er zijn geen Coco Coins overgedragen.`);
+      return false;
+    }
   };
 
-  const handleGiftBadge = (targetName, badgeId) => {
+  const handleGiftBadge = async (targetName, badgeId) => {
     const { name: fromName, key: fromKey } = getActiveBadgeProfile();
     const targetKey = getCollectorKey(targetName);
     const badge = getBadge(badgeId);
-    const fromBadges = { ...(badgeCollections[fromKey] || {}) };
-    const targetBadges = { ...(badgeCollections[targetKey] || {}) };
-    const count = Number(fromBadges[badgeId]) || 0;
-    if (!targetName || !targetKey || targetKey === fromKey || !badge || count <= 0) {
+    const localCount = Number(badgeCollections[fromKey]?.[badgeId]) || 0;
+    if (!targetName || !targetKey || targetKey === fromKey || !badge || localCount <= 0) {
       window.alert('Deze badge kan niet worden overgedragen. Controleer de speler en je badgevoorraad.');
       return false;
     }
-    const onlyCopyWarning = count === 1 ? '\n\nDit is je enige exemplaar van deze badge.' : '';
+    const onlyCopyWarning = localCount === 1 ? '\n\nDit is je enige exemplaar van deze badge.' : '';
     if (!window.confirm(`${badge.name} cadeau geven aan ${targetName}?${onlyCopyWarning}`)) return false;
 
-    fromBadges[badgeId] -= 1;
-    if (fromBadges[badgeId] <= 0) delete fromBadges[badgeId];
-    targetBadges[badgeId] = (Number(targetBadges[badgeId]) || 0) + 1;
-    persistBadgeCollections({ ...badgeCollections, [fromKey]: fromBadges, [targetKey]: targetBadges });
-    logCaptainMutation(fromName, 0, 'badge', `Badge cadeau gegeven aan ${targetName}: ${badge.name}`, starBank[fromKey] || 0);
-    logCaptainMutation(targetName, 0, 'badge', `Badge cadeau ontvangen van ${fromName}: ${badge.name}`, starBank[targetKey] || 0);
-    return true;
+    try {
+      const transactionId = globalThis.crypto?.randomUUID?.() || `gift-${Date.now()}-${Math.random().toString(36).slice(2, 9)}`;
+      const committed = await commitProfileStoreAction(currentState => {
+        const currentCollections = currentState.coco_badge_collections || {};
+        const fromBadges = { ...(currentCollections[fromKey] || {}) };
+        const targetBadges = { ...(currentCollections[targetKey] || {}) };
+        if ((Number(fromBadges[badgeId]) || 0) <= 0) throw new Error('De badge is inmiddels niet meer beschikbaar.');
+        fromBadges[badgeId] -= 1;
+        if (fromBadges[badgeId] <= 0) delete fromBadges[badgeId];
+        targetBadges[badgeId] = (Number(targetBadges[badgeId]) || 0) + 1;
+        const currentLogs = currentState.coco_captains_log || {};
+        const currentBank = reconcileBankWithCaptainsLogs(currentState.coco_bank || {}, currentLogs);
+        const fromLogName = Object.keys(currentLogs).find(name => getCollectorKey(name) === fromKey) || fromName;
+        const targetLogName = Object.keys(currentLogs).find(name => getCollectorKey(name) === targetKey) || targetName;
+        const now = new Date().toISOString();
+        return {
+          ...currentState,
+          coco_badge_collections: { ...currentCollections, [fromKey]: fromBadges, [targetKey]: targetBadges },
+          coco_captains_log: {
+            ...currentLogs,
+            [fromLogName]: [...(currentLogs[fromLogName] || []), { timestamp: now, amount: 0, type: 'badge', description: `Badge cadeau gegeven aan ${targetName}: ${badge.name}`, balanceAfter: Number(currentBank[fromKey]) || 0, transactionId }],
+            [targetLogName]: [...(currentLogs[targetLogName] || []), { timestamp: now, amount: 0, type: 'badge', description: `Badge cadeau ontvangen van ${fromName}: ${badge.name}`, balanceAfter: Number(currentBank[targetKey]) || 0, transactionId }]
+          }
+        };
+      });
+      return Boolean(committed);
+    } catch (giftError) {
+      console.warn('Badgecadeau kon niet veilig worden verwerkt.', giftError);
+      window.alert(`${giftError.message || 'Het badgecadeau kon niet worden opgeslagen.'} Er is geen badge overgedragen.`);
+      return false;
+    }
   };
 
   const handleCreatePlayerTrade = async (targetName, offeredBadgeId, requestedBadgeId) => {
@@ -3212,6 +3385,18 @@ export default function App() {
       updatedAt: now
     };
     try {
+      const { data: latestStore, error: latestStoreError } = await supabase
+        .from('rooms')
+        .select('current_task_state')
+        .eq('code', COCO_PROFILE_STORE_CODE)
+        .maybeSingle();
+      if (latestStoreError) throw latestStoreError;
+      const latestCollections = latestStore?.current_task_state?.coco_badge_collections || {};
+      if ((Number(latestCollections[fromKey]?.[offeredBadgeId]) || 0) <= 0 || (Number(latestCollections[toKey]?.[requestedBadgeId]) || 0) <= 0) {
+        window.alert('Een van de badges is zojuist gewijzigd en is niet meer beschikbaar. Het overzicht wordt ververst.');
+        await refreshSharedProfileStoreRef.current?.();
+        return false;
+      }
       const { data, error } = await supabase
         .from('rooms')
         .insert({
@@ -3247,23 +3432,45 @@ export default function App() {
     }
 
     let finalResolution = resolution;
-    let nextBadgeCollections = null;
     if (resolution === 'accepted') {
-      const fromBadges = { ...(badgeCollections[trade.fromKey] || {}) };
-      const toBadges = { ...(badgeCollections[trade.toKey] || {}) };
-      const offeredCount = Number(fromBadges[trade.offeredBadgeId]) || 0;
-      const requestedCount = Number(toBadges[trade.requestedBadgeId]) || 0;
-      if (offeredCount <= 0 || requestedCount <= 0) {
-        window.alert('De ruil kan niet doorgaan: een van de badges is inmiddels niet meer beschikbaar. Het voorstel wordt geannuleerd.');
-        finalResolution = 'cancelled';
-      } else {
-        fromBadges[trade.offeredBadgeId] -= 1;
-        if (fromBadges[trade.offeredBadgeId] <= 0) delete fromBadges[trade.offeredBadgeId];
-        toBadges[trade.requestedBadgeId] -= 1;
-        if (toBadges[trade.requestedBadgeId] <= 0) delete toBadges[trade.requestedBadgeId];
-        fromBadges[trade.requestedBadgeId] = (Number(fromBadges[trade.requestedBadgeId]) || 0) + 1;
-        toBadges[trade.offeredBadgeId] = (Number(toBadges[trade.offeredBadgeId]) || 0) + 1;
-        nextBadgeCollections = { ...badgeCollections, [trade.fromKey]: fromBadges, [trade.toKey]: toBadges };
+      try {
+        await commitProfileStoreAction(currentState => {
+          const receipts = currentState.coco_trade_receipts || {};
+          if (receipts[trade.id]) return currentState;
+          const currentCollections = currentState.coco_badge_collections || {};
+          const fromBadges = { ...(currentCollections[trade.fromKey] || {}) };
+          const toBadges = { ...(currentCollections[trade.toKey] || {}) };
+          if ((Number(fromBadges[trade.offeredBadgeId]) || 0) <= 0 || (Number(toBadges[trade.requestedBadgeId]) || 0) <= 0) {
+            throw new Error('Een van de badges is inmiddels niet meer beschikbaar.');
+          }
+          fromBadges[trade.offeredBadgeId] -= 1;
+          if (fromBadges[trade.offeredBadgeId] <= 0) delete fromBadges[trade.offeredBadgeId];
+          toBadges[trade.requestedBadgeId] -= 1;
+          if (toBadges[trade.requestedBadgeId] <= 0) delete toBadges[trade.requestedBadgeId];
+          fromBadges[trade.requestedBadgeId] = (Number(fromBadges[trade.requestedBadgeId]) || 0) + 1;
+          toBadges[trade.offeredBadgeId] = (Number(toBadges[trade.offeredBadgeId]) || 0) + 1;
+          const currentLogs = currentState.coco_captains_log || {};
+          const currentBank = reconcileBankWithCaptainsLogs(currentState.coco_bank || {}, currentLogs);
+          const fromLogName = Object.keys(currentLogs).find(name => getCollectorKey(name) === trade.fromKey) || trade.fromName;
+          const toLogName = Object.keys(currentLogs).find(name => getCollectorKey(name) === trade.toKey) || trade.toName;
+          const offeredName = getBadge(trade.offeredBadgeId)?.name;
+          const requestedName = getBadge(trade.requestedBadgeId)?.name;
+          const completedAt = new Date().toISOString();
+          return {
+            ...currentState,
+            coco_badge_collections: { ...currentCollections, [trade.fromKey]: fromBadges, [trade.toKey]: toBadges },
+            coco_trade_receipts: { ...receipts, [trade.id]: completedAt },
+            coco_captains_log: {
+              ...currentLogs,
+              [fromLogName]: [...(currentLogs[fromLogName] || []), { timestamp: completedAt, amount: 0, type: 'badge', description: `Badge geruild met ${trade.toName}: ${offeredName} voor ${requestedName}`, balanceAfter: Number(currentBank[trade.fromKey]) || 0, transactionId: trade.id }],
+              [toLogName]: [...(currentLogs[toLogName] || []), { timestamp: completedAt, amount: 0, type: 'badge', description: `Badge geruild met ${trade.fromName}: ${requestedName} voor ${offeredName}`, balanceAfter: Number(currentBank[trade.toKey]) || 0, transactionId: trade.id }]
+            }
+          };
+        });
+      } catch (acceptError) {
+        console.warn('Ruil kon niet veilig worden uitgevoerd.', acceptError);
+        window.alert(`${acceptError.message || 'De ruil kon niet worden opgeslagen.'} Er zijn geen badges overgedragen.`);
+        return false;
       }
     }
 
@@ -3276,16 +3483,11 @@ export default function App() {
         .eq('id', trade.storeId);
       if (error) {
         console.warn('Ruilvoorstel kon niet worden afgehandeld.', error);
-        window.alert('De ruil kon niet online worden bevestigd. Er zijn nog geen badges overgedragen.');
+        window.alert(resolution === 'accepted'
+          ? 'De badges zijn veilig overgedragen, maar het voorstel kon nog niet als afgehandeld worden gemarkeerd. Probeer het voorstel nogmaals; de badges worden niet dubbel overgedragen.'
+          : 'Het ruilvoorstel kon niet online worden afgehandeld. Probeer het opnieuw.');
         return false;
       }
-    }
-    if (nextBadgeCollections) {
-      persistBadgeCollections(nextBadgeCollections);
-      const offeredName = getBadge(trade.offeredBadgeId)?.name;
-      const requestedName = getBadge(trade.requestedBadgeId)?.name;
-      logCaptainMutation(trade.fromName, 0, 'badge', `Badge geruild met ${trade.toName}: ${offeredName} voor ${requestedName}`, starBank[trade.fromKey] || 0);
-      logCaptainMutation(trade.toName, 0, 'badge', `Badge geruild met ${trade.fromName}: ${requestedName} voor ${offeredName}`, starBank[trade.toKey] || 0);
     }
     persistPlayerTrades(playerTrades.map(item => item.id === tradeId ? resolvedTrade : item));
     return true;
@@ -5355,6 +5557,7 @@ export default function App() {
                 ? <img className="global-profile-avatar" src={assetPath(profileAvatar.image)} alt="" style={{ borderColor: profileColor }} />
                 : <span className="global-profile-avatar-fallback" style={{ borderColor: profileColor }}>{activeProfileName.slice(0, 1).toUpperCase()}</span>}
             </button>
+            <span className="global-profile-divider" aria-hidden="true">•</span>
             <button
               type="button"
               className="global-profile-segment global-profile-name-segment"
@@ -5365,6 +5568,7 @@ export default function App() {
               }}
               aria-label={`Open spelersoverzicht van ${activeProfileName}`}
             ><span className="global-profile-name">{activeProfileName}</span></button>
+            <span className="global-profile-divider" aria-hidden="true">•</span>
             <button type="button" className="global-profile-segment global-profile-balance-segment" onClick={openCoinViewer} aria-label={`Bekijk Coco Coin. Saldo: ${balance}`}>
               <span>{balance}</span><CocoCoinIcon size={20} />
             </button>
@@ -5604,6 +5808,21 @@ export default function App() {
   const incomingPlayerTradeCount = playerTrades.filter(trade => (
     trade.status === 'pending' && trade.toKey === portalTradeProfileKey
   )).length;
+  const portalLogName = Object.keys(captainsLogs).find(name => getCollectorKey(name) === portalTradeProfileKey);
+  const incomingPlayerNotifications = (captainsLogs[portalLogName] || [])
+    .filter(entry => /^Donatie ontvangen van |^Badge cadeau ontvangen van /i.test(String(entry?.description || '')))
+    .filter(entry => String(entry?.timestamp || '') > String(seenPlayerNotifications[portalTradeProfileKey] || ''));
+  const incomingPlayerNotificationCount = incomingPlayerNotifications.length;
+  const totalPortalActionCount = incomingPlayerTradeCount + incomingPlayerNotificationCount;
+  const markIncomingPlayerNotificationsSeen = () => {
+    if (!incomingPlayerNotificationCount) return;
+    const latestSeenAt = incomingPlayerNotifications.reduce((latest, entry) => (
+      String(entry?.timestamp || '') > latest ? String(entry.timestamp) : latest
+    ), String(seenPlayerNotifications[portalTradeProfileKey] || ''));
+    const nextSeen = { ...seenPlayerNotifications, [portalTradeProfileKey]: latestSeenAt };
+    setSeenPlayerNotifications(nextSeen);
+    localStorage.setItem(PLAYER_NOTIFICATION_SEEN_KEY, JSON.stringify(nextSeen));
+  };
 
   return (
     <div className="app">
@@ -6432,8 +6651,8 @@ export default function App() {
                     e.stopPropagation();
                     if (selectedPortalGame === 'music_match') {
                       window.location.href = room?.code
-                        ? `./music/index.html?room=${room.code}&v=82`
-                        : './music/index.html?v=82';
+                        ? `./music/index.html?room=${room.code}&v=83`
+                        : './music/index.html?v=83';
                     } else {
                       setSelectedPortalGame('music_match');
                     }
@@ -6498,6 +6717,7 @@ export default function App() {
                 <div 
                   onClick={(e) => {
                     e.stopPropagation();
+                    markIncomingPlayerNotificationsSeen();
                     if (selectedPortalGame === 'coin_shop') {
                       setSelectedPortalGame(null);
                       setShowPortalShop(true);
@@ -6505,7 +6725,7 @@ export default function App() {
                       setSelectedPortalGame('coin_shop');
                     }
                   }}
-                  className={`portal-card coin-shop-card ${selectedPortalGame === 'coin_shop' ? 'selected-glow' : ''} ${incomingPlayerTradeCount > 0 ? 'has-trade-alert' : ''}`}
+                  className={`portal-card coin-shop-card ${selectedPortalGame === 'coin_shop' ? 'selected-glow' : ''} ${totalPortalActionCount > 0 ? 'has-trade-alert' : ''}`}
                   style={selectedPortalGame === 'coin_shop' ? { border: '3.5px solid #ff9800', boxShadow: '0 0 25px rgba(255, 152, 0, 0.75)', transform: 'scale(1.03)', transition: 'all 0.25s ease' } : { transition: 'all 0.25s ease' }}
                   role="button" 
                   tabIndex={0}
@@ -6514,11 +6734,12 @@ export default function App() {
                     <div className="portal-card-media portal-glow-shop">
                       <img src={assetPath("portal/miguel-market.png")} className="portal-media-img" alt="Miguel speelt gitaar" />
                     </div>
-                    <span className="portal-card-badge shop">{incomingPlayerTradeCount > 0 ? `${incomingPlayerTradeCount} ruil${incomingPlayerTradeCount === 1 ? '' : 'en'} wacht${incomingPlayerTradeCount === 1 ? '' : 'en'}` : 'Badgemarkt'}</span>
+                    <span className="portal-card-badge shop">{totalPortalActionCount > 0 ? `${totalPortalActionCount} nieuw` : 'Badgemarkt'}</span>
                   </div>
                   <div className="portal-card-body">
                     <h3>Miguel's Market</h3>
                     {incomingPlayerTradeCount > 0 && <p className="portal-trade-alert-text">Miguel heeft een nieuw ruilvoorstel voor je!</p>}
+                    {incomingPlayerNotificationCount > 0 && <p className="portal-trade-alert-text">Je hebt een cadeau of Coco Coin-donatie ontvangen!</p>}
                     <p style={{ color: '#ff9800', fontSize: '12px', marginTop: '-4px' }}>Koop, verzamel en ruil badges</p>
                     <p>Open verrassingspakjes, verzamel badges uit beide Disney-parken en ontdek ieder uur een nieuw ruilaanbod van Miguel.</p>
                   </div>

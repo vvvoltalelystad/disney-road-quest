@@ -28,9 +28,9 @@ button{cursor:pointer}
 .global-app-header-actions{display:flex;align-items:center;gap:8px;width:100%;min-width:0}
 .global-profile-pill{
   display:grid;
-  grid-template-columns:38px minmax(max-content,1fr) minmax(68px,auto);
+  grid-template-columns:38px 8px minmax(max-content,1fr) 8px minmax(68px,auto);
   align-items:center;
-  gap:8px;
+  gap:5px;
   flex:1 1 280px;
   width:min(100%,430px);
   max-width:430px;
@@ -53,7 +53,7 @@ button{cursor:pointer}
 .global-profile-avatar{width:30px;height:30px;flex:0 0 30px;margin:0;border:2px solid var(--gold);border-radius:50%;background:#07162d;object-fit:contain}
 .global-profile-avatar-fallback{display:grid;width:30px;height:30px;place-items:center;border:2px solid var(--gold);border-radius:50%;background:#07162d;font-size:13px}
 .global-profile-balance-segment{justify-content:flex-end;gap:5px}
-.global-profile-divider{color:rgba(255,212,92,.62);font-weight:900;text-align:center}
+.global-profile-divider{display:grid;place-items:center;color:rgba(255,212,92,.62);font-weight:900;text-align:center;pointer-events:none}
 .global-profile-name{display:block;min-width:0;overflow:hidden;text-align:center;text-overflow:ellipsis}
 .global-log-anchor{justify-content:flex-end;font-size:16px;line-height:1}
 .global-profile-segment:focus-visible{outline:2px solid var(--gold);outline-offset:3px;border-radius:5px}
