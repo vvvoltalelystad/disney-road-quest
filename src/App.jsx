@@ -5787,7 +5787,9 @@ export default function App() {
   const renderFacilitatorDashboard = (task) => {
     if (!isRoomHost() || room?.current_task_state?.roundPhase !== 'playing') return null;
     const state = room.current_task_state || {};
-    const hostMustAnswer = localPlayer?.id && players.some(player => player.id === localPlayer.id);
+    // A playing host must never see solutions before submitting. Use the explicit
+    // facilitator role as the only exception and fail closed while player sync lags.
+    const hostMustAnswer = !isFacilitatorHost();
     const hostHasAnswered = task.type === 'quiz' ? state.quizAnswers?.[localPlayer?.id] !== undefined
       : ['whoami', 'fact', 'emoji'].includes(task.type) ? state.genericAnswers?.[localPlayer?.id] !== undefined
       : task.type === 'diary' ? !!state.answers?.[localPlayer?.id]?.[`part${state.part || 1}`]
