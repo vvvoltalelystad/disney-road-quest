@@ -7904,7 +7904,9 @@ export default function App() {
                           })()}
 
                           <h2 style={isRoundAnnouncement ? { display: 'none' } : undefined}>{t.title}</h2>
-                          <div className="prompt" style={isRoundAnnouncement ? { display: 'none' } : undefined}>{t.text}</div>
+                          {(t.type !== 'draw' || isMyTurn || isFacilitatorHost()) && (
+                            <div className="prompt" style={isRoundAnnouncement ? { display: 'none' } : undefined}>{t.text}</div>
+                          )}
                           {!isRoundAnnouncement && room.current_task_state?.bonusRound && (
                             <div className="notice green" style={{ marginTop: '12px', textAlign: 'center' }}>🎆 Disney Parade Bonus actief · alle verdiende punten ×2</div>
                           )}
