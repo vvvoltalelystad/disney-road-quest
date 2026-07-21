@@ -94,8 +94,8 @@ const DISNEY_PROFILE_COLORS = [
 ];
 
 const DISNEY_PROFILE_AVATARS = [
-  ['linguini', 'Alfredo Linguini', 'linguini.webp'], ['bruno', 'Bruno', 'bruno.png'],
-  ['buzz', 'Buzz Lightyear', 'buzz.png'], ['heihei', 'Heihei', 'heihei.png'],
+  ['bruno', 'Bruno', 'bruno.png'], ['buzz', 'Buzz Lightyear', 'buzz.png'],
+  ['linguini', 'Ernesto de la Cruz', 'Ernesto_png.png', true], ['heihei', 'Heihei', 'heihei.png'],
   ['hen-wen', 'Hen Wen', 'hen-wen.png'], ['jack', 'Jack Sparrow', 'jack.png'],
   ['kuzco', 'Kuzco', 'kuzco.png'], ['maximus', 'Maximus', 'maximus.png'],
   ['medusa', 'Madame Medusa', 'medusa.png'], ['miguel', 'Miguel', 'miguel.png'],
@@ -104,7 +104,9 @@ const DISNEY_PROFILE_AVATARS = [
   ['percy', 'Percy', 'percy.png'], ['peter', 'Peter Pan', 'peter.png'],
   ['redpanda', 'Rode panda', 'redpanda.png'], ['remy', 'Remy', 'remy.png'],
   ['stitch', 'Stitch', 'stitch.png'], ['taran', 'Taran', 'taran.png']
-].map(([id, name, file]) => ({ id, name, image: `music/avatars/${file}` }));
+]
+  .map(([id, name, file, publicRoot = false]) => ({ id, name, image: publicRoot ? file : `music/avatars/${file}` }))
+  .sort((left, right) => left.name.localeCompare(right.name, 'nl', { sensitivity: 'base' }));
 
 const BADGE_RARITIES = [
   { id: 'common', name: 'Common', subtitle: 'De eerste stap van ieder Disney-avontuur', perPark: 12, frame: 'badges/frames/common-silver.png' },
@@ -5658,7 +5660,7 @@ export default function App() {
               aria-label="Wijzig avatar en spelerskleur"
             >
               {profileAvatar
-                ? <img className="global-profile-avatar" src={assetPath(profileAvatar.image)} alt="" style={{ borderColor: profileColor }} />
+                ? <img className="global-profile-avatar" src={assetPath(profileAvatar.image)} alt="" style={{ borderColor: profileColor, objectFit: profileAvatar.id === 'olaf' ? 'cover' : 'contain' }} />
                 : <span className="global-profile-avatar-fallback" style={{ borderColor: profileColor }}>{activeProfileName.slice(0, 1).toUpperCase()}</span>}
             </button>
             <span className="global-profile-divider" aria-hidden="true">•</span>
@@ -6558,7 +6560,7 @@ export default function App() {
                     onClick={() => activateCocoProfile(name)}
                   >
                     {avatar
-                      ? <img src={assetPath(avatar.image)} alt="" style={{ width: '48px', height: '48px', objectFit: 'contain', border: `3px solid ${color}`, borderRadius: '50%', background: '#06152d' }} />
+                      ? <img src={assetPath(avatar.image)} alt="" style={{ width: '48px', height: '48px', objectFit: avatar.id === 'olaf' ? 'cover' : 'contain', border: `3px solid ${color}`, borderRadius: '50%', background: '#06152d' }} />
                       : <span style={{ fontSize: '26px', fontWeight: 900, color }}>{name.slice(0, 1).toUpperCase()}</span>}
                     <span>
                       <strong>{name}</strong>
@@ -6649,7 +6651,7 @@ export default function App() {
                       aria-pressed={profileDraftAvatar === avatar.id}
                       title={avatar.name}
                     >
-                      <img src={assetPath(avatar.image)} alt={avatar.name} />
+                      <img src={assetPath(avatar.image)} alt={avatar.name} style={{ objectFit: avatar.id === 'olaf' ? 'cover' : 'contain' }} />
                       <span>{avatar.name}</span>
                     </button>
                   ))}
