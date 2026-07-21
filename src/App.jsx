@@ -76,6 +76,9 @@ const PLAYER_TRADES_KEY = 'disney_player_trades';
 const PLAYER_TRADE_MODE = 'player-trade';
 const BADGE_PACK_COST = 5;
 const BADGE_SELL_VALUE = 2;
+const BADGE_PACK_FIRST_WEIGHTS = { common: 70, uncommon: 23, rare: 6, epic: 1 };
+const BADGE_PACK_SECOND_WEIGHTS = { common: 55, uncommon: 25, rare: 13, epic: 6, legendary: 1 };
+const BADGE_MARKET_WEIGHTS = { common: 75, uncommon: 18, rare: 5, epic: 1.7, legendary: 0.3 };
 const BADGE_SHOWCASE_SEED_VERSION = 3;
 const ENABLE_LEGACY_SHOP = false;
 
@@ -295,8 +298,7 @@ const randomBadge = (weights, excludedIds = []) => {
 
 const createHourlyBadgeMarket = (hour = getMarketHour()) => {
   const offers = [];
-  const weights = { common: 42, uncommon: 28, rare: 17, epic: 9, legendary: 4 };
-  while (offers.length < 3) offers.push(randomBadge(weights, offers).id);
+  while (offers.length < 3) offers.push(randomBadge(BADGE_MARKET_WEIGHTS, offers).id);
   return { hour, offers };
 };
 
@@ -541,7 +543,7 @@ function PlayerTradeSquare({
 
 function MiguelMarket({
   activeName, balance, ownedBadges, badgeMarket, badgeMarketNow,
-  ownedAchievements, achievementCelebration, tradeOfferIndex, sellOpen, openedPack,
+  ownedAchievements, achievementCelebration, tradeOfferIndex, sellOpen, openedPack, packPurchaseBusy,
   profiles, allBadgeCollections, playerTrades,
   onOpenPack, onChooseTrade, onTrade, onOpenSell, onCloseSell, onSell, onClosePack, onCloseAchievement, onInspectCoin,
   onDonateCoins, onGiftBadge, onCreatePlayerTrade, onResolvePlayerTrade
@@ -665,8 +667,8 @@ function MiguelMarket({
             <p><strong>Badge 1:</strong> 55% Common · 25% Uncommon · 15% Rare · 5% Epic</p>
             <p><strong>Badge 2:</strong> 40% Common · 30% Uncommon · 15% Rare · 10% Epic · 5% Legendary</p>
           </details>
-          <button type="button" className="btn primary full" disabled={balance < BADGE_PACK_COST} onClick={onOpenPack}>
-            {balance < BADGE_PACK_COST ? 'Niet genoeg Coco Coins' : `Open pakje · ${BADGE_PACK_COST} Coco Coins`}
+          <button type="button" className="btn primary full" disabled={packPurchaseBusy || balance < BADGE_PACK_COST} onClick={onOpenPack}>
+            {packPurchaseBusy ? 'Pakje wordt geopend…' : balance < BADGE_PACK_COST ? 'Niet genoeg Coco Coins' : `Open pakje · ${BADGE_PACK_COST} Coco Coins`}
           </button>
         </article>
 
@@ -1486,6 +1488,8 @@ export default function App() {
   const [playerTrades, setPlayerTrades] = useState(() => readJsonStorage(PLAYER_TRADES_KEY, []));
   const [marketTradeOfferIndex, setMarketTradeOfferIndex] = useState(null);
   const [badgeSellOpen, setBadgeSellOpen] = useState(false);
+  const [packPurchaseBusy, setPackPurchaseBusy] = useState(false);
+  const packPurchaseBusyRef = useRef(false);
   const [openedBadgePack, setOpenedBadgePack] = useState(null);
   const [shopPlayerName, setShopPlayerName] = useState(() => localStorage.getItem('disney_player_name') || 'Speler 1');
   const [cocoProfiles, setCocoProfiles] = useState(() => {
@@ -2698,24 +2702,94 @@ export default function App() {
     localStorage.setItem(PLAYER_TRADES_KEY, JSON.stringify(cleanTrades));
   };
 
-  const handleOpenBadgePack = () => {
+  const handleOpenBadgePack = async () => {
+    if (packPurchaseBusyRef.current) return;
     const { name, key } = getActiveBadgeProfile();
-    const balance = Number(starBank[key]) || 0;
-    if (balance < BADGE_PACK_COST) return;
-
-    const firstBadge = randomBadge({ common: 55, uncommon: 25, rare: 15, epic: 5 });
-    const secondBadge = randomBadge({ common: 40, uncommon: 30, rare: 15, epic: 10, legendary: 5 }, [firstBadge.id]);
+    packPurchaseBusyRef.current = true;
+    setPackPurchaseBusy(true);
+    const firstBadge = randomBadge(BADGE_PACK_FIRST_WEIGHTS);
+    const secondBadge = randomBadge(BADGE_PACK_SECOND_WEIGHTS, [firstBadge.id]);
     const wonBadges = [firstBadge, secondBadge];
-    const profileBadges = { ...(badgeCollections[key] || {}) };
-    wonBadges.forEach(badge => { profileBadges[badge.id] = (profileBadges[badge.id] || 0) + 1; });
+    const purchaseId = globalThis.crypto?.randomUUID?.() || `pack-${Date.now()}-${Math.random().toString(36).slice(2, 9)}`;
 
-    const nextBank = { ...starBank, [key]: balance - BADGE_PACK_COST };
-    const nextCollections = { ...badgeCollections, [key]: profileBadges };
-    setStarBank(nextBank);
-    localStorage.setItem(COCO_BANK_KEY, JSON.stringify(nextBank));
-    persistBadgeCollections(nextCollections);
-    logCaptainMutation(name, -BADGE_PACK_COST, 'spend', 'Badgepakje geopend bij Miguel', nextBank[key]);
-    setOpenedBadgePack(wonBadges);
+    try {
+      let committedState = null;
+      for (let attempt = 0; attempt < 4 && !committedState; attempt += 1) {
+        const { data: store, error: readError } = await supabase
+          .from('rooms')
+          .select('id,current_task_state')
+          .eq('code', COCO_PROFILE_STORE_CODE)
+          .maybeSingle();
+        if (readError) throw readError;
+        if (!store?.id) throw new Error('De centrale profielopslag is niet gevonden.');
+        const currentState = store.current_task_state || {};
+        const currentBalance = Number(currentState.coco_bank?.[key]) || 0;
+        if (currentBalance < BADGE_PACK_COST) {
+          window.alert('Dit profiel heeft niet genoeg Coco Coins voor een badgepakje.');
+          return;
+        }
+        const receipts = currentState.coco_shop_receipts || {};
+        if (receipts[purchaseId]) return;
+        const nextProfileBadges = { ...(currentState.coco_badge_collections?.[key] || {}) };
+        wonBadges.forEach(badge => {
+          nextProfileBadges[badge.id] = (Number(nextProfileBadges[badge.id]) || 0) + 1;
+        });
+        const nextBank = { ...(currentState.coco_bank || {}), [key]: currentBalance - BADGE_PACK_COST };
+        const nextCollections = {
+          ...(currentState.coco_badge_collections || {}),
+          [key]: nextProfileBadges
+        };
+        const currentLogs = currentState.coco_captains_log || {};
+        const logName = Object.keys(currentLogs).find(profileName => getCollectorKey(profileName) === key) || name;
+        const now = new Date().toISOString();
+        const nextLogs = {
+          ...currentLogs,
+          [logName]: [...(currentLogs[logName] || []), {
+            timestamp: now,
+            amount: -BADGE_PACK_COST,
+            type: 'spend',
+            description: 'Badgepakje geopend bij Miguel',
+            balanceAfter: nextBank[key],
+            transactionId: purchaseId
+          }]
+        };
+        const nextState = {
+          ...currentState,
+          coco_bank: nextBank,
+          coco_badge_collections: nextCollections,
+          coco_captains_log: nextLogs,
+          coco_shop_receipts: { ...receipts, [purchaseId]: now },
+          updated_at: now
+        };
+        let updateQuery = supabase
+          .from('rooms')
+          .update({ current_task_state: nextState })
+          .eq('id', store.id);
+        const expectedUpdatedAt = String(currentState.updated_at || '');
+        if (expectedUpdatedAt) updateQuery = updateQuery.eq('current_task_state->>updated_at', expectedUpdatedAt);
+        const { data: updatedStore, error: updateError } = await updateQuery
+          .select('current_task_state')
+          .maybeSingle();
+        if (updateError) throw updateError;
+        if (updatedStore?.current_task_state) committedState = updatedStore.current_task_state;
+      }
+      if (!committedState) throw new Error('De winkel werd tegelijk op een ander toestel bijgewerkt.');
+
+      cocoProfileStoreUpdatedAtRef.current = String(committedState.updated_at || '');
+      setStarBank(committedState.coco_bank || {});
+      setBadgeCollections(committedState.coco_badge_collections || {});
+      setCaptainsLogs(committedState.coco_captains_log || {});
+      localStorage.setItem(COCO_BANK_KEY, JSON.stringify(committedState.coco_bank || {}));
+      localStorage.setItem(BADGE_COLLECTION_KEY, JSON.stringify(committedState.coco_badge_collections || {}));
+      localStorage.setItem('disney_captains_log', JSON.stringify(committedState.coco_captains_log || {}));
+      setOpenedBadgePack(wonBadges);
+    } catch (purchaseError) {
+      console.warn('Badgepakje kon niet betrouwbaar worden geopend.', purchaseError);
+      window.alert('Het badgepakje kon niet veilig worden opgeslagen. Er zijn geen Coco Coins afgeschreven; probeer het opnieuw.');
+    } finally {
+      packPurchaseBusyRef.current = false;
+      setPackPurchaseBusy(false);
+    }
   };
 
   const handleTradeBadge = offeredBadgeId => {
@@ -5263,28 +5337,28 @@ export default function App() {
           <div className="global-profile-pill">
             <button
               type="button"
-              className="global-profile-segment global-profile-name-segment"
+              className="global-profile-segment global-profile-avatar-segment"
               onClick={() => openProfileAppearance(activeProfileName)}
               title="Wijzig avatar en spelerskleur"
+              aria-label="Wijzig avatar en spelerskleur"
             >
-              {profileAvatar && <img className="global-profile-avatar" src={assetPath(profileAvatar.image)} alt="" style={{ borderColor: profileColor }} />}
-              <span className="global-profile-name">{activeProfileName}</span>
+              {profileAvatar
+                ? <img className="global-profile-avatar" src={assetPath(profileAvatar.image)} alt="" style={{ borderColor: profileColor }} />
+                : <span className="global-profile-avatar-fallback" style={{ borderColor: profileColor }}>{activeProfileName.slice(0, 1).toUpperCase()}</span>}
             </button>
-            <span className="global-profile-divider" aria-hidden="true">·</span>
-            <button type="button" className="global-profile-segment global-profile-balance-segment" onClick={openCoinViewer} aria-label={`Bekijk Coco Coin. Saldo: ${balance}`}>
-              <span>{balance}</span><CocoCoinIcon size={20} />
-            </button>
-            <span className="global-profile-divider" aria-hidden="true">·</span>
             <button
               type="button"
-              className="global-profile-segment global-log-anchor"
+              className="global-profile-segment global-profile-name-segment"
               onClick={() => {
                 setLogProfileName(activeProfileName);
                 setOpenLedgerSection(null);
                 setLogPopupOpen(true);
               }}
-              aria-label="Open Captain's Log"
-            >⚓</button>
+              aria-label={`Open spelersoverzicht van ${activeProfileName}`}
+            ><span className="global-profile-name">{activeProfileName}</span></button>
+            <button type="button" className="global-profile-segment global-profile-balance-segment" onClick={openCoinViewer} aria-label={`Bekijk Coco Coin. Saldo: ${balance}`}>
+              <span>{balance}</span><CocoCoinIcon size={20} />
+            </button>
           </div>
           <button className="iconbtn" onClick={toggleThemeMode} aria-label={themeMode === 'day' ? 'Nachtstand inschakelen' : 'Dagstand inschakelen'}>
             {themeMode === 'day' ? "🌙" : "☀️"}
@@ -6349,8 +6423,8 @@ export default function App() {
                     e.stopPropagation();
                     if (selectedPortalGame === 'music_match') {
                       window.location.href = room?.code
-                        ? `./music/index.html?room=${room.code}&v=80`
-                        : './music/index.html?v=80';
+                        ? `./music/index.html?room=${room.code}&v=81`
+                        : './music/index.html?v=81';
                     } else {
                       setSelectedPortalGame('music_match');
                     }
@@ -6482,6 +6556,7 @@ export default function App() {
                         tradeOfferIndex={marketTradeOfferIndex}
                         sellOpen={badgeSellOpen}
                         openedPack={openedBadgePack}
+                        packPurchaseBusy={packPurchaseBusy}
                         profiles={getDisplayShopPlayers()}
                         allBadgeCollections={badgeCollections}
                         playerTrades={playerTrades}
