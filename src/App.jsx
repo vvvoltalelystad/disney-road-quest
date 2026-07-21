@@ -69,10 +69,10 @@ const PROFILE_PREFERENCES_KEY = 'disney_profile_preferences';
 const ARENA_SAVES_KEY = 'disney_arena_saves';
 const ACTIVE_PROFILE_KEY = 'disney_active_profile';
 const COCO_PROFILE_STORE_CODE = 'COCO-PROFILES-V1';
-const COCO_PROFILE_STORE_VERSION = 9;
+const COCO_PROFILE_STORE_VERSION = 10;
 const DAGOBERT_PROFILE_KEY = 'dagobert';
 const DAGOBERT_ACCESS_HASH = 'b904516427494c9f2b856c5477657fa66ebb293dfc390903ce12b033a7b9fdd0';
-let dagobertAccessGrantedForCurrentPage = false;
+const unlockedProfileKeysForCurrentPage = new Set();
 const BADGE_COLLECTION_KEY = 'disney_badge_collections';
 const BADGE_MARKET_KEY = 'disney_badge_market';
 const BADGE_ACHIEVEMENT_KEY = 'disney_badge_achievements';
@@ -917,10 +917,14 @@ const norm = (str) => {
 const getCollectorKey = (name) => norm(name || 'speler') || 'speler';
 
 const isDagobertProfile = name => getCollectorKey(name) === DAGOBERT_PROFILE_KEY;
-const hasDagobertPageAccess = () => dagobertAccessGrantedForCurrentPage;
+const getProfilePinHash = (name, preferences = {}) => (
+  preferences?.[getCollectorKey(name)]?.pinHash || (isDagobertProfile(name) ? DAGOBERT_ACCESS_HASH : '')
+);
+const hasProfilePageAccess = name => unlockedProfileKeysForCurrentPage.has(getCollectorKey(name));
 const getStoredActiveProfile = () => {
   const storedName = localStorage.getItem(ACTIVE_PROFILE_KEY) || localStorage.getItem('disney_player_name') || '';
-  if (isDagobertProfile(storedName) && !hasDagobertPageAccess()) {
+  const storedPreferences = readJsonStorage(PROFILE_PREFERENCES_KEY, {});
+  if (getProfilePinHash(storedName, storedPreferences) && !hasProfilePageAccess(storedName)) {
     localStorage.removeItem(ACTIVE_PROFILE_KEY);
     localStorage.removeItem('disney_player_name');
     return '';
@@ -933,16 +937,21 @@ const hashProfileAccessCode = async value => {
   const digest = await globalThis.crypto.subtle.digest('SHA-256', bytes);
   return [...new Uint8Array(digest)].map(byte => byte.toString(16).padStart(2, '0')).join('');
 };
-const requestDagobertPageAccess = async name => {
-  if (!isDagobertProfile(name) || hasDagobertPageAccess()) return true;
-  const accessCode = window.prompt('Voer de toegangscode voor profiel Dagobert in:');
+const verifyProfilePin = async (name, expectedHash, message = '') => {
+  if (!expectedHash) return true;
+  const accessCode = window.prompt(message || `Voer de pincode voor profiel ${name} in:`);
   if (accessCode === null) return false;
   const accessHash = await hashProfileAccessCode(accessCode);
-  if (!accessHash || accessHash !== DAGOBERT_ACCESS_HASH) {
-    window.alert('Onjuiste toegangscode. Profiel Dagobert blijft vergrendeld.');
+  if (!accessHash || accessHash !== expectedHash) {
+    window.alert(`Onjuiste pincode. Profiel ${name} blijft vergrendeld.`);
     return false;
   }
-  dagobertAccessGrantedForCurrentPage = true;
+  return true;
+};
+const requestProfilePageAccess = async (name, pinHash) => {
+  if (!pinHash || hasProfilePageAccess(name)) return true;
+  if (!(await verifyProfilePin(name, pinHash))) return false;
+  unlockedProfileKeysForCurrentPage.add(getCollectorKey(name));
   return true;
 };
 
@@ -2075,6 +2084,76 @@ export default function App() {
     setProfileSetupOpen(false);
   };
 
+  const saveProfilePinHash = async (name, pinHash) => {
+    const key = getCollectorKey(name);
+    const current = profilePreferences[key] || createProfilePreference(name, cocoProfiles.findIndex(profileName => getCollectorKey(profileName) === key));
+    try {
+      const committed = await commitProfileStoreAction(currentState => ({
+        ...currentState,
+        coco_profile_preferences: {
+          ...(currentState.coco_profile_preferences || {}),
+          [key]: {
+            ...current,
+            ...(currentState.coco_profile_preferences?.[key] || {}),
+            name,
+            pinHash: pinHash || ''
+          }
+        },
+        coco_profile_store_version: COCO_PROFILE_STORE_VERSION
+      }));
+      if (!committed) return false;
+      if (pinHash) unlockedProfileKeysForCurrentPage.add(key);
+      else unlockedProfileKeysForCurrentPage.delete(key);
+      return true;
+    } catch (pinError) {
+      window.alert(`${pinError.message || 'De pincode kon niet worden opgeslagen.'} Er is niets gewijzigd.`);
+      return false;
+    }
+  };
+
+  const promptForNewProfilePin = async (profileName) => {
+    const nextPin = window.prompt(`Kies een pincode voor ${profileName} (4 tot 6 cijfers):`);
+    if (nextPin === null) return null;
+    if (!/^\d{4,6}$/.test(nextPin)) {
+      window.alert('Een pincode moet uit minimaal 4 en maximaal 6 cijfers bestaan.');
+      return null;
+    }
+    const confirmation = window.prompt('Voer dezelfde pincode nogmaals in:');
+    if (confirmation !== nextPin) {
+      window.alert('De pincodes zijn niet gelijk. Er is niets gewijzigd.');
+      return null;
+    }
+    return hashProfileAccessCode(nextPin);
+  };
+
+  const handleEnableProfilePin = async () => {
+    const pinHash = await promptForNewProfilePin(activeProfileName);
+    if (!pinHash) return;
+    if (!(await saveProfilePinHash(activeProfileName, pinHash))) return;
+    window.alert(`Profiel ${activeProfileName} is nu gesloten met een pincode.`);
+  };
+
+  const handleChangeProfilePin = async () => {
+    const currentHash = getProfilePinHash(activeProfileName, profilePreferences);
+    if (!(await verifyProfilePin(activeProfileName, currentHash, `Voer eerst de huidige pincode van ${activeProfileName} in:`))) return;
+    const nextHash = await promptForNewProfilePin(activeProfileName);
+    if (!nextHash) return;
+    if (!(await saveProfilePinHash(activeProfileName, nextHash))) return;
+    window.alert('De pincode is gewijzigd.');
+  };
+
+  const handleDisableProfilePin = async () => {
+    if (isDagobertProfile(activeProfileName)) {
+      window.alert('Dagobert is het noodprofiel en blijft altijd met een pincode beveiligd.');
+      return;
+    }
+    const currentHash = getProfilePinHash(activeProfileName, profilePreferences);
+    if (!(await verifyProfilePin(activeProfileName, currentHash, `Voer de huidige pincode van ${activeProfileName} in om het slot te verwijderen:`))) return;
+    if (!window.confirm(`Profiel ${activeProfileName} openmaken zonder pincode?`)) return;
+    if (!(await saveProfilePinHash(activeProfileName, ''))) return;
+    window.alert(`Profiel ${activeProfileName} is nu open.`);
+  };
+
   const uniqueProfileNames = (names) => {
     const seen = new Set();
     return names
@@ -2099,7 +2178,7 @@ export default function App() {
   const activateCocoProfile = async (name) => {
     const cleanName = String(name || '').trim();
     if (!cleanName) return;
-    if (!(await requestDagobertPageAccess(cleanName))) return;
+    if (!(await requestProfilePageAccess(cleanName, getProfilePinHash(cleanName, profilePreferences)))) return;
     persistCocoProfiles([...cocoProfiles, cleanName]);
     setActiveProfileName(cleanName);
     setShopPlayerName(cleanName);
@@ -2281,10 +2360,22 @@ export default function App() {
         const remoteProfiles = uniqueProfileNames(remoteState.coco_profiles || []);
         const migrateLocalState = remoteProfiles.length === 0 && localProfiles.length > 0;
         let mergedProfiles = migrateLocalState ? uniqueProfileNames([...remoteProfiles, ...localProfiles]) : remoteProfiles;
-        if (profileStoreVersion < COCO_PROFILE_STORE_VERSION && !mergedProfiles.some(isDagobertProfile)) {
+        if (profileStoreVersion < 9 && !mergedProfiles.some(isDagobertProfile)) {
           mergedProfiles = uniqueProfileNames([...mergedProfiles, 'Dagobert']);
         }
-        const mergedProfilePreferences = mergeProfilePreferences(remoteState.coco_profile_preferences, profilePreferences, mergedProfiles);
+        let mergedProfilePreferences = mergeProfilePreferences(remoteState.coco_profile_preferences, profilePreferences, mergedProfiles);
+        if (profileStoreVersion < COCO_PROFILE_STORE_VERSION) {
+          const dagobertName = mergedProfiles.find(isDagobertProfile) || 'Dagobert';
+          const dagobertKey = getCollectorKey(dagobertName);
+          mergedProfilePreferences = {
+            ...mergedProfilePreferences,
+            [dagobertKey]: {
+              ...(mergedProfilePreferences[dagobertKey] || createProfilePreference(dagobertName)),
+              name: dagobertName,
+              pinHash: DAGOBERT_ACCESS_HASH
+            }
+          };
+        }
         const mergedRewardReceipts = { ...profileRewardReceipts, ...(remoteState.coco_reward_receipts || {}) };
         let mergedBank = migrateLocalState ? mergeBank(remoteState.coco_bank, starBank) : (remoteState.coco_bank || {});
         const mergedCollections = migrateLocalState ? mergeCollections(remoteState.coco_collections, collections) : (remoteState.coco_collections || {});
@@ -2329,7 +2420,7 @@ export default function App() {
             };
           });
         }
-        if (profileStoreVersion < COCO_PROFILE_STORE_VERSION) {
+        if (profileStoreVersion < 9) {
           const dagobertName = mergedProfiles.find(isDagobertProfile) || 'Dagobert';
           const dagobertKey = getCollectorKey(dagobertName);
           mergedBadgeCollections = {
@@ -2534,6 +2625,16 @@ export default function App() {
 
     return () => window.clearTimeout(timeoutId);
   }, [badgeAchievements, badgeCollections, badgeMarket, badgeShowcaseSeedVersion, captainsLogs, cocoProfiles, cocoProfilesReady, collections, contentUsage, exclusiveClaims, playerTrades, profilePreferences, profileRewardReceipts, soloHistory, starBank]);
+
+  useEffect(() => {
+    if (!cocoProfilesReady || !activeProfileName) return;
+    const pinHash = getProfilePinHash(activeProfileName, profilePreferences);
+    if (!pinHash || hasProfilePageAccess(activeProfileName)) return;
+    setActiveProfileName('');
+    setPlayerNameInput('');
+    localStorage.removeItem(ACTIVE_PROFILE_KEY);
+    localStorage.removeItem('disney_player_name');
+  }, [activeProfileName, cocoProfilesReady, profilePreferences]);
 
   useEffect(() => {
     if (!cocoProfilesReady || !cocoProfileStoreIdRef.current) return undefined;
@@ -3230,7 +3331,11 @@ export default function App() {
 
   const handleRenameShopProfile = async () => {
     const currentName = activeProfileName || shopPlayerName.trim() || 'Speler 1';
-    if (!(await requestDagobertPageAccess(currentName))) return;
+    if (isDagobertProfile(currentName)) {
+      window.alert('Het noodprofiel Dagobert kan niet worden hernoemd.');
+      return;
+    }
+    if (!(await requestProfilePageAccess(currentName, getProfilePinHash(currentName, profilePreferences)))) return;
     const keepProfileChooserOpen = !activeProfileName;
     const nextName = window.prompt('Nieuwe profielnaam', currentName)?.trim();
     if (!nextName || nextName === currentName) return;
@@ -3424,7 +3529,11 @@ export default function App() {
 
   const handleDeleteShopProfile = async () => {
     const currentName = activeProfileName || shopPlayerName.trim() || 'Speler 1';
-    if (!(await requestDagobertPageAccess(currentName))) return;
+    if (isDagobertProfile(currentName)) {
+      window.alert('Het noodprofiel Dagobert kan niet worden verwijderd.');
+      return;
+    }
+    if (!(await requestProfilePageAccess(currentName, getProfilePinHash(currentName, profilePreferences)))) return;
     const keepProfileChooserOpen = !activeProfileName;
     if (getDisplayShopPlayers().length <= 1) {
       window.alert('Er moet minimaal een profiel overblijven.');
@@ -3545,6 +3654,30 @@ export default function App() {
       window.alert(`${donationError.message || 'De donatie kon niet worden opgeslagen.'} Er zijn geen Coco Coins overgedragen.`);
       return false;
     }
+  };
+
+  const handleRecoverProfilePinWithDagobert = async () => {
+    const targetName = shopPlayerName.trim();
+    const dagobertName = getDisplayShopPlayers().find(isDagobertProfile) || 'Dagobert';
+    if (!targetName || isDagobertProfile(targetName)) {
+      window.alert('Kies een ander profiel waarvan je de pincode wilt herstellen.');
+      return;
+    }
+    const dagobertHash = getProfilePinHash(dagobertName, profilePreferences);
+    if (!(await verifyProfilePin(dagobertName, dagobertHash, 'Voer de beheerpincode van Dagobert in:'))) return;
+    const nextPin = window.prompt(`Nieuwe pincode voor ${targetName} (4 tot 6 cijfers). Laat leeg om het profiel open te maken:`);
+    if (nextPin === null) return;
+    if (nextPin !== '' && !/^\d{4,6}$/.test(nextPin)) {
+      window.alert('Een pincode moet uit minimaal 4 en maximaal 6 cijfers bestaan.');
+      return;
+    }
+    if (!window.confirm(nextPin
+      ? `De pincode van ${targetName} opnieuw instellen?`
+      : `Het slot van ${targetName} verwijderen en het profiel openmaken?`)) return;
+    const nextHash = nextPin ? await hashProfileAccessCode(nextPin) : '';
+    if (!(await saveProfilePinHash(targetName, nextHash))) return;
+    unlockedProfileKeysForCurrentPage.delete(getCollectorKey(targetName));
+    window.alert(nextPin ? `De pincode van ${targetName} is opnieuw ingesteld.` : `Profiel ${targetName} is nu open.`);
   };
 
   const handleGiftBadge = async (targetName, badgeId) => {
@@ -6737,7 +6870,7 @@ export default function App() {
                       ? <img src={assetPath(avatar.image)} alt="" style={{ width: '48px', height: '48px', objectFit: avatar.id === 'olaf' ? 'cover' : 'contain', border: `3px solid ${color}`, borderRadius: '50%', background: '#06152d' }} />
                       : <span style={{ fontSize: '26px', fontWeight: 900, color }}>{name.slice(0, 1).toUpperCase()}</span>}
                     <span>
-                      <strong>{isDagobertProfile(name) ? '🔒 ' : ''}{name}</strong>
+                      <strong>{getProfilePinHash(name, profilePreferences) ? '🔒 ' : '🔓 '}{name}</strong>
                       <small>{formatCocoCoins(balance)} · {ownedCount} badge{ownedCount === 1 ? '' : 's'}</small>
                     </span>
                   </button>
@@ -6752,12 +6885,17 @@ export default function App() {
                 onChange={(e) => setShopPlayerName(e.target.value)}
                 style={{ width: '100%', boxSizing: 'border-box' }}
               >
-                {getDisplayShopPlayers().map(name => <option key={name} value={name}>{name}</option>)}
+                {getDisplayShopPlayers().map(name => <option key={name} value={name}>{getProfilePinHash(name, profilePreferences) ? '🔒' : '🔓'} {name}</option>)}
               </select>
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px', marginTop: '8px' }}>
                 <button type="button" className="btn mini secondary" onClick={handleRenameShopProfile}>Naam wijzigen</button>
                 <button type="button" className="btn mini secondary" onClick={handleDeleteShopProfile}>Verwijderen</button>
               </div>
+              {!isDagobertProfile(shopPlayerName) && (
+                <button type="button" className="btn mini secondary full" onClick={handleRecoverProfilePinWithDagobert} style={{ marginTop: '8px' }}>
+                  🔑 Pincode herstellen via Dagobert
+                </button>
+              )}
             </div>
 
             <div style={{ display: 'grid', gridTemplateColumns: '1fr auto', gap: '8px' }}>
@@ -6829,6 +6967,25 @@ export default function App() {
                       <span>{avatar.name}</span>
                     </button>
                   ))}
+                </div>
+                <div style={{ padding: '12px', margin: '14px 0', background: '#061225', border: '1px solid var(--line)', borderRadius: '12px' }}>
+                  <h3 style={{ marginTop: 0 }}>Profielslot</h3>
+                  {getProfilePinHash(activeProfileName, profilePreferences) ? (
+                    <>
+                      <p style={{ margin: '0 0 10px', color: 'var(--muted)' }}>🔒 Gesloten profiel · na iedere paginalading is de pincode opnieuw nodig.</p>
+                      <div className="btnrow">
+                        <button type="button" className="btn mini secondary" onClick={handleChangeProfilePin}>Pincode wijzigen</button>
+                        {!isDagobertProfile(activeProfileName) && (
+                          <button type="button" className="btn mini danger" onClick={handleDisableProfilePin}>Slot verwijderen</button>
+                        )}
+                      </div>
+                    </>
+                  ) : (
+                    <>
+                      <p style={{ margin: '0 0 10px', color: 'var(--muted)' }}>🔓 Open profiel · iedereen kan dit profiel zonder pincode openen.</p>
+                      <button type="button" className="btn mini secondary full" onClick={handleEnableProfilePin}>Pincode instellen</button>
+                    </>
+                  )}
                 </div>
                 <button type="button" className="btn primary full" onClick={saveProfileAppearance}>Profiel opslaan</button>
               </section>
