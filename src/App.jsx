@@ -1708,7 +1708,34 @@ export default function App() {
     return shuffleArray(Array.from({ length: size }, (_, i) => i + 1).filter(value => !used.has(value)));
   };
 
+  const isValidSudokuNumberGrid = (grid, size, requireComplete = false) => {
+    if (!Array.isArray(grid) || grid.length !== size || grid.some(row => !Array.isArray(row) || row.length !== size)) return false;
+    const { blockRows, blockCols } = getSudokuBlockShape(size);
+    const validGroup = values => {
+      const filled = values.filter(Boolean);
+      return (!requireComplete || filled.length === size)
+        && filled.every(value => Number.isInteger(value) && value >= 1 && value <= size)
+        && new Set(filled).size === filled.length;
+    };
+
+    for (let index = 0; index < size; index++) {
+      if (!validGroup(grid[index])) return false;
+      if (!validGroup(grid.map(row => row[index]))) return false;
+    }
+    for (let startRow = 0; startRow < size; startRow += blockRows) {
+      for (let startCol = 0; startCol < size; startCol += blockCols) {
+        const block = [];
+        for (let row = startRow; row < startRow + blockRows; row++) {
+          for (let col = startCol; col < startCol + blockCols; col++) block.push(grid[row][col]);
+        }
+        if (!validGroup(block)) return false;
+      }
+    }
+    return true;
+  };
+
   const countSudokuSolutions = (puzzle, size, limit = 2) => {
+    if (!isValidSudokuNumberGrid(puzzle, size, false)) return 0;
     const board = puzzle.map(row => [...row]);
     let count = 0;
 
@@ -1732,7 +1759,7 @@ export default function App() {
       }
 
       if (!bestCell) {
-        count++;
+        if (isValidSudokuNumberGrid(board, size, true)) count++;
         return;
       }
 
@@ -1772,8 +1799,27 @@ export default function App() {
 
   const generateSudoku = (size) => {
     const emojis = size === 6 ? EMOJIS_6X6 : EMOJIS_9X9;
-    const solutionNumbers = makeSolvedSudokuNumbers(size);
-    const puzzleNumbers = makeUniqueSudokuPuzzle(solutionNumbers, size);
+    let solutionNumbers = null;
+    let puzzleNumbers = null;
+
+    // Generate defensively: a puzzle is only accepted after both its completed
+    // grid and its givens pass validation and a fresh solver proves exactly one
+    // solution. Retrying also protects against future generator/template changes.
+    for (let attempt = 0; attempt < 30; attempt++) {
+      const candidateSolution = makeSolvedSudokuNumbers(size);
+      if (!isValidSudokuNumberGrid(candidateSolution, size, true)) continue;
+      const candidatePuzzle = makeUniqueSudokuPuzzle(candidateSolution, size);
+      if (!isValidSudokuNumberGrid(candidatePuzzle, size, false)) continue;
+      if (countSudokuSolutions(candidatePuzzle, size, 2) !== 1) continue;
+      solutionNumbers = candidateSolution;
+      puzzleNumbers = candidatePuzzle;
+      break;
+    }
+
+    if (!solutionNumbers || !puzzleNumbers) {
+      window.alert('Er kon geen geldige Sudoku met precies één oplossing worden gemaakt. Probeer het opnieuw.');
+      return;
+    }
     const shuffledEmojis = shuffleArray(emojis);
     const mapping = Object.fromEntries(shuffledEmojis.map((emoji, index) => [index + 1, emoji]));
     const newSolution = solutionNumbers.map(row => row.map(value => mapping[value]));
