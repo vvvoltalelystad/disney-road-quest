@@ -2134,9 +2134,9 @@ const PLANK_EVENT_DIE = [
   { id: "chest", name: "Schatkist", icon: "💰", tone: "#ffd45c", allowsLetter: true }
 ];
 const PLANK_DIFFICULTIES = {
-  easy: { label: "Rustig", maxLetters: 14, preReveal: 2, maxStrikes: 5, vowelCost: 3, startTreasure: 3, solvePenalty: 1, autoHintAfter: 2, showCategory: true, showHint: true },
-  normal: { label: "Normaal", maxLetters: 22, preReveal: 1, maxStrikes: 4, vowelCost: 4, startTreasure: 3, solvePenalty: 1, autoHintAfter: 2, showCategory: true, showHint: false },
-  hard: { label: "Uitdagend", maxLetters: Infinity, preReveal: 0, maxStrikes: 3, vowelCost: 5, startTreasure: 2, solvePenalty: 2, autoHintAfter: 2, showCategory: false, showHint: false }
+  easy: { label: "Rustig", preReveal: 2, maxStrikes: 5, vowelCost: 3, startTreasure: 3, solvePenalty: 1, autoHintAfter: 2, showCategory: true, showHint: true },
+  normal: { label: "Normaal", preReveal: 1, maxStrikes: 4, vowelCost: 4, startTreasure: 3, solvePenalty: 1, autoHintAfter: 2, showCategory: true, showHint: false },
+  hard: { label: "Uitdagend", preReveal: 0, maxStrikes: 3, vowelCost: 5, startTreasure: 2, solvePenalty: 2, autoHintAfter: 2, showCategory: false, showHint: false }
 };
 const PLANK_LANGUAGES = {
   en: { flag: "🇬🇧", label: "Engelstalig woord" },
@@ -2301,8 +2301,21 @@ function PlankTreasureIsland() {
 }
 
 const getPlankOccurrenceCount = (word, letter) => word.split("").filter(char => char === letter).length;
-const getPlankLetterCount = word => word.split("").filter(char => /[A-Z0-9]/.test(char)).length;
+const getPlankLetterCount = word => word.split("").filter(char => /[A-Z]/.test(char)).length;
+const getPlankUniqueLetterCount = word => new Set(word.split("").filter(char => /[A-Z]/.test(char))).size;
 const getPlankWordCount = word => word.trim().split(/\s+/).filter(Boolean).length;
+const getPlankWordDifficulty = word => {
+  const letterCount = Math.max(1, getPlankLetterCount(word));
+  const uniqueLetterCount = getPlankUniqueLetterCount(word);
+  // Short codes offer very little context. For longer answers, every extra
+  // different letter increases the challenge while extra length reveals more
+  // of the pattern. This keeps a three-letter name hard and a long title with
+  // recurring letters accessible.
+  const challengeScore = ((uniqueLetterCount * 8) + 12) / letterCount;
+  if (letterCount <= 5 || challengeScore > 7.4) return "hard";
+  if (challengeScore > 5.6) return "normal";
+  return "easy";
+};
 const isPlankWordSolved = (word, guesses) => (
   word.split("").every(char => !PLANK_LETTERS.includes(char) || guesses.includes(char))
 );
@@ -2310,16 +2323,12 @@ const isPlankWordSolved = (word, guesses) => (
 function createPiratesPlankState(difficulty = "normal", excludedWordIds = []) {
   const safeDifficulty = PLANK_DIFFICULTIES[difficulty] ? difficulty : "normal";
   const config = PLANK_DIFFICULTIES[safeDifficulty];
-  const candidates = PIRATES_PLANK_WORDS.filter(entry => getPlankLetterCount(entry.word) <= config.maxLetters);
+  const matchingCandidates = PIRATES_PLANK_WORDS.filter(entry => getPlankWordDifficulty(entry.word) === safeDifficulty);
+  const candidates = matchingCandidates.length ? matchingCandidates : PIRATES_PLANK_WORDS;
   const excluded = new Set(excludedWordIds || []);
   const unusedCandidates = candidates.filter(entry => !excluded.has(entry.id));
   const selectionPool = unusedCandidates.length ? unusedCandidates : candidates;
-  const weightedCandidates = [
-    ...selectionPool,
-    ...selectionPool.filter(entry => getPlankLetterCount(entry.word) <= 14),
-    ...(safeDifficulty === "easy" ? selectionPool.filter(entry => getPlankLetterCount(entry.word) <= 11) : [])
-  ];
-  const entry = weightedCandidates[Math.floor(Math.random() * weightedCandidates.length)];
+  const entry = selectionPool[Math.floor(Math.random() * selectionPool.length)];
   const uniqueLetters = Array.from(new Set(entry.word.split("").filter(char => PLANK_LETTERS.includes(char))));
   const shuffledLetters = [...uniqueLetters].sort(() => Math.random() - 0.5);
   const startingGuesses = shuffledLetters.slice(0, Math.min(config.preReveal, Math.max(0, uniqueLetters.length - 2)));
@@ -2853,7 +2862,7 @@ export function PiratesPlankGame({ mode, room, localPlayer, players, updateRoomS
 
         <div style={{ display: 'flex', flexWrap: 'wrap', justifyContent: 'center', gap: '6px', marginTop: '-3px' }}>
           <span className="badge">{difficultyConfig.label}</span>
-          <span className="badge">{getPlankWordCount(word)} {getPlankWordCount(word) === 1 ? 'woord' : 'woorden'} · {getPlankLetterCount(word)} letters</span>
+          <span className="badge">{getPlankWordCount(word)} {getPlankWordCount(word) === 1 ? 'woord' : 'woorden'} · {getPlankLetterCount(word)} letters · {getPlankUniqueLetterCount(word)} verschillend</span>
           {difficultyConfig.showCategory && <span className="badge">Categorie: {wordCategory}</span>}
         </div>
         {difficultyConfig.showHint && (

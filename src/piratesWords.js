@@ -34,9 +34,18 @@ const CURATED_WORDS = [
   ['101 DALMATIERS', 'nl', 'Film', 'Een heleboel gevlekte puppy’s.']
 ];
 
-const SOURCE_KEYS = new Set(['answers', 'answer', 'movie_nl', 'movie_en', 'movie_aliases', 'character_nl', 'character_en', 'character', 'name', 'solution', 'optionA', 'optionB']);
+const SOURCE_KEYS = new Set(['answer', 'movie_nl', 'movie_en', 'movie_aliases', 'character_nl', 'character_en', 'character', 'name', 'solution']);
 
-const normalizeWord = value => String(value || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toUpperCase().replace(/[^A-Z0-9 '&-]/g, ' ').replace(/\s+/g, ' ').trim();
+// Some source questions contain short accepted aliases. For the Plank we always
+// use the complete, recognisable Disney name instead of such an answer fragment.
+const CANONICAL_PLANK_WORDS = new Map([
+  ['MIM', 'MADAM MIM']
+]);
+
+const normalizeWord = value => {
+  const normalized = String(value || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toUpperCase().replace(/[^A-Z0-9 '&-]/g, ' ').replace(/\s+/g, ' ').trim();
+  return CANONICAL_PLANK_WORDS.get(normalized) || normalized;
+};
 const slug = value => normalizeWord(value).toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '');
 const categoryForKey = key => key.startsWith('movie') ? 'Film' : key.startsWith('character') ? 'Personage' : 'Disney-kennis';
 const hintFor = (category, language) => category === 'Film'
@@ -46,13 +55,26 @@ const hintFor = (category, language) => category === 'Film'
     : (language === 'nl' ? 'Een bekend antwoord uit de Disney-wereld.' : 'A familiar answer from the world of Disney.');
 
 const extracted = [];
+const fallbackOptions = [];
 const collect = (value, key = '') => {
   if (typeof value === 'string') {
     if (SOURCE_KEYS.has(key)) extracted.push({ word: normalizeWord(value), key });
   } else if (Array.isArray(value)) {
     value.forEach(item => collect(item, key));
   } else if (value && typeof value === 'object') {
-    Object.entries(value).forEach(([childKey, child]) => collect(child, childKey));
+    if (Array.isArray(value.answers)) {
+      if (Number.isInteger(value.correct) && value.answers[value.correct] != null) {
+        value.answers.forEach((answer, index) => {
+          const target = index === value.correct ? extracted : fallbackOptions;
+          target.push({ word: normalizeWord(answer), key: 'answers' });
+        });
+      } else {
+        value.answers.forEach(answer => extracted.push({ word: normalizeWord(answer), key: 'answers' }));
+      }
+    }
+    Object.entries(value).forEach(([childKey, child]) => {
+      if (childKey !== 'answers') collect(child, childKey);
+    });
   }
 };
 DEFAULT_TASKS.forEach(task => collect(task));
@@ -72,8 +94,14 @@ const buildDatabase = () => {
   };
   CURATED_WORDS.forEach(([word, language, category, hint]) => add(language === 'nl' ? dutch : english, { word, category, hint }, language));
   extracted.filter(item => item.key.endsWith('_en') || item.key === 'movie_aliases').forEach(item => add(english, item, 'en'));
-  extracted.filter(item => item.key.endsWith('_nl') || ['answers', 'answer', 'optionA', 'optionB'].includes(item.key)).forEach(item => add(dutch, item, 'nl'));
+  extracted.filter(item => item.key.endsWith('_nl') || ['answers', 'answer'].includes(item.key)).forEach(item => add(dutch, item, 'nl'));
   extracted.forEach(item => {
+    if (english.length < ENGLISH_TARGET) add(english, item, 'en');
+    else if (dutch.length < DUTCH_TARGET) add(dutch, item, 'nl');
+  });
+  // The curated and correct-answer pool gets priority. Plausible alternative
+  // quiz options are only used to complete the requested 450/150 database.
+  fallbackOptions.forEach(item => {
     if (english.length < ENGLISH_TARGET) add(english, item, 'en');
     else if (dutch.length < DUTCH_TARGET) add(dutch, item, 'nl');
   });

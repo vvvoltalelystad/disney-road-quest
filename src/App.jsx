@@ -7414,7 +7414,7 @@ export default function App() {
                           {selectedArcadeGame === 'piratesplank' && (
                             <div style={{ background: '#07152c', border: '1px solid var(--line)', borderRadius: '12px', padding: '12px', marginBottom: '12px' }}>
                               <label style={{ display: 'block', marginBottom: '4px', fontSize: '13px', fontWeight: 'bold', color: 'var(--gold)' }}>Moeilijkheid Black Pearl</label>
-                              <div style={{ color: 'var(--muted)', fontSize: '11px', marginBottom: '9px' }}>Bepaalt de lengte, hints, kosten en het aantal strikes.</div>
+                              <div style={{ color: 'var(--muted)', fontSize: '11px', marginBottom: '9px' }}>Woorden worden ingedeeld op lengte en het aantal verschillende letters; het niveau bepaalt daarnaast hints, kosten en strikes.</div>
                               <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '8px' }}>
                                 {[
                                   { id: 'easy', label: 'Rustig' },
