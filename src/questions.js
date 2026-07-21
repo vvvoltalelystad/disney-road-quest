@@ -6654,12 +6654,12 @@ const ADULT_WHOAMI_HINTS = {
   'whoami-21': ['Ik handel impulsief vanuit een groot verlangen naar verbinding en interpreteer aandacht daardoor te snel als vertrouwen.', 'Mijn poging om een familieruzie te herstellen voert mij samen met een buitenstaander door een gevaarlijk winterlandschap.'],
   'whoami-22': ['Mijn reputatie is veel groter dan mijn bereidheid om verantwoordelijkheid te nemen voor de gevolgen van mijn daden.', 'De tekens op mijn lichaam vertellen prestaties, maar verbergen aanvankelijk één beslissende fout.'],
   'whoami-23': ['Ik behandel gastvrijheid als een voorstelling en blijf optimistisch terwijl mijn toekomst letterlijk aftelt.', 'Mijn houding tegenover een onverwachte gast staat haaks op die van mijn nauwgezette collega.'],
-  'whoami-24': ['Ik probeer orde te bewaren in een huishouden waar bovennatuurlijke omstandigheden elke routine hebben veranderd.', 'Ik wantrouw een onverwachte gast en bots daardoor voortdurend met een veel uitbundiger collega.'],
+  'whoami-24': ['Ik probeer orde te bewaren in een huishouden waar bovennatuurlijke omstandigheden elke routine hebben veranderd.', 'Ik wantrouw een onverwachte gast en bots daardoor voortdurend met een veel uitbundiger collega.', 'Mijn houten kast, opwindsleutel en slinger maken mij letterlijk tot de klok die steeds waarschuwt hoeveel tijd er nog resteert.'],
   'whoami-25': ['Mijn zorgzame aard maakt mij tot een stabiele ouderfiguur binnen een huishouden dat zijn menselijke vorm is kwijtgeraakt.', 'Mijn jonge familielid is nieuwsgieriger naar de gevangene dan ik verstandig vind.'],
   'whoami-26': ['Bewondering uit mijn omgeving heeft mij ervan overtuigd dat verlangen hetzelfde is als recht hebben op iemand.', 'Wanneer charme niet werkt, gebruik ik de angst van een gemeenschap voor een onbekend wezen.'],
   'whoami-27': ['Mijn officiële positie biedt voorrechten maar weinig zeggenschap over mijn eigen toekomst.', 'Ik verlaat incognito een beschermde omgeving en ontmoet iemand die zich later juist als hooggeplaatst voordoet.'],
   'whoami-28': ['Ik neem een verboden identiteit aan om een familielid te beschermen en moet vervolgens presteren binnen een systeem dat mij uitsluit.', 'Mijn succes hangt af van strategie en doorzettingsvermogen, niet van de fysieke norm waaraan men mij meet.'],
-  'whoami-29': ['Mijn verhalen over mijzelf zijn zelden volledig betrouwbaar, maar mijn improvisatievermogen redt mij uit de gevolgen.', 'Mijn vrijheid is verbonden aan zowel een bijzonder kompas als een schip dat anderen eveneens opeisen.'],
+  'whoami-29': ['Mijn verhalen over mijzelf zijn zelden volledig betrouwbaar, maar mijn improvisatievermogen redt mij uit de gevolgen.', 'Mijn vrijheid is verbonden aan zowel een bijzonder kompas als een schip dat anderen eveneens opeisen.', 'Mijn kompas wijst niet naar het noorden maar naar wat de drager het meest verlangt; ondertussen blijft de Black Pearl het middelpunt van mijn ontsnappingen.'],
   'whoami-30': ['Een beperking in mijn geheugen verhindert niet dat ik uitzonderlijk loyaal blijf aan een doel dat ik onderweg telkens opnieuw moet begrijpen.', 'Een korte boodschap uit mijn verleden blijkt belangrijker voor mijn identiteit dan ik aanvankelijk besef.'],
   'whoami-31': ['Angst na eerder verlies maakt mij overbeschermend tegenover het enige familielid dat mij nog rest.', 'Tijdens een lange zoektocht moet ik leren vertrouwen op een metgezel die informatie niet goed kan vasthouden.'],
   'whoami-32': ['De bezorgdheid van mijn ouder botst met mijn behoefte om te bewijzen dat een lichamelijk verschil mij niet definieert.', 'Een impulsieve daad brengt mij terecht in een menselijke omgeving waar ontsnappen alleen samen lukt.'],
@@ -6671,6 +6671,18 @@ const ADULT_WHOAMI_HINTS = {
   'whoami-38': ['Mijn talent om onopgemerkt te blijven voedt een rivaliteit waarin status belangrijker wordt dan veiligheid.', 'Ik saboteer een collega door samen te werken met een leidinggevende die vasthoudt aan een achterhaald systeem.'],
   'whoami-39': ['Een afgedwongen gewoon leven botst met mijn behoefte om mijn uitzonderlijke vermogen zinvol te gebruiken.', 'Mijn wens om weer actief te worden brengt mijn gezin in gevaar, waarna juist samenwerking de oplossing wordt.'],
   'whoami-40': ['Ik combineer gezinsverantwoordelijkheid met een professionele identiteit die ik lange tijd verborgen moet houden.', 'Mijn vermogen maakt infiltratie en redding mogelijk, maar in mijn gezin is flexibiliteit vooral figuurlijk nodig.']
+};
+
+// Keep the first two diary fragments indirect. The third fragment may contain
+// the unique plot combination, but none of the earlier fragments may print an
+// accepted character or film answer verbatim.
+const ADULT_DIARY_REFINEMENTS = {
+  'diary-56': {
+    part2: 'Na een wettelijk verbod verruil ik reddingswerk voor een kantoorbaan waarin ik klanten juist heimelijk probeer te helpen tegen het beleid van mijn werkgever.'
+  },
+  'diary-57': {
+    part2: 'Binnen ons gezin combineer ik strategisch leiderschap met de zorg voor drie kinderen, van wie de uiteenlopende talenten samenwerking noodzakelijk maken.'
+  }
 };
 
 const EMOJI_QUIZ_TASKS = [
@@ -6785,6 +6797,12 @@ DEFAULT_TASKS.forEach(task => {
   if (!adultHints) return;
   task.hint1 = adultHints[0];
   task.hint2 = adultHints[1];
+  if (adultHints[2]) task.hint3 = adultHints[2];
+});
+
+DEFAULT_TASKS.forEach(task => {
+  const refinement = ADULT_DIARY_REFINEMENTS[task.id];
+  if (refinement) Object.assign(task, refinement);
 });
 
 export const PRONUNCIATION_MAP = [];

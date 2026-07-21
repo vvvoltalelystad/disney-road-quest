@@ -8314,7 +8314,7 @@ export default function App() {
                               return (
                                 <div>
                                   <div className="notice" style={{ background: '#0a1c3c' }}>
-                                    <strong>Hint {activePart} van 3</strong> · iedereen ziet dezelfde hint en antwoordt op het eigen scherm.
+                                    <strong>Hint {activePart} van 3 · {activePart === 1 ? '5+ mogelijkheden' : activePart === 2 ? 'ongeveer 3 mogelijkheden' : '1 beslissende oplossing'}</strong> · iedereen ziet dezelfde hint en antwoordt op het eigen scherm.
                                   </div>
                                   <div style={{ padding: '14px', background: '#091c38', borderRadius: '12px', marginBottom: '14px', border: '1px solid var(--line)' }}>
                                     <p style={{ margin: 0, fontStyle: 'italic', fontSize: '16px', lineHeight: '1.5' }}>{fragment}</p>
@@ -8682,18 +8682,18 @@ export default function App() {
                                 <div>
                                   <div style={{ padding: '12px', background: '#091c38', borderRadius: '12px', marginBottom: '14px', border: '1px solid var(--line)' }}>
                                     <div style={{ marginBottom: '8px' }}>
-                                      <strong style={{ color: 'var(--gold)', display: 'block', fontSize: '13px' }}>Hint 1 (Gratis):</strong>
+                                      <strong style={{ color: 'var(--gold)', display: 'block', fontSize: '13px' }}>Hint 1 · breed spoor (5+ mogelijkheden) · 3 punten:</strong>
                                       <span style={{ fontSize: '15px' }}>{t.hint1}</span>
                                     </div>
                                     {hintLevel >= 2 && (
                                       <div style={{ marginTop: '12px', borderTop: '1px solid var(--line)', paddingTop: '8px' }}>
-                                        <strong style={{ color: 'var(--gold)', display: 'block', fontSize: '13px' }}>Hint 2 (Kosten: -1 punt):</strong>
+                                        <strong style={{ color: 'var(--gold)', display: 'block', fontSize: '13px' }}>Hint 2 · sterke vernauwing (ongeveer 3 mogelijkheden) · 2 punten:</strong>
                                         <span style={{ fontSize: '15px' }}>{t.hint2}</span>
                                       </div>
                                     )}
                                     {hintLevel >= 3 && (
                                       <div style={{ marginTop: '12px', borderTop: '1px solid var(--line)', paddingTop: '8px' }}>
-                                        <strong style={{ color: 'var(--gold)', display: 'block', fontSize: '13px' }}>Hint 3 (Kosten: -2 punten):</strong>
+                                        <strong style={{ color: 'var(--gold)', display: 'block', fontSize: '13px' }}>Hint 3 · beslissende combinatie (1 oplossing) · 1 punt:</strong>
                                         <span style={{ fontSize: '15px' }}>{t.hint3}</span>
                                       </div>
                                     )}
