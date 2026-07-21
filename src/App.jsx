@@ -2731,7 +2731,9 @@ export default function App() {
         if (readError) throw readError;
         if (!store?.id) throw new Error('De centrale profielopslag is niet gevonden.');
         const currentState = store.current_task_state || {};
-        const currentBalance = Number(currentState.coco_bank?.[key]) || 0;
+        const currentLogs = currentState.coco_captains_log || {};
+        const reconciledBank = reconcileBankWithCaptainsLogs(currentState.coco_bank || {}, currentLogs);
+        const currentBalance = Number(reconciledBank[key]) || 0;
         if (currentBalance < BADGE_PACK_COST) {
           window.alert('Dit profiel heeft niet genoeg Coco Coins voor een badgepakje.');
           return;
@@ -2742,12 +2744,11 @@ export default function App() {
         wonBadges.forEach(badge => {
           nextProfileBadges[badge.id] = (Number(nextProfileBadges[badge.id]) || 0) + 1;
         });
-        const nextBank = { ...(currentState.coco_bank || {}), [key]: currentBalance - BADGE_PACK_COST };
+        const nextBank = { ...reconciledBank, [key]: currentBalance - BADGE_PACK_COST };
         const nextCollections = {
           ...(currentState.coco_badge_collections || {}),
           [key]: nextProfileBadges
         };
-        const currentLogs = currentState.coco_captains_log || {};
         const logName = Object.keys(currentLogs).find(profileName => getCollectorKey(profileName) === key) || name;
         const now = new Date().toISOString();
         const nextLogs = {
@@ -6431,8 +6432,8 @@ export default function App() {
                     e.stopPropagation();
                     if (selectedPortalGame === 'music_match') {
                       window.location.href = room?.code
-                        ? `./music/index.html?room=${room.code}&v=81`
-                        : './music/index.html?v=81';
+                        ? `./music/index.html?room=${room.code}&v=82`
+                        : './music/index.html?v=82';
                     } else {
                       setSelectedPortalGame('music_match');
                     }
