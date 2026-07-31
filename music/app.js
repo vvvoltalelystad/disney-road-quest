@@ -131,7 +131,72 @@ function scorebar(){const count=state.players.length;return `<div class="scoreba
 function progress(){if(!state.room?.total_rounds)return'';let n=state.room.current_round_no||0,t=state.room.total_rounds;return `<div class="progress"><i style="width:${Math.min(100,n/t*100)}%"></i></div><p class="small" style="text-align:center;margin:6px 0 12px">Ronde ${n} van ${t}</p>`}
 async function fetchSongs(){let r=await state.sb.from('dmq_songs').select('*').order('song_number');if(r.error)throw r.error;state.songs=r.data||[]}
 async function loadRoom(id,show=true){try{if(show)loading('Kamer openen…');let r=await state.sb.from('dmq_rooms').select('*').eq('id',id).single();if(r.error)return false;let p=await state.sb.from('dmq_players').select('*').eq('room_id',id).order('joined_at');if(p.error)throw p.error;const players=p.data||[];const me=players.find(x=>x.user_id===state.user.id)||null;const isHost=r.data.host_user_id===state.user.id;if(!isHost&&!me){localStorage.removeItem('dmq-v2-room');return false}state.room=r.data;state.players=players;state.me=me;localStorage.setItem('dmq-v2-room',id);await fetchRound();subscribe();render();return true}catch(e){console.error(e);return false}}
-async function fetchRound(){if(!state.room?.current_round_no)return;let r=await state.sb.from('dmq_rounds').select('*').eq('room_id',state.room.id).eq('round_no',state.room.current_round_no).maybeSingle();if(r.error)throw r.error;if(r.data && (!state.round || state.round.id !== r.data.id)){state.currentAnswer={film:'',title:'',year:'',text:'',artist:'',year_period:null};state.answerPhaseStartedAt=null;state.reviewFinalPoints=null;state.reviewCorrectionNote=null}state.round=r.data;if(r.data){let a=await state.sb.from('dmq_answers').select('*').eq('round_id',r.data.id);if(a.error)throw a.error;state.answers=(a.data||[]).map(answer=>({...answer,note:answer.correction_note||''}));let allRResult=await state.sb.from('dmq_rounds').select('*').eq('room_id',state.room.id).order('round_no',{ascending:true});state.allRounds=allRResult.data||[];let allAResult=await state.sb.from('dmq_answers').select('*').eq('room_id',state.room.id);state.allAnswers=allAResult.data||[]}}
+async function fetchRound(){
+    if(!state.room?.current_round_no)return;
+
+    let r=await state.sb
+        .from('dmq_rounds')
+        .select('*')
+        .eq('room_id',state.room.id)
+        .eq('round_no',state.room.current_round_no)
+        .maybeSingle();
+
+    if(r.error)throw r.error;
+
+    if(r.data&&(!state.round||state.round.id!==r.data.id)){
+        state.currentAnswer={
+            film:'',
+            title:'',
+            year:'',
+            text:'',
+            artist:'',
+            year_period:null
+        };
+        state.answerPhaseStartedAt=null;
+        state.reviewFinalPoints=null;
+        state.reviewCorrectionNote=null;
+    }
+
+    state.round=r.data;
+
+    if(r.data){
+        let a=await state.sb
+            .from('dmq_answers')
+            .select('*')
+            .eq('round_id',r.data.id);
+
+        if(a.error)throw a.error;
+
+        state.answers=(a.data||[]).map(answer=>({
+            ...answer,
+            note:answer.correction_note||''
+        }));
+
+        if(state.room?.settings?.jackpot||state.room?.status==='finished'){
+            await fetchGameHistory();
+        }
+    }
+}
+async function fetchGameHistory(){
+    let allRResult=await state.sb
+        .from('dmq_rounds')
+        .select('*')
+        .eq('room_id',state.room.id)
+        .order('round_no',{ascending:true});
+
+    if(allRResult.error)throw allRResult.error;
+
+    state.allRounds=allRResult.data||[];
+
+    let allAResult=await state.sb
+        .from('dmq_answers')
+        .select('*')
+        .eq('room_id',state.room.id);
+
+    if(allAResult.error)throw allAResult.error;
+
+    state.allAnswers=allAResult.data||[];
+}
 let rt=null;function schedule(){clearTimeout(rt);rt=setTimeout(refreshAll,130)}
 async function refreshAll(){
     if(state.refreshing){
